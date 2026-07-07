@@ -1,0 +1,1243 @@
+{
+  "ARIYALUR": [
+    {
+      "no": 149,
+      "name": "ARIYALUR",
+      "booths": 330
+    },
+    {
+      "no": 150,
+      "name": "JAYANKONDAM",
+      "booths": 320
+    }
+  ],
+  "CHENGALPATTU": [
+    {
+      "no": 32,
+      "name": "CHENGALPATTU",
+      "booths": 496
+    },
+    {
+      "no": 34,
+      "name": "CHEYYUR",
+      "booths": 287
+    },
+    {
+      "no": 35,
+      "name": "MADURANTAKAM",
+      "booths": 285
+    },
+    {
+      "no": 30,
+      "name": "PALLAVARAM",
+      "booths": 468
+    },
+    {
+      "no": 31,
+      "name": "TAMBARAM",
+      "booths": 465
+    },
+    {
+      "no": 33,
+      "name": "THIRUPORUR",
+      "booths": 369
+    }
+  ],
+  "CHENNAI": [
+    {
+      "no": 8,
+      "name": "AMBATTUR",
+      "booths": 364
+    },
+    {
+      "no": 21,
+      "name": "ANNA NAGAR",
+      "booths": 273
+    },
+    {
+      "no": 19,
+      "name": "CHEPAUK-THIRUVALLIKENI",
+      "booths": 235
+    },
+    {
+      "no": 11,
+      "name": "DR.RADHAKRISHNAN NAGAR",
+      "booths": 246
+    },
+    {
+      "no": 16,
+      "name": "EGMORE",
+      "booths": 200
+    },
+    {
+      "no": 18,
+      "name": "HARBOUR",
+      "booths": 192
+    },
+    {
+      "no": 13,
+      "name": "KOLATHUR",
+      "booths": 286
+    },
+    {
+      "no": 9,
+      "name": "MADAVARAM",
+      "booths": 521
+    },
+    {
+      "no": 25,
+      "name": "MYLAPORE",
+      "booths": 272
+    },
+    {
+      "no": 12,
+      "name": "PERAMBUR",
+      "booths": 298
+    },
+    {
+      "no": 17,
+      "name": "ROYAPURAM",
+      "booths": 194
+    },
+    {
+      "no": 23,
+      "name": "SAIDAPET",
+      "booths": 282
+    },
+    {
+      "no": 27,
+      "name": "SHOZHINGANALLUR",
+      "booths": 700
+    },
+    {
+      "no": 15,
+      "name": "THIRU-VI-KA-NAGAR",
+      "booths": 223
+    },
+    {
+      "no": 10,
+      "name": "THIRUVOTTIYUR",
+      "booths": 344
+    },
+    {
+      "no": 24,
+      "name": "THIYAGARAYANAGAR",
+      "booths": 2026
+    },
+    {
+      "no": 20,
+      "name": "THOUSAND LIGHTS",
+      "booths": 247
+    },
+    {
+      "no": 26,
+      "name": "VELACHERY",
+      "booths": 314
+    },
+    {
+      "no": 14,
+      "name": "VILLIVAKKAM",
+      "booths": 255
+    },
+    {
+      "no": 22,
+      "name": "VIRUGAMPAKKAM",
+      "booths": 311
+    }
+  ],
+  "COIMBATORE": [
+    {
+      "no": 118,
+      "name": "COIMBATORE (NORTH)",
+      "booths": 339
+    },
+    {
+      "no": 120,
+      "name": "COIMBATORE (SOUTH)",
+      "booths": 283
+    },
+    {
+      "no": 117,
+      "name": "KAVUNDAMPALAYAM",
+      "booths": 547
+    },
+    {
+      "no": 122,
+      "name": "KINATHUKADAVU",
+      "booths": 377
+    },
+    {
+      "no": 111,
+      "name": "METTUPPALAYAM",
+      "booths": 360
+    },
+    {
+      "no": 123,
+      "name": "POLLACHI",
+      "booths": 281
+    },
+    {
+      "no": 121,
+      "name": "SINGANALLUR",
+      "booths": 358
+    },
+    {
+      "no": 116,
+      "name": "SULUR",
+      "booths": 385
+    },
+    {
+      "no": 119,
+      "name": "THONDAMUTHUR",
+      "booths": 0
+    },
+    {
+      "no": 124,
+      "name": "VALPARAI",
+      "booths": 262
+    }
+  ],
+  "CUDDALORE": [
+    {
+      "no": 157,
+      "name": "BHUVANAGIRI",
+      "booths": 304
+    },
+    {
+      "no": 158,
+      "name": "CHIDAMBARAM",
+      "booths": 298
+    },
+    {
+      "no": 155,
+      "name": "CUDDALORE",
+      "booths": 258
+    },
+    {
+      "no": 159,
+      "name": "KATTUMANNARKOIL",
+      "booths": 291
+    },
+    {
+      "no": 153,
+      "name": "NEYVELI",
+      "booths": 256
+    },
+    {
+      "no": 154,
+      "name": "PANRUTI",
+      "booths": 309
+    },
+    {
+      "no": 151,
+      "name": "TITTAKUDI",
+      "booths": 279
+    },
+    {
+      "no": 152,
+      "name": "VRIDDHACHALAM",
+      "booths": 317
+    }
+  ],
+  "DHARMAPURI": [
+    {
+      "no": 59,
+      "name": "DHARMAPURI",
+      "booths": 320
+    },
+    {
+      "no": 61,
+      "name": "HARUR",
+      "booths": 322
+    },
+    {
+      "no": 57,
+      "name": "PALACODU",
+      "booths": 312
+    },
+    {
+      "no": 60,
+      "name": "PAPPIREDDIPATTI",
+      "booths": 322
+    },
+    {
+      "no": 58,
+      "name": "PENNAGARAM",
+      "booths": 320
+    }
+  ],
+  "DINDIGUL": [
+    {
+      "no": 129,
+      "name": "ATHOOR",
+      "booths": 341
+    },
+    {
+      "no": 132,
+      "name": "DINDIGUL",
+      "booths": 316
+    },
+    {
+      "no": 131,
+      "name": "NATHAM",
+      "booths": 359
+    },
+    {
+      "no": 130,
+      "name": "NILAKKOTTAI",
+      "booths": 305
+    },
+    {
+      "no": 128,
+      "name": "ODDANCHATRAM",
+      "booths": 314
+    },
+    {
+      "no": 127,
+      "name": "PALANI",
+      "booths": 339
+    },
+    {
+      "no": 133,
+      "name": "VEDASANDUR",
+      "booths": 327
+    }
+  ],
+  "ERODE": [
+    {
+      "no": 105,
+      "name": "ANTHIYUR",
+      "booths": 271
+    },
+    {
+      "no": 104,
+      "name": "BHAVANI",
+      "booths": 306
+    },
+    {
+      "no": 107,
+      "name": "BHAVANISAGAR",
+      "booths": 327
+    },
+    {
+      "no": 98,
+      "name": "ERODE (EAST)",
+      "booths": 259
+    },
+    {
+      "no": 99,
+      "name": "ERODE (WEST)",
+      "booths": 325
+    },
+    {
+      "no": 106,
+      "name": "GOBICHETTIPALAYAM",
+      "booths": 309
+    },
+    {
+      "no": 102,
+      "name": "KANGAYAM",
+      "booths": 0
+    },
+    {
+      "no": 100,
+      "name": "MODAKKURICHI",
+      "booths": 290
+    }
+  ],
+  "KALLAKURICHI": [
+    {
+      "no": 80,
+      "name": "KALLAKURICHI",
+      "booths": 370
+    },
+    {
+      "no": 78,
+      "name": "RISHIVANDIYAM",
+      "booths": 350
+    },
+    {
+      "no": 79,
+      "name": "SANKARAPURAM",
+      "booths": 340
+    },
+    {
+      "no": 77,
+      "name": "ULUNDURPETTAI",
+      "booths": 375
+    }
+  ],
+  "KANCHEEPURAM": [
+    {
+      "no": 28,
+      "name": "ALANDUR",
+      "booths": 431
+    },
+    {
+      "no": 37,
+      "name": "KANCHEEPURAM",
+      "booths": 358
+    },
+    {
+      "no": 29,
+      "name": "SRIPERUMBUDUR",
+      "booths": 435
+    },
+    {
+      "no": 36,
+      "name": "UTHIRAMERUR",
+      "booths": 321
+    }
+  ],
+  "KANNIYAKUMARI": [
+    {
+      "no": 231,
+      "name": "COLACHAL",
+      "booths": 316
+    },
+    {
+      "no": 229,
+      "name": "KANNIYAKUMARI",
+      "booths": 363
+    },
+    {
+      "no": 234,
+      "name": "KILLIYOOR",
+      "booths": 301
+    },
+    {
+      "no": 230,
+      "name": "NAGERCOIL",
+      "booths": 322
+    },
+    {
+      "no": 232,
+      "name": "PADMANABHAPURAM",
+      "booths": 312
+    },
+    {
+      "no": 233,
+      "name": "VILAVANCODE",
+      "booths": 300
+    }
+  ],
+  "KARUR": [
+    {
+      "no": 134,
+      "name": "ARAVAKURICHI",
+      "booths": 267
+    },
+    {
+      "no": 135,
+      "name": "KARUR",
+      "booths": 283
+    },
+    {
+      "no": 136,
+      "name": "KRISHNARAYAPURAM",
+      "booths": 275
+    },
+    {
+      "no": 137,
+      "name": "KULITHALAI",
+      "booths": 286
+    }
+  ],
+  "KRISHNAGIRI": [
+    {
+      "no": 52,
+      "name": "BARGUR",
+      "booths": 324
+    },
+    {
+      "no": 55,
+      "name": "HOSUR",
+      "booths": 445
+    },
+    {
+      "no": 53,
+      "name": "KRISHNAGIRI",
+      "booths": 340
+    },
+    {
+      "no": 56,
+      "name": "THALLI",
+      "booths": 321
+    },
+    {
+      "no": 51,
+      "name": "UTHANGARAI",
+      "booths": 319
+    },
+    {
+      "no": 54,
+      "name": "VEPPANAHALLI",
+      "booths": 343
+    }
+  ],
+  "MADURAI": [
+    {
+      "no": 193,
+      "name": "MADURAI CENTRAL",
+      "booths": 253
+    },
+    {
+      "no": 189,
+      "name": "MADURAI EAST",
+      "booths": 398
+    },
+    {
+      "no": 191,
+      "name": "MADURAI NORTH",
+      "booths": 266
+    },
+    {
+      "no": 192,
+      "name": "MADURAI SOUTH",
+      "booths": 236
+    },
+    {
+      "no": 194,
+      "name": "MADURAI WEST",
+      "booths": 327
+    },
+    {
+      "no": 188,
+      "name": "MELUR",
+      "booths": 291
+    },
+    {
+      "no": 190,
+      "name": "SHOLAVANDAN",
+      "booths": 261
+    },
+    {
+      "no": 196,
+      "name": "THIRUMANGALAM",
+      "booths": 350
+    },
+    {
+      "no": 195,
+      "name": "THIRUPARANKUNDRAM",
+      "booths": 352
+    },
+    {
+      "no": 197,
+      "name": "USILAMPATTI",
+      "booths": 342
+    }
+  ],
+  "MAYILADUTHURAI": [
+    {
+      "no": 161,
+      "name": "MAYILADUTHURAI",
+      "booths": 303
+    },
+    {
+      "no": 162,
+      "name": "POOMPUHAR",
+      "booths": 342
+    },
+    {
+      "no": 160,
+      "name": "SIRKAZHI",
+      "booths": 305
+    }
+  ],
+  "NAGAPATTINAM": [
+    {
+      "no": 164,
+      "name": "KILVELUR",
+      "booths": 220
+    },
+    {
+      "no": 163,
+      "name": "NAGAPATTINAM",
+      "booths": 240
+    },
+    {
+      "no": 165,
+      "name": "VEDARANYAM",
+      "booths": 240
+    }
+  ],
+  "NAMAKKAL": [
+    {
+      "no": 97,
+      "name": "KUMARAPALAYAM",
+      "booths": 324
+    },
+    {
+      "no": 94,
+      "name": "NAMAKKAL",
+      "booths": 290
+    },
+    {
+      "no": 95,
+      "name": "PARAMATHI-VELUR",
+      "booths": 268
+    },
+    {
+      "no": 92,
+      "name": "RASIPURAM",
+      "booths": 285
+    },
+    {
+      "no": 93,
+      "name": "SENTHAMANGALAM",
+      "booths": 304
+    },
+    {
+      "no": 96,
+      "name": "TIRUCHENGODU",
+      "booths": 289
+    }
+  ],
+  "PERAMBALUR": [
+    {
+      "no": 148,
+      "name": "KUNNAM",
+      "booths": 345
+    },
+    {
+      "no": 147,
+      "name": "PERAMBALUR",
+      "booths": 387
+    }
+  ],
+  "PUDUKKOTTAI": [
+    {
+      "no": 182,
+      "name": "ALANGUDI",
+      "booths": 258
+    },
+    {
+      "no": 183,
+      "name": "ARANTHANGI",
+      "booths": 302
+    },
+    {
+      "no": 178,
+      "name": "GANDARVAKKOTTAI",
+      "booths": 250
+    },
+    {
+      "no": 180,
+      "name": "PUDUKKOTTAI",
+      "booths": 295
+    },
+    {
+      "no": 181,
+      "name": "THIRUMAYAM",
+      "booths": 300
+    },
+    {
+      "no": 179,
+      "name": "VIRALIMALAI",
+      "booths": 276
+    }
+  ],
+  "RAMANATHAPURAM": [
+    {
+      "no": 212,
+      "name": "MUDHUKULATHUR",
+      "booths": 414
+    },
+    {
+      "no": 209,
+      "name": "PARAMAKUDI",
+      "booths": 323
+    },
+    {
+      "no": 211,
+      "name": "RAMANATHAPURAM",
+      "booths": 399
+    },
+    {
+      "no": 210,
+      "name": "TIRUVADANAI",
+      "booths": 378
+    }
+  ],
+  "RANIPET": [
+    {
+      "no": 38,
+      "name": "ARAKKONAM",
+      "booths": 284
+    },
+    {
+      "no": 41,
+      "name": "RANIPET",
+      "booths": 304
+    },
+    {
+      "no": 39,
+      "name": "SHOLINGHUR",
+      "booths": 341
+    }
+  ],
+  "SALEM": [
+    {
+      "no": 82,
+      "name": "ATTUR",
+      "booths": 306
+    },
+    {
+      "no": 86,
+      "name": "EDAPPADI",
+      "booths": 0
+    },
+    {
+      "no": 81,
+      "name": "GANGAVALLI",
+      "booths": 280
+    },
+    {
+      "no": 85,
+      "name": "METTUR",
+      "booths": 327
+    },
+    {
+      "no": 84,
+      "name": "OMALUR",
+      "booths": 362
+    },
+    {
+      "no": 89,
+      "name": "SALEM (NORTH)",
+      "booths": 286
+    },
+    {
+      "no": 90,
+      "name": "SALEM (SOUTH)",
+      "booths": 268
+    },
+    {
+      "no": 88,
+      "name": "SALEM (WEST)",
+      "booths": 310
+    },
+    {
+      "no": 87,
+      "name": "SANKARI",
+      "booths": 339
+    },
+    {
+      "no": 91,
+      "name": "VEERAPANDI",
+      "booths": 312
+    },
+    {
+      "no": 83,
+      "name": "YERCAUD",
+      "booths": 336
+    }
+  ],
+  "SIVAGANGA": [
+    {
+      "no": 184,
+      "name": "KARAIKUDI",
+      "booths": 388
+    },
+    {
+      "no": 187,
+      "name": "MANAMADURAI",
+      "booths": 369
+    },
+    {
+      "no": 186,
+      "name": "SIVAGANGA",
+      "booths": 393
+    },
+    {
+      "no": 185,
+      "name": "TIRUPPATTUR",
+      "booths": 368
+    }
+  ],
+  "TENKASI": [
+    {
+      "no": 223,
+      "name": "ALANGULAM",
+      "booths": 332
+    },
+    {
+      "no": 221,
+      "name": "KADAYANALLUR",
+      "booths": 364
+    },
+    {
+      "no": 219,
+      "name": "SANKARANKOVIL",
+      "booths": 315
+    },
+    {
+      "no": 222,
+      "name": "TENKASI",
+      "booths": 359
+    },
+    {
+      "no": 220,
+      "name": "VASUDEVANALLUR",
+      "booths": 310
+    }
+  ],
+  "THANJAVUR": [
+    {
+      "no": 171,
+      "name": "KUMBAKONAM",
+      "booths": 300
+    },
+    {
+      "no": 175,
+      "name": "ORATHANADU",
+      "booths": 314
+    },
+    {
+      "no": 172,
+      "name": "PAPANASAM",
+      "booths": 315
+    },
+    {
+      "no": 176,
+      "name": "PATTUKKOTTAI",
+      "booths": 310
+    },
+    {
+      "no": 177,
+      "name": "PERAVURANI",
+      "booths": 284
+    },
+    {
+      "no": 174,
+      "name": "THANJAVUR",
+      "booths": 309
+    },
+    {
+      "no": 173,
+      "name": "THIRUVAIYARU",
+      "booths": 338
+    },
+    {
+      "no": 170,
+      "name": "THIRUVIDAIMARUDUR",
+      "booths": 326
+    }
+  ],
+  "THE NILGIRIS": [
+    {
+      "no": 110,
+      "name": "COONOOR",
+      "booths": 244
+    },
+    {
+      "no": 109,
+      "name": "GUDALUR",
+      "booths": 238
+    },
+    {
+      "no": 108,
+      "name": "UDHAGAMANDALAM",
+      "booths": 254
+    }
+  ],
+  "THENI": [
+    {
+      "no": 198,
+      "name": "ANDIPATTI",
+      "booths": 344
+    },
+    {
+      "no": 200,
+      "name": "BODINAYAKANUR",
+      "booths": 346
+    },
+    {
+      "no": 201,
+      "name": "CUMBUM",
+      "booths": 345
+    },
+    {
+      "no": 199,
+      "name": "PERIYAKULAM",
+      "booths": 359
+    }
+  ],
+  "THIRUVALLUR": [
+    {
+      "no": 6,
+      "name": "AVADI",
+      "booths": 499
+    },
+    {
+      "no": 1,
+      "name": "GUMMIDIPOONDI",
+      "booths": 344
+    },
+    {
+      "no": 7,
+      "name": "MADURAVOYAL",
+      "booths": 482
+    },
+    {
+      "no": 2,
+      "name": "PONNERI",
+      "booths": 327
+    },
+    {
+      "no": 5,
+      "name": "POONAMALLEE",
+      "booths": 452
+    },
+    {
+      "no": 4,
+      "name": "THIRUVALLUR",
+      "booths": 335
+    },
+    {
+      "no": 3,
+      "name": "TIRUTTANI",
+      "booths": 337
+    }
+  ],
+  "THIRUVARUR": [
+    {
+      "no": 167,
+      "name": "MANNARGUDI",
+      "booths": 307
+    },
+    {
+      "no": 169,
+      "name": "NANNILAM",
+      "booths": 344
+    },
+    {
+      "no": 166,
+      "name": "THIRUTHURAIPOONDI",
+      "booths": 293
+    },
+    {
+      "no": 168,
+      "name": "THIRUVARUR",
+      "booths": 327
+    }
+  ],
+  "THOOTHUKUDI": [
+    {
+      "no": 218,
+      "name": "KOVILPATTI",
+      "booths": 315
+    },
+    {
+      "no": 217,
+      "name": "OTTAPIDARAM",
+      "booths": 315
+    },
+    {
+      "no": 216,
+      "name": "SRIVAIKUNTAM",
+      "booths": 293
+    },
+    {
+      "no": 214,
+      "name": "THOOTHUKKUDI",
+      "booths": 360
+    },
+    {
+      "no": 215,
+      "name": "TIRUCHENDUR",
+      "booths": 307
+    },
+    {
+      "no": 213,
+      "name": "VILATHIKULAM",
+      "booths": 274
+    }
+  ],
+  "TIRUCHIRAPPALLI": [
+    {
+      "no": 143,
+      "name": "LALGUDI",
+      "booths": 276
+    },
+    {
+      "no": 144,
+      "name": "MANACHANALLUR",
+      "booths": 0
+    },
+    {
+      "no": 138,
+      "name": "MANAPPARAI",
+      "booths": 346
+    },
+    {
+      "no": 145,
+      "name": "MUSIRI",
+      "booths": 283
+    },
+    {
+      "no": 139,
+      "name": "SRIRANGAM",
+      "booths": 366
+    },
+    {
+      "no": 142,
+      "name": "THIRUVERUMBUR",
+      "booths": 312
+    },
+    {
+      "no": 146,
+      "name": "THURAIYUR",
+      "booths": 297
+    },
+    {
+      "no": 141,
+      "name": "TIRUCHIRAPPALLI (EAST)",
+      "booths": 304
+    },
+    {
+      "no": 140,
+      "name": "TIRUCHIRAPPALLI (WEST)",
+      "booths": 305
+    }
+  ],
+  "TIRUNELVELI": [
+    {
+      "no": 225,
+      "name": "AMBASAMUDRAM",
+      "booths": 321
+    },
+    {
+      "no": 227,
+      "name": "NANGUNERI",
+      "booths": 349
+    },
+    {
+      "no": 226,
+      "name": "PALAYAMKOTTAI",
+      "booths": 296
+    },
+    {
+      "no": 228,
+      "name": "RADHAPURAM",
+      "booths": 326
+    },
+    {
+      "no": 224,
+      "name": "TIRUNELVELI",
+      "booths": 386
+    }
+  ],
+  "TIRUPATHUR": [
+    {
+      "no": 48,
+      "name": "AMBUR",
+      "booths": 300
+    },
+    {
+      "no": 49,
+      "name": "JOLARPET",
+      "booths": 287
+    },
+    {
+      "no": 50,
+      "name": "TIRUPATTUR",
+      "booths": 303
+    },
+    {
+      "no": 47,
+      "name": "VANIYAMBADI",
+      "booths": 312
+    }
+  ],
+  "TIRUPPUR": [
+    {
+      "no": 112,
+      "name": "AVANASHI",
+      "booths": 372
+    },
+    {
+      "no": 101,
+      "name": "DHARAPURAM",
+      "booths": 320
+    },
+    {
+      "no": 126,
+      "name": "MADATHUKULAM",
+      "booths": 294
+    },
+    {
+      "no": 115,
+      "name": "PALLADAM",
+      "booths": 0
+    },
+    {
+      "no": 103,
+      "name": "PERUNDURAI",
+      "booths": 292
+    },
+    {
+      "no": 113,
+      "name": "TIRUPPUR (NORTH)",
+      "booths": 442
+    },
+    {
+      "no": 114,
+      "name": "TIRUPPUR (SOUTH)",
+      "booths": 289
+    },
+    {
+      "no": 125,
+      "name": "UDUMALAIPETTAI",
+      "booths": 307
+    }
+  ],
+  "TIRUVANNAMALAI": [
+    {
+      "no": 67,
+      "name": "ARANI",
+      "booths": 323
+    },
+    {
+      "no": 62,
+      "name": "CHENGAM",
+      "booths": 341
+    },
+    {
+      "no": 68,
+      "name": "CHEYYAR",
+      "booths": 334
+    },
+    {
+      "no": 65,
+      "name": "KALASAPAKKAM",
+      "booths": 301
+    },
+    {
+      "no": 64,
+      "name": "KILPENNATHUR",
+      "booths": 307
+    },
+    {
+      "no": 66,
+      "name": "POLUR",
+      "booths": 299
+    },
+    {
+      "no": 63,
+      "name": "TIRUVANNAMALAI",
+      "booths": 318
+    },
+    {
+      "no": 69,
+      "name": "VANDAVASI",
+      "booths": 293
+    }
+  ],
+  "VELLORE": [
+    {
+      "no": 44,
+      "name": "ANAIKATTU",
+      "booths": 295
+    },
+    {
+      "no": 42,
+      "name": "ARCOT",
+      "booths": 318
+    },
+    {
+      "no": 46,
+      "name": "GUDIYATTAM",
+      "booths": 319
+    },
+    {
+      "no": 40,
+      "name": "KATPADI",
+      "booths": 280
+    },
+    {
+      "no": 45,
+      "name": "KILVAITHINANKUPPAM",
+      "booths": 265
+    },
+    {
+      "no": 43,
+      "name": "VELLORE",
+      "booths": 268
+    }
+  ],
+  "VILUPPURAM": [
+    {
+      "no": 70,
+      "name": "GINGEE",
+      "booths": 320
+    },
+    {
+      "no": 71,
+      "name": "MAILAM",
+      "booths": 277
+    },
+    {
+      "no": 72,
+      "name": "TINDIVANAM",
+      "booths": 293
+    },
+    {
+      "no": 76,
+      "name": "TIRUKKOYILUR",
+      "booths": 330
+    },
+    {
+      "no": 73,
+      "name": "VANUR",
+      "booths": 299
+    },
+    {
+      "no": 75,
+      "name": "VIKRAVANDI",
+      "booths": 310
+    },
+    {
+      "no": 74,
+      "name": "VILUPPURAM",
+      "booths": 337
+    }
+  ],
+  "VIRUDHUNAGAR": [
+    {
+      "no": 207,
+      "name": "ARUPPUKKOTTAI",
+      "booths": 270
+    },
+    {
+      "no": 202,
+      "name": "RAJAPALAYAM",
+      "booths": 269
+    },
+    {
+      "no": 204,
+      "name": "SATTUR",
+      "booths": 291
+    },
+    {
+      "no": 205,
+      "name": "SIVAKASI",
+      "booths": 288
+    },
+    {
+      "no": 203,
+      "name": "SRIVILLIPUTHUR",
+      "booths": 308
+    },
+    {
+      "no": 208,
+      "name": "TIRUCHULI",
+      "booths": 292
+    },
+    {
+      "no": 206,
+      "name": "VIRUDHUNAGAR",
+      "booths": 281
+    }
+  ]
+}

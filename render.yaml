@@ -1,0 +1,76 @@
+services:
+  # ── Frontend — Static Site (free, never sleeps, CDN-served) ──────────────
+  - type: web
+    name: bjptn-frontend
+    env: static
+    buildCommand: cd frontend && npm install && npm run build
+    staticPublishPath: frontend/dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_API_URL
+        sync: false # Set to your backend URL e.g. https://bjptn-backend.onrender.com
+
+  # ── Backend — Web Service (free tier + UptimeRobot keep-alive) ───────────
+  - type: web
+    name: bjptn-backend
+    env: node
+    region: oregon
+    plan: free
+    buildCommand: cd backend && npm install
+    startCommand: cd backend && node src/index.js
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PUPPETEER_CACHE_DIR
+        value: /opt/render/.cache/puppeteer
+
+      # ── Secrets — set these as Render Secret environment variables ──
+      # Never commit actual values. Set via Render dashboard → Environment.
+      - key: MONGO_URI
+        sync: false # Mark as secret — set in dashboard
+      - key: MONGO_DB
+        value: wetheleaders
+      - key: MONGO_VOTER_URL
+        sync: false
+      - key: MONGO_VOTER_DB_NAME
+        value: voter_db
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      - key: CLOUDINARY_PHOTO_FOLDER
+        value: member_photos
+      - key: CLOUDINARY_CARDS_FOLDER
+        value: generated_cards
+      - key: ADMIN_USERNAME
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: SESSION_SECRET
+        generateValue: true # Render generates a strong random value
+      - key: SMS_API_KEY
+        sync: false
+      - key: WHATSAPP_VERIFY_TOKEN
+        sync: false
+      - key: WHATSAPP_APP_SECRET
+        sync: false
+      - key: WHATSAPP_ACCESS_TOKEN
+        sync: false
+      - key: WHATSAPP_PHONE_NUMBER_ID
+        sync: false
+      - key: BASE_URL
+        sync: false # Set to your production domain e.g. https://we-the-leader.onrender.com
+      - key: WHATSAPP_WABA_ID
+        sync: false
+      - key: WHATSAPP_FLOW_PRIVATE_KEY
+        sync: false # RSA private key (newlines as \n)
+      - key: WHATSAPP_FLOW_REGISTRATION_ID
+        sync: false # Updated after recreate-flows.js
+      - key: WHATSAPP_FLOW_LOGIN_ID
+        sync: false # Updated after recreate-flows.js

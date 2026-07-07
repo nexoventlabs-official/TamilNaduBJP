@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<title>BJP Tamil Nadu Member ID Card</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,400&family=Barlow+Condensed:wght@600;700;800;900&family=Poppins:wght@400;500;600;700;800&family=Great+Vibes&display=swap" rel="stylesheet">
+<style>
+/* ─── RESET ─── */
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+
+body {
+  background: #f0f2f5;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 48px 24px;
+  gap: 32px;
+  font-family: 'Poppins', 'Barlow', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* ─── CARD CONTAINER ─── */
+/* True size: 1576 × 998px — scaled to 61% for display */
+.card-wrap {
+  transform: scale(0.61);
+  transform-origin: top center;
+  margin-bottom: -390px;
+  flex-shrink: 0;
+}
+
+.card {
+  position: relative;
+  width: 1576px;
+  height: 998px;
+  background: #FFFFFF;
+  border-radius: 24px;
+  overflow: hidden;
+  box-shadow: 0 32px 80px rgba(0,0,0,0.18);
+  border: 1px solid rgba(255,102,0,0.2);
+  font-family: 'Poppins', 'Barlow', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* ── Tricolor Accent Bars ── */
+.tricolor-top {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 12px;
+  display: flex;
+  z-index: 10;
+}
+.tri-saffron { flex: 1; background: #FF9933; }
+.tri-white { flex: 1; background: #FFFFFF; }
+.tri-green { flex: 1; background: #138808; }
+
+
+
+/* ─── LAYER 1 — ALL UI ─── */
+.ui {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+
+/* ── HEADER ── */
+.header {
+  position: absolute;
+  top: 12px; left: 0; right: 0;
+  height: 250px;
+  display: flex;
+  align-items: center;
+  padding: 0 48px;
+  background: linear-gradient(to right, rgba(255,153,51,0.08) 0%, rgba(255,255,255,0) 100%);
+}
+
+.logo-section {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  flex: 1;
+}
+
+.logo {
+  width: 170px;
+  height: 170px;
+  background: url('bjp_logo.svg') center / contain no-repeat;
+}
+
+.header-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.party-name-ta {
+  font-size: 32px;
+  font-weight: 800;
+  color: #FF6600;
+  line-height: 1.1;
+  letter-spacing: 0.5px;
+}
+
+.party-name-en {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 74px;
+  font-weight: 900;
+  color: #138808;
+  line-height: 0.95;
+  letter-spacing: 1.5px;
+  margin-top: 2px;
+}
+
+.subtitle {
+  font-size: 16px;
+  font-weight: 700;
+  color: #0E2F56;
+  letter-spacing: 5px;
+  margin-top: 8px;
+  text-transform: uppercase;
+}
+
+/* ── LEADERS COLLAGE (Right Side) ── */
+.leaders-collage {
+  position: absolute;
+  top: 12px;
+  right: 0;
+  bottom: 340px;
+  width: 800px;
+  background: radial-gradient(circle at 70% 45%, rgba(255,153,51,0.22) 0%, rgba(255,255,255,0) 65%);
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.leader-portrait-modi {
+  position: absolute;
+  bottom: 0;
+  right: 40px;
+  width: 760px;
+  height: 960px;
+  background: url('modi_transparent.png') right bottom / contain no-repeat;
+  z-index: 1;
+}
+
+.leader-portrait-nayanar {
+  position: absolute;
+  bottom: 0;
+  right: 0px;
+  width: 490px;
+  height: 635px;
+  background: url('nayanar_transparent.png') right bottom / contain no-repeat;
+  z-index: 2;
+}
+
+.header-border {
+  position: absolute;
+  top: 262px;
+  left: 36px; right: 620px;
+  height: 1.5px;
+  background: linear-gradient(to right, #FF9933, #FF6600, #138808);
+}
+
+/* ── MEMBER PHOTO BOX ── */
+.photo-box {
+  position: absolute;
+  left: 56px;
+  top: 294px;
+  width: 268px;
+  height: 384px;
+  border: 3px solid #FF9933;
+  border-radius: 16px;
+  overflow: hidden;
+  background: #F3F4F6;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.06);
+}
+.photo-box svg { width: 72px; height: 72px; fill: #D1D5DB; }
+.photo-box span {
+  font-size: 13px; font-weight: 600;
+  color: #9CA3AF; letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+.photo-box img {
+  width: 100%; height: 100%;
+  object-fit: cover; display: none;
+}
+
+/* ── FIELD ROWS ── */
+.fields {
+  position: absolute;
+  left: 360px;
+  top: 294px;
+  width: 580px;
+}
+
+.field-row {
+  display: flex;
+  align-items: center;
+  height: 64px;
+  border-bottom: 1.5px solid #F3F4F6;
+}
+.field-row:last-child { border-bottom: none; }
+
+.field-icon {
+  width: 44px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.field-icon svg { width: 26px; height: 26px; fill: #FF9933; }
+
+.field-label {
+  width: 230px;
+  flex-shrink: 0;
+  font-size: 17px;
+  font-weight: 700;
+  color: #4B5563;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.field-colon {
+  width: 32px;
+  flex-shrink: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: #9CA3AF;
+  text-align: center;
+}
+
+.field-value {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 32px;
+  font-weight: 800;
+  color: #111827;
+  letter-spacing: 0.5px;
+  max-width: 460px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── NAME row styling ── */
+.fields .field-row:first-child .field-label,
+.fields .field-row:first-child .field-colon,
+.fields .field-row:first-child .field-icon { display: none; }
+.fields .field-row:first-child .field-value {
+  font-size: 40px;
+  font-weight: 900;
+  color: #FF6600;
+  max-width: 680px;
+  letter-spacing: 1px;
+}
+
+/* ── MEMBERSHIP ID BOX (bottom-left) ── */
+.id-box {
+  position: absolute;
+  left: 56px;
+  top: 706px;
+  width: 416px;
+  height: 168px;
+  background: linear-gradient(135deg, rgba(255,153,51,0.08) 0%, rgba(255,255,255,0.02) 100%);
+  border: 1px solid rgba(255,153,51,0.25);
+  border-bottom: 4px solid #FF6600;
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 0 32px;
+}
+.id-label {
+  font-size: 14px;
+  font-weight: 700;
+  color: #6B7280;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+.id-value {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 58px;
+  font-weight: 900;
+  color: #FF6600;
+  letter-spacing: 1px;
+  line-height: 1;
+}
+
+/* ── QR BOX (bottom-right) ── */
+.qr-box {
+  position: absolute;
+  right: 120px;
+  bottom: 100px;
+  width: 144px;
+  z-index: 15;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.qr-img-wrap {
+  background: #FFF;
+  padding: 8px;
+  border: 1.5px solid rgba(19,136,8,0.15);
+  border-radius: 12px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.03);
+}
+.qr-img-wrap img { width: 100%; display: block; }
+.qr-scan-bar {
+  background: #138808;
+  text-align: center;
+  padding: 6px 12px;
+  font-size: 10px;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: 1.5px;
+  border-radius: 6px;
+  margin-top: 10px;
+  box-shadow: 0 2px 6px rgba(19,136,8,0.3);
+}
+
+/* ── SIGNATURE ZONE ── */
+.sig-zone {
+  position: absolute;
+  left: 530px;
+  bottom: 100px;
+  width: 600px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.sig-img {
+  font-family: 'Great Vibes', cursive;
+  font-size: 58px;
+  color: #0E2F56;
+  height: 80px;
+  line-height: 80px;
+  text-align: center;
+  margin-bottom: -5px;
+  user-select: none;
+}
+.sig-title {
+  font-size: 17px;
+  font-weight: 800;
+  color: #0E2F56;
+  letter-spacing: 3px;
+  white-space: nowrap;
+}
+.sig-line-wrap {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 250px;
+  margin-bottom: 6px;
+}
+.sig-line { flex: 1; height: 1.5px; background: #0E2F56; }
+.sig-org {
+  text-align: center;
+  margin-top: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #6B7280;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+
+/* ── FOOTER ── */
+.footer {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 80px;
+  background: #0E2F56;
+  display: flex;
+  align-items: center;
+  padding: 0 48px;
+}
+.foot-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #E5E7EB;
+}
+.foot-item svg { width: 20px; height: 20px; fill: #FF9933; flex-shrink: 0; }
+.foot-sep { flex: 1; text-align: center; font-size: 22px; color: #4B5563; }
+.foot-center {
+  flex: 1;
+  text-align: center;
+  font-size: 16px;
+  font-weight: 800;
+  color: #FF9933;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+
+/* ─── FORM PANEL ─── */
+.form-panel {
+  background: #fff;
+  border-radius: 20px;
+  padding: 32px;
+  width: 962px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+  border: 1px solid rgba(0,0,0,0.05);
+}
+.form-title {
+  font-size: 14px;
+  font-weight: 800;
+  color: #FF6600;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  margin-bottom: 20px;
+}
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.fg { display: flex; flex-direction: column; gap: 6px; }
+.fg label {
+  font-size: 11px; font-weight: 700;
+  color: #6B7280; letter-spacing: 1px; text-transform: uppercase;
+}
+.fg input {
+  border: 2px solid #E5E7EB;
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 14px;
+  font-family: inherit;
+  color: #1F2937;
+  outline: none;
+  transition: all 0.2s;
+}
+.fg input:focus { border-color: #FF6600; }
+.btn-row { display: flex; gap: 14px; }
+.btn {
+  flex: 1; padding: 14px;
+  border: none; border-radius: 12px;
+  font-size: 14px; font-weight: 800;
+  cursor: pointer;
+  font-family: inherit;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  transition: all 0.15s;
+}
+.btn:hover { opacity: 0.92; transform: translateY(-1px); }
+.btn-gen { background: #FF6600; color: #fff; box-shadow: 0 4px 12px rgba(255,102,0,0.25); }
+.btn-dl  { background: #138808; color: #fff; box-shadow: 0 4px 12px rgba(19,136,8,0.25); }
+</style>
+</head>
+<body>
+
+<div class="card-wrap">
+<div class="card" id="card">
+
+  <!-- Tricolor top accent -->
+  <div class="tricolor-top">
+    <div class="tri-saffron"></div>
+    <div class="tri-white"></div>
+    <div class="tri-green"></div>
+  </div>
+
+    <!-- LEADERS COLLAGE -->
+    <div class="leaders-collage">
+      <div class="leader-portrait-modi"></div>
+      <div class="leader-portrait-nayanar"></div>
+    </div>
+
+    <!-- Layer 1: UI -->
+    <div class="ui">
+
+      <!-- HEADER -->
+      <div class="header">
+      <div class="logo-section">
+        <div class="logo"></div>
+        <div class="header-text">
+          <div class="party-name-ta">பாரதிய ஜனதா கட்சி</div>
+          <div class="party-name-en">BHARATIYA JANATA PARTY</div>
+          <div class="subtitle">TAMIL NADU STATE UNIT</div>
+        </div>
+      </div>
+    </div>
+    <div class="header-border"></div>
+
+    <!-- MEMBER PHOTO -->
+    <div class="photo-box" id="photo-box">
+      <svg viewBox="0 0 24 24"><path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/></svg>
+      <span>MEMBER PHOTO</span>
+      <img id="member-photo-img" src="" alt=""/>
+    </div>
+
+    <!-- FIELDS -->
+    <div class="fields">
+
+      <div class="field-row">
+        <div class="field-icon"></div>
+        <div class="field-label">NAME</div>
+        <div class="field-colon">:</div>
+        <div class="field-value" id="v-name">RAMESH KUMAR</div>
+      </div>
+
+      <div class="field-row">
+        <div class="field-icon"><svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg></div>
+        <div class="field-label">EPIC NO</div>
+        <div class="field-colon">:</div>
+        <div class="field-value" id="v-epic">ABC1234567</div>
+      </div>
+
+      <div class="field-row">
+        <div class="field-icon"><svg viewBox="0 0 24 24"><path d="M15 11V5l-3-3-3 3v2H3v14h18V11h-6zm-8 8H5v-2h2v2zm0-4H5v-2h2v2zm0-4H5V9h2v2zm6 8h-2v-2h2v2zm0-4h-2v-2h2v2zm0-4h-2V9h2v2zm0-4h-2V5h2v2zm6 12h-2v-2h2v2zm0-4h-2v-2h2v2z"/></svg></div>
+        <div class="field-label">ASSEMBLY</div>
+        <div class="field-colon">:</div>
+        <div class="field-value" id="v-asm">MADURAI CENTRAL</div>
+      </div>
+
+      <div class="field-row">
+        <div class="field-icon"><svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg></div>
+        <div class="field-label">BOOTH NUMBER</div>
+        <div class="field-colon">:</div>
+        <div class="field-value" id="v-booth">45</div>
+      </div>
+
+      <div class="field-row">
+        <div class="field-icon"><svg viewBox="0 0 24 24"><path d="M17 12h-5v5h5v-5zM16 1v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2h-1V1h-2zm3 18H5V8h14v11z"/></svg></div>
+        <div class="field-label">DISTRICT</div>
+        <div class="field-colon">:</div>
+        <div class="field-value" id="v-dist">MADURAI</div>
+      </div>
+
+      <div class="field-row">
+        <div class="field-icon"><svg viewBox="0 0 24 24"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm-8 2.5c1.38 0 2.5 1.12 2.5 2.5S13.38 11.5 12 11.5 9.5 10.38 9.5 9s1.12-2.5 2.5-2.5zm5 9h-10v-.5c0-1.67 3.33-2.5 5-2.5s5 .83 5 2.5v.5z"/></svg></div>
+        <div class="field-label">MEMBER ID</div>
+        <div class="field-colon">:</div>
+        <div class="field-value" id="v-mid">BJP-76A32B9</div>
+      </div>
+
+    </div>
+
+    <!-- MEMBERSHIP ID BOX -->
+    <div class="id-box">
+      <div class="id-label">BJP MEMBER ID</div>
+      <div class="id-value" id="v-mid-big">BJP-76A32B9</div>
+    </div>
+
+    <!-- QR CODE -->
+    <div class="qr-box">
+      <div class="qr-img-wrap">
+        <img id="qr-img" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAQEAAAEQAQMAAAB4ZJ/eAAAABlBMVEX///8AAADVzN5KAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAB3RSTlMAgIGAgIDAwO+pjwAAAEdJREFUeNrtlDESwCAIA5H//2mkM6UT1x0NRE4mICB0X25t79M0a+NlK2pUvXhGkFf11xS/pUf1uD5Xp148w4i7egLwHj1B/PMPG8v5CusAAAAASUVORK5CYII=" alt="QR Code"/>
+      </div>
+      <div class="qr-scan-bar">SCAN TO VERIFY</div>
+    </div>
+
+    <!-- SIGNATURE -->
+    <div class="sig-zone">
+      <div class="sig-img">Nayanar Nagendran</div>
+      <div class="sig-line-wrap">
+        <div class="sig-line"></div>
+        <div class="sig-title">STATE PRESIDENT</div>
+        <div class="sig-line"></div>
+      </div>
+      <div class="sig-org">BJP TAMIL NADU STATE UNIT</div>
+    </div>
+
+    <!-- FOOTER -->
+    <div class="footer">
+      <div class="foot-item">
+        <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
+        tnbjp.org
+      </div>
+      <div class="foot-sep">|</div>
+      <div class="foot-center">Nation First. Party Next. Self Last.</div>
+      <div class="foot-sep">|</div>
+      <div class="foot-item">
+        <svg viewBox="0 0 24 24"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
+        info@tnbjp.org
+      </div>
+    </div>
+
+  </div><!-- /ui -->
+</div><!-- /card -->
+</div><!-- /card-wrap -->
+
+<!-- ─── FORM ─── -->
+<div class="form-panel">
+  <div class="form-title">BJP Tamil Nadu - Card Live Previewer</div>
+  <div class="form-grid">
+    <div class="fg"><label>Full Name</label><input id="f-name" value="RAMESH KUMAR"/></div>
+    <div class="fg"><label>EPIC No</label><input id="f-epic" value="ABC1234567"/></div>
+    <div class="fg"><label>Assembly</label><input id="f-asm" value="MADURAI CENTRAL"/></div>
+    <div class="fg"><label>Booth Number</label><input id="f-booth" value="45"/></div>
+    <div class="fg"><label>District</label><input id="f-dist" value="MADURAI"/></div>
+    <div class="fg"><label>Membership ID</label><input id="f-mid" value="BJP-76A32B9"/></div>
+  </div>
+  <div class="btn-row">
+    <button class="btn btn-gen" onclick="generate()">⟳ Update Preview</button>
+    <button class="btn btn-dl"  onclick="downloadPNG()">↓ Download Mockup PNG</button>
+  </div>
+</div>
+
+<script src="html2canvas.min.js"></script>
+<script>
+const g = id => document.getElementById(id);
+
+function generate() {
+  const name  = (g('f-name').value  || 'NAME').toUpperCase();
+  const epic  = (g('f-epic').value  || '-').toUpperCase();
+  const asm   = (g('f-asm').value   || '-').toUpperCase();
+  const booth =  g('f-booth').value || '-';
+  const dist  = (g('f-dist').value  || '-').toUpperCase();
+  const mid   = (g('f-mid').value   || 'BJP-0000000').toUpperCase();
+
+  g('v-name').textContent    = name;
+  g('v-epic').textContent    = epic;
+  g('v-asm').textContent     = asm;
+  g('v-booth').textContent   = booth;
+  g('v-dist').textContent    = dist;
+  g('v-mid').textContent     = mid;
+  g('v-mid-big').textContent = mid;
+}
+
+function downloadPNG() {
+  generate();
+  const wrap = document.querySelector('.card-wrap');
+  wrap.style.transform    = 'none';
+  wrap.style.marginBottom = '0';
+
+  html2canvas(g('card'), {
+    scale: 3,
+    useCORS: true,
+    allowTaint: true,
+    backgroundColor: '#FFFFFF',
+    width: 1576, height: 998,
+  }).then(canvas => {
+    wrap.style.transform    = 'scale(0.61)';
+    wrap.style.marginBottom = '-390px';
+    const a = document.createElement('a');
+    a.download = `BJP_TN_Card_${g('f-name').value}_${g('f-mid').value}.png`;
+    a.href = canvas.toDataURL('image/png', 1.0);
+    a.click();
+  });
+}
+</script>
+</body>
+</html>

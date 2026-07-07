@@ -1,0 +1,160 @@
+{
+  "version": "6.2",
+  "data_api_version": "3.0",
+  "routing_model": {
+    "MOBILE_INPUT": ["OTP_VERIFY"],
+    "OTP_VERIFY":   ["SUCCESS"],
+    "SUCCESS":      []
+  },
+  "screens": [
+    {
+      "id": "MOBILE_INPUT",
+      "title": "Member Login",
+      "terminal": false,
+      "data": {
+        "error_message": {
+          "type": "string",
+          "__example__": ""
+        },
+        "show_error": {
+          "type": "boolean",
+          "__example__": false
+        }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "TextHeading",
+            "text": "Welcome Back!"
+          },
+          {
+            "type": "TextBody",
+            "text": "Enter your registered mobile number to access your Digital Member ID Card."
+          },
+          {
+            "type": "TextInput",
+            "label": "Mobile Number",
+            "input-type": "phone",
+            "required": true,
+            "name": "mobile",
+            "helper-text": "10-digit registered mobile number"
+          },
+          {
+            "type": "TextBody",
+            "text": "${data.error_message}",
+            "visible": "${data.show_error}"
+          },
+          {
+            "type": "Footer",
+            "label": "Send OTP",
+            "on-click-action": {
+              "name": "data_exchange",
+              "payload": {
+                "screen": "MOBILE_INPUT",
+                "mobile": "${form.mobile}"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "OTP_VERIFY",
+      "title": "Verify OTP",
+      "terminal": false,
+      "data": {
+        "mobile": {
+          "type": "string",
+          "__example__": "9876543210"
+        },
+        "error_message": {
+          "type": "string",
+          "__example__": ""
+        },
+        "show_error": {
+          "type": "boolean",
+          "__example__": false
+        }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "TextHeading",
+            "text": "Enter OTP"
+          },
+          {
+            "type": "TextBody",
+            "text": "A 6-digit OTP has been sent to your mobile number. Enter it below."
+          },
+          {
+            "type": "TextInput",
+            "label": "6-digit OTP",
+            "input-type": "number",
+            "required": true,
+            "name": "otp",
+            "helper-text": "Enter the OTP sent to your mobile"
+          },
+          {
+            "type": "TextBody",
+            "text": "${data.error_message}",
+            "visible": "${data.show_error}"
+          },
+          {
+            "type": "Footer",
+            "label": "Verify OTP",
+            "on-click-action": {
+              "name": "data_exchange",
+              "payload": {
+                "screen": "OTP_VERIFY",
+                "mobile": "${data.mobile}",
+                "otp":    "${form.otp}"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "SUCCESS",
+      "title": "Login Successful",
+      "terminal": true,
+      "success": true,
+      "data": {
+        "mobile": {
+          "type": "string",
+          "__example__": "9876543210"
+        },
+        "epic_no": {
+          "type": "string",
+          "__example__": "TNA1234567"
+        }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "TextHeading",
+            "text": "Login Successful!"
+          },
+          {
+            "type": "TextBody",
+            "text": "You are now verified. Visit the link below to view and download your Digital Member ID Card:\n\nhttps://we-the-leader.vercel.app"
+          },
+          {
+            "type": "Footer",
+            "label": "Open My Card",
+            "on-click-action": {
+              "name": "complete",
+              "payload": {
+                "mobile":  "${data.mobile}",
+                "epic_no": "${data.epic_no}"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}
