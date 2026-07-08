@@ -210,8 +210,7 @@ router.get('/api/card/:epicNo', async (req, res) => {
     const stat   = await db.collection('generation_stats').findOne({ epic_no: epicNo })  || {};
     const genDoc = await db.collection('generated_voters').findOne({ EPIC_NO: epicNo })   || {};
 
-    const cardUrl = stat.card_url   || genDoc.card_url   || '';
-    if (!cardUrl) {
+    if (!genDoc.EPIC_NO && !stat.epic_no) {
       return res.status(404).json({ success: false, message: 'Card not found.' });
     }
 
@@ -219,12 +218,12 @@ router.get('/api/card/:epicNo', async (req, res) => {
     const voter = voterDoc || genDoc;
 
     const name = voter
-      ? (voter.VOTER_NAME || `${voter.FM_NAME_EN || ''} ${voter.LASTNAME_EN || ''}`.trim() || '')
+      ? (voter.VOTER_NAME || `${voter.FM_NAME_EN || ''} ${voter.LASTNAME_EN || ''}`.trim() || voter.name || '')
       : '';
 
     return res.json({
       success:      true,
-      card_url:     cardUrl,
+      card_url:     stat.card_url     || genDoc.card_url     || '',
       back_url:     stat.back_url     || genDoc.back_url     || '',
       combined_url: stat.combined_url || genDoc.combined_url || '',
       photo_url:    stat.photo_url    || genDoc.photo_url    || '',
@@ -232,9 +231,9 @@ router.get('/api/card/:epicNo', async (req, res) => {
       gen_count:    stat.count        || 0,
       name,
       epic_no:      epicNo,
-      assembly_name: voter?.ASSEMBLY_NAME || '',
-      district:      voter?.DISTRICT      || voter?.DISTRICT_NAME || '',
-      part_no:       String(voter?.PART_NO || ''),
+      assembly_name: voter?.ASSEMBLY_NAME || voter?.assembly_name || '',
+      district:      voter?.DISTRICT      || voter?.DISTRICT_NAME || voter?.district || '',
+      part_no:       String(voter?.PART_NO || voter?.part_no || ''),
     });
   } catch (err) {
     console.error('card error:', err);

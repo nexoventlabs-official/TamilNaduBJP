@@ -13,7 +13,7 @@ const getReferralParams = () => {
     let ref = (p.get('ref') || '').trim().toUpperCase()
     let rid = (p.get('rid') || '').trim().toUpperCase()
     // Validate format before using
-    if (/^WTL-[0-9A-F]{8}$/.test(ref) && /^REF-[0-9A-F]{8}$/.test(rid)) {
+    if (/^(WTL|BJP)-[0-9A-F]{8}$/.test(ref) && /^REF-[0-9A-F]{8}$/.test(rid)) {
       return { ref, rid }
     }
 
@@ -25,7 +25,7 @@ const getReferralParams = () => {
       if (data && Date.now() - data.timestamp < 24 * 60 * 60 * 1000) {
         const storedRef = (data.wtlCode || '').trim().toUpperCase()
         const storedRid = (data.referralId || '').trim().toUpperCase()
-        if (/^WTL-[0-9A-F]{8}$/.test(storedRef) && /^REF-[0-9A-F]{8}$/.test(storedRid)) {
+        if (/^(WTL|BJP)-[0-9A-F]{8}$/.test(storedRef) && /^REF-[0-9A-F]{8}$/.test(storedRid)) {
           return { ref: storedRef, rid: storedRid }
         }
       }
@@ -272,7 +272,9 @@ function GeneratedCardMsg({ card, isNew = false }) {  const c = card || {}
   const [fullCardData, setFullCardData] = useState(null)
 
   useEffect(() => {
-    if (c.name && c.assembly_name) {
+    const hasName = c.name || c.voter_name || c.VOTER_NAME;
+    const hasAssembly = c.assembly_name || c.assembly || c.ASSEMBLY_NAME;
+    if (hasName && hasAssembly) {
       setFullCardData(c)
     } else if (c.epic_no) {
       publicApi.getCardData(c.epic_no)
@@ -301,6 +303,208 @@ function GeneratedCardMsg({ card, isNew = false }) {  const c = card || {}
           Loading preview…
         </div>
       )}
+    </div>
+  )
+}
+
+function WelcomeLetterMsg({ name, date }) {
+  const safeId = name.replace(/[^a-zA-Z0-9]/g, '-')
+  
+  const handlePrint = () => {
+    const iframe = document.getElementById(`welcome-iframe-${safeId}`)
+    if (iframe && iframe.contentWindow) {
+      iframe.contentWindow.focus()
+      iframe.contentWindow.print()
+    }
+  }
+
+  const letterUrl = `/Welcome_letter.html?name=${encodeURIComponent(name)}&date=${encodeURIComponent(date)}&hideControls=true`
+
+  return (
+    <div style={{
+      background: 'var(--color-carbon)',
+      border: '1.5px solid rgba(19, 136, 8, 0.25)',
+      borderRadius: '20px',
+      padding: '16px',
+      width: '320px',
+      boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2)',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: 12,
+      backdropFilter: 'blur(8px)'
+    }}>
+      {/* File Header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{
+          width: 36,
+          height: 36,
+          borderRadius: '10px',
+          background: 'rgba(19, 136, 8, 0.1)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          border: '1px solid rgba(19, 136, 8, 0.2)',
+          flexShrink: 0
+        }}>
+          <i className="bi bi-file-earmark-pdf-fill" style={{ color: 'var(--color-signal-mint)', fontSize: 20 }} />
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, textAlign: 'left' }}>
+          <span style={{ fontSize: 12, fontWeight: 'bold', color: 'var(--color-chalk)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>Welcome_Letter.pdf</span>
+          <span style={{ fontSize: 9, color: 'var(--color-ash)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{date}</span>
+        </div>
+      </div>
+
+      {/* Embedded Iframe Preview */}
+      <div style={{
+        width: '100%',
+        height: '420px',
+        borderRadius: '12px',
+        overflow: 'hidden',
+        border: '1px solid var(--color-graphite)',
+        background: '#fff',
+        position: 'relative'
+      }}>
+        <iframe 
+          id={`welcome-iframe-${safeId}`}
+          src={letterUrl} 
+          style={{ 
+            width: '100%', 
+            height: '100%', 
+            border: 'none',
+            transform: 'scale(1.0)',
+            transformOrigin: 'top left'
+          }} 
+          title="Welcome Letter Preview"
+        />
+      </div>
+
+      {/* Action Buttons */}
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button
+          onClick={handlePrint}
+          style={{
+            flex: 1,
+            background: 'linear-gradient(135deg, #138808 0%, #0c5b05 100%)',
+            color: '#fff',
+            border: 'none',
+            padding: '10px 14px',
+            borderRadius: '12px',
+            fontSize: 11,
+            fontWeight: 'bold',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 6,
+            transition: 'all 0.15s'
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-1px)' }}
+          onMouseLeave={(e) => { e.currentTarget.style.transform = 'none' }}
+        >
+          <i className="bi bi-file-earmark-pdf-fill" /> Save as PDF / Print
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function AppreciationLetterMsg({ name, date }) {
+  const safeId = name.replace(/[^a-zA-Z0-9]/g, '-')
+  
+  const handlePrint = () => {
+    const iframe = document.getElementById(`appreciation-iframe-${safeId}`)
+    if (iframe && iframe.contentWindow) {
+      iframe.contentWindow.focus()
+      iframe.contentWindow.print()
+    }
+  }
+
+  const letterUrl = `/Appreciation_letter.html?name=${encodeURIComponent(name)}&date=${encodeURIComponent(date)}&hideControls=true`
+
+  return (
+    <div style={{
+      background: 'var(--color-carbon)',
+      border: '1.5px solid rgba(19, 136, 8, 0.25)',
+      borderRadius: '20px',
+      padding: '16px',
+      width: '320px',
+      boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2)',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: 12,
+      backdropFilter: 'blur(8px)'
+    }}>
+      {/* File Header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{
+          width: 36,
+          height: 36,
+          borderRadius: '10px',
+          background: 'rgba(19, 136, 8, 0.1)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          border: '1px solid rgba(19, 136, 8, 0.2)',
+          flexShrink: 0
+        }}>
+          <i className="bi bi-file-earmark-pdf-fill" style={{ color: 'var(--color-signal-mint)', fontSize: 20 }} />
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, textAlign: 'left' }}>
+          <span style={{ fontSize: 12, fontWeight: 'bold', color: 'var(--color-chalk)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>Appreciation_Letter.pdf</span>
+          <span style={{ fontSize: 9, color: 'var(--color-ash)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{date}</span>
+        </div>
+      </div>
+
+      {/* Embedded Iframe Preview */}
+      <div style={{
+        width: '100%',
+        height: '420px',
+        borderRadius: '12px',
+        overflow: 'hidden',
+        border: '1px solid var(--color-graphite)',
+        background: '#fff',
+        position: 'relative'
+      }}>
+        <iframe 
+          id={`appreciation-iframe-${safeId}`}
+          src={letterUrl} 
+          style={{ 
+            width: '100%', 
+            height: '100%', 
+            border: 'none',
+            transform: 'scale(1.0)',
+            transformOrigin: 'top left'
+          }} 
+          title="Appreciation Letter Preview"
+        />
+      </div>
+
+      {/* Action Buttons */}
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button
+          onClick={handlePrint}
+          style={{
+            flex: 1,
+            background: 'linear-gradient(135deg, #138808 0%, #0c5b05 100%)',
+            color: '#fff',
+            border: 'none',
+            padding: '10px 14px',
+            borderRadius: '12px',
+            fontSize: 11,
+            fontWeight: 'bold',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 6,
+            transition: 'all 0.15s'
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-1px)' }}
+          onMouseLeave={(e) => { e.currentTarget.style.transform = 'none' }}
+        >
+          <i className="bi bi-file-earmark-pdf-fill" /> Save as PDF / Print
+        </button>
+      </div>
     </div>
   )
 }
@@ -363,7 +567,7 @@ function SelectWingMsg({ wtlCode, epicNo, isLatest }) {
     try {
       const res = await chat.requestVolunteer(wtlCode, epicNo, selectedWing)
       setSubmitted(true)
-      setStatusText(res.message || '✅ Volunteer request submitted! Admin will review it shortly.')
+      setStatusText(res.message || '✅ Organizer request submitted! Admin will review it shortly.')
     } catch (err) {
       setStatusText(`❌ ${err.message || 'Unable to submit request. Please try again.'}`)
     } finally {
@@ -383,7 +587,7 @@ function SelectWingMsg({ wtlCode, epicNo, isLatest }) {
   return (
     <div className="info-card volunteer-card" style={{ maxWidth: 300, background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: 12, overflow: 'hidden', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06)' }}>
       <div className="info-card-header" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', fontSize: 13, fontWeight: 'bold', color: '#0f172a' }}>
-        <i className="bi bi-hand-thumbs-up-fill" style={{ color: 'var(--color-coral)' }} /> Become a Volunteer
+        <i className="bi bi-hand-thumbs-up-fill" style={{ color: 'var(--color-coral)' }} /> Become an Organizer
       </div>
       <div style={{ padding: 12 }}>
         {existingRequest ? (
@@ -894,6 +1098,1269 @@ function CardModal({ cardData, onClose }) {
   )
 }
 
+const SCHEMES = [
+  {
+    id: 1,
+    category: 'Women & Child Welfare',
+    title: 'Sukanya Samriddhi Yojana (SSY)',
+    highlight: '8.2% INTEREST',
+    overview: "This is a savings scheme by the Government of India designed to build a dedicated corpus for a girl child's higher education and marriage expenses.",
+    tags: ['Girl Child Welfare', 'Tax-Free Savings', '8.2% Annually'],
+    eligibility: 'Available for parents with girls under 10 years old. It features an attractive 8.2% tax-free interest rate and deduction benefits under Section 80C.',
+    documents: [
+      'Aadhaar & PAN (Parents)',
+      'Child Birth Certificate',
+      'Photo of Child & Parent'
+    ],
+    steps: [
+      'Visit nearest Post Office or authorized commercial bank',
+      'Collect Sukanya Samriddhi account opening form',
+      'Fill form details with girl child and parent information',
+      'Attach girl child birth certificate and parent KYC documents',
+      'Make first deposit (minimum ₹250) to activate account'
+    ]
+  },
+  {
+    id: 2,
+    category: 'Women & Child Welfare',
+    title: 'Lakhpati Didi Scheme',
+    highlight: '₹1 LAKH INCOME GOAL',
+    overview: 'A national livelihood program providing skill development, drone training, and enterprise credit support to rural women entrepreneurs.',
+    tags: ['Women SHGs', '🛠️ Skill & Drone Training', 'Entrepreneurship Loan'],
+    eligibility: 'Aims to enable rural Self-Help Group (SHG) women members to earn a sustainable household income of at least ₹1 Lakh per annum through entrepreneurship.',
+    documents: [
+      'Aadhaar & Ration Card',
+      'SHG Membership Certificate',
+      'Active Bank Passbook'
+    ],
+    steps: [
+      'Join local women Self-Help Group (SHG) in your village',
+      'Register for the Lakhpati Didi livelihood program',
+      'Select and complete technical skill/drone training courses',
+      'Create livelihood business project plan with group support',
+      'Apply for interest-free/low-interest enterprise loan'
+    ]
+  },
+  {
+    id: 3,
+    category: 'Women & Child Welfare',
+    title: 'PM Matru Vandana Yojana (PMMVY)',
+    highlight: '₹5,000 DIRECT CASH',
+    overview: 'A maternity benefit program that provides direct cash assistance to pregnant women to promote immunization and healthcare support.',
+    tags: ['Maternal Nutrition', '👶 Child Immunization', '₹5,000 DBT Cash'],
+    eligibility: 'Pregnant and lactating mothers receive a direct benefit transfer (DBT) of ₹5,00,000 in their bank account to compensate for wages and cover food.',
+    documents: [
+      'Aadhaar (Mother & Husband)',
+      'Mother & Child Protection Card',
+      'Aadhaar Seeded Bank Account'
+    ],
+    steps: [
+      'Visit local Anganwadi Center or health sub-center',
+      'Register first pregnancy or second girl child on portal',
+      'Submit PMMVY application Form 1A with bank account copy',
+      'Upload ANC health check-up records and child birth slip',
+      'Receive cash benefit directly via Aadhaar-seeded DBT'
+    ]
+  },
+  {
+    id: 4,
+    category: 'Education & Research',
+    title: 'PM Vidyalaxmi Higher Education Loan',
+    highlight: 'COLLATERAL-FREE',
+    overview: 'A national portal offering meritorious students collateral-free and guarantor-free higher education loans for admission to designated Quality Higher Educational Institutions.',
+    tags: ['Quality Education', 'Collateral-Free Loans', 'Interest Subvention'],
+    eligibility: 'Enables access to education loans with zero assets required as collateral. Offers interest subvention of 3% for family incomes up to ₹8 Lakhs.',
+    documents: [
+      'Student & Parent Aadhaar',
+      'College Admission Letter',
+      'Fee Structure & Marksheets'
+    ],
+    steps: [
+      'Register online on the official pmvidyalaxmi.gov.in portal',
+      'Fill the Common Education Loan Application Form (CELAF)',
+      'Select eligible bank loans matching your requirements',
+      'Upload college admission letter, fee structure, and KYC',
+      'Track application status online until loan is disbursed'
+    ]
+  },
+  {
+    id: 5,
+    category: 'Education & Research',
+    title: 'PM-YASASVI Scholarship Scheme',
+    highlight: 'SCHOOL FEE GRANTS',
+    overview: 'A scholarship scheme under the Ministry of Social Justice and Empowerment for OBC, EBC, and DNT students studying in Top Class Schools.',
+    tags: ['OBC/EBC Welfare', 'Merit Scholarships', 'Full Fee Support'],
+    eligibility: 'Full fee coverage. Eligible students receive up to ₹75,000/year (Class 9-10) and up to ₹1,25,000/year (Class 11-12) via direct benefit transfer.',
+    documents: [
+      'Student Aadhaar & Caste Cert.',
+      'Family Income Cert. (<₹2.5L)',
+      'Marksheet of Previous Class'
+    ],
+    steps: [
+      'Check eligibility criteria for OBC/EBC/DNT students',
+      'Register online on National Scholarship Portal (NSP)',
+      'Fill student profile and select YASASVI Scholarship',
+      'Upload school marksheets, income certificate, and caste card',
+      'Direct bank transfer of scholarship fund upon verification'
+    ]
+  },
+  {
+    id: 6,
+    category: 'Education & Research',
+    title: 'PM Research Fellowship (PMRF)',
+    highlight: '₹80,000 / MONTH STIPEND',
+    overview: 'A prestigious fellowship designed to support top scientific and technological PhD research talent at premium institutes.',
+    tags: ['PhD Researchers', 'IIT/IISc/NIT Host', 'Contigency Fund'],
+    eligibility: 'Stipends of ₹70,000 to ₹80,000/month, along with a research contingency grant of ₹2 Lakhs per year for 5 consecutive years.',
+    documents: [
+      'Academic Transcripts & Degrees',
+      'Research Proposal Statement',
+      'GATE/NET Score Report'
+    ],
+    steps: [
+      'Enroll in PhD program at IITs, IISc, IISERs, or central universities',
+      'Prepare detailed research project proposal with guide',
+      'Apply online during the active PMRF admission cycle',
+      'Submit academic references, publications, and transcripts',
+      'Attend national committee interview for final selection'
+    ]
+  },
+  {
+    id: 7,
+    category: 'Artisans & Small Business',
+    title: 'PM Vishwakarma Scheme',
+    highlight: '₹15,000 TOOLKIT GRANT',
+    overview: 'A scheme supporting traditional artisans and craftspeople who work with hand tools, aiming to preserve heritage and modernize their skills.',
+    tags: ['🛠️ 18 Craft Trades', 'Toolkit Grants', 'Low Interest Loans'],
+    eligibility: 'Covers 18 trades (carpenters, potters, blacksmiths, etc.). Provides ₹15,000 toolkit grants, training stipends, and collateral-free enterprise credit starting at 5% interest.',
+    documents: [
+      'Aadhaar Card (Linked Mobile)',
+      'Bank Account Details',
+      'Ration Card / Address Proof'
+    ],
+    steps: [
+      'Visit local Common Service Center (CSC) with Aadhaar card',
+      'Register trade details (carpenters, potters, weavers, etc.)',
+      'Complete basic skill verification and training (5-7 days)',
+      'Claim ₹15,000 toolkit digital e-voucher for modern tools',
+      'Apply for first collateral-free loan up to ₹1,00,000'
+    ]
+  },
+  {
+    id: 8,
+    category: 'Artisans & Small Business',
+    title: 'Pradhan Mantri Mudra Yojana (PMMY)',
+    highlight: '₹50,000 TO ₹20 LAKHS',
+    overview: 'A flagship loan scheme supporting non-farm, non-corporate micro and small enterprises to access collateral-free business capital.',
+    tags: ['Micro Enterprises', 'Startups & Shops', 'No Asset Security'],
+    eligibility: 'Provides business loans up to ₹20 Lakhs categorized into Shishu (up to ₹50k), Kishor (up to ₹5 Lakhs), and Tarun (up to ₹20 Lakhs) with no collateral needed.',
+    documents: [
+      'KYC Identity & Address Proof',
+      'Business License / Udyam',
+      'Last 6 Months Bank Statement'
+    ],
+    steps: [
+      'Prepare business plan for Shishu, Kishor, or Tarun loan',
+      'Visit nearest commercial bank, co-op bank, or NBFC',
+      'Fill Pradhan Mantri Mudra Yojana application form',
+      'Submit identity proof, address proof, and business license',
+      'Get loan approved and disbursed without asset security'
+    ]
+  },
+  {
+    id: 9,
+    category: 'Artisans & Small Business',
+    title: 'PM SVANidhi Scheme',
+    highlight: 'STREET VENDOR CREDIT',
+    overview: 'A special micro-credit scheme providing working capital loans to urban and semi-urban street vendors to resume livelihoods.',
+    tags: ['Street Hawkers', 'Regular Repay Subsidy', 'Cash Back Rewards'],
+    eligibility: 'First-time collateral-free working capital loan of ₹10,000. Successful repayment unlocks secondary loans of ₹20,000 and tertiary loans of ₹50,000.',
+    documents: [
+      'Aadhaar Card (Linked Mobile)',
+      'Letter of Recommendation / Vendor ID',
+      'Bank Account Details'
+    ],
+    steps: [
+      'Ensure your name is in street vendor list (ULB survey)',
+      'Apply online at pmsvanidhi.mohua.gov.in portal',
+      'Submit Aadhaar card and Letter of Recommendation (LoR)',
+      'Get details verified by local municipal corporation',
+      'Receive first ₹10,000 working capital loan in bank'
+    ]
+  },
+  {
+    id: 10,
+    category: 'Healthcare & Energy',
+    title: 'Ayushman Bharat (PM-JAY) & CMCHIS',
+    highlight: '₹5 LAKHS CASHLESS COVER',
+    overview: "A flagship health insurance program integrated with Tamil Nadu's Chief Minister's Comprehensive Health Insurance Scheme (CMCHIS), offering up to ₹5 Lakhs per family per year cashless treatment and extended to all senior citizens aged 70+.",
+    tags: ['Cashless Hospitalization', '₹5 Lakhs Floater / Family', '👴 Senior Citizens 70+ Priority'],
+    eligibility: 'Provides cashless hospital coverage of ₹5,00,000 per family per year on a floater basis for secondary and tertiary care at empanelled hospitals, with special priority cards issued to senior citizens aged 70+.',
+    documents: [
+      'Aadhaar Card',
+      'Family Smart Ration Card',
+      'Active Registered Mobile Number'
+    ],
+    steps: [
+      'Check eligibility online at beneficiary.nha.gov.in portal',
+      'Visit nearest Common Service Center (CSC) to print Ayushman card',
+      'Locate empaneled government or private hospital for treatment',
+      'Present Ayushman/CMCHIS card to Arogya Mitra at hospital',
+      'Avail completely cashless treatment up to ₹5,00,000'
+    ]
+  },
+  {
+    id: 11,
+    category: 'Healthcare & Energy',
+    title: 'PM Surya Ghar: Muft Bijli Yojana',
+    highlight: '300 UNITS FREE POWER',
+    overview: 'A national subsidy program to help households install rooftop solar systems, reducing electricity bills and supplying clean energy.',
+    tags: ['☀️ Rooftop Solar Subsidy', '300 Free Power Units', '₹78,000 DBT Grant'],
+    eligibility: 'Gives up to ₹78,000 cash subsidy directly into bank accounts for installations (up to 3kW). Excess power generated can be sold back to the grid.',
+    documents: [
+      'Aadhaar Card & Home Deed',
+      'Electricity Bill (Latest)',
+      'Bank Account Passbook Copy'
+    ],
+    steps: [
+      'Register on pmsuryaghar.gov.in with electricity consumer number',
+      'Submit feasibility application to local electricity board',
+      'Choose certified vendor to install rooftop solar panels',
+      'Install net meter and submit completion report to portal',
+      'Receive subsidy directly in bank account within 30 days'
+    ]
+  },
+  {
+    id: 12,
+    category: 'Agriculture & Farmers',
+    title: 'PM Kisan Samman Nidhi (PM-KISAN)',
+    highlight: '₹6,000 ANNUAL CASH SUPPORT',
+    overview: 'An income support scheme providing direct financial assistance to all landholding farmer families across India to buy agricultural inputs.',
+    tags: ['Landholding Farmers', 'Input Purchase Support', '₹6,000 DBT Income'],
+    eligibility: 'Farmers receive an annual income support of ₹6,000 paid directly in 3 equal installments of ₹2,000 via Aadhaar-linked DBT transfers.',
+    documents: [
+      'Aadhaar & Mobile Number',
+      'Land Holding Records (Patta/Chitta)',
+      'Active Aadhaar Seeded Bank A/c'
+    ],
+    steps: [
+      'Visit official pmkisan.gov.in portal for selfregistration',
+      'Fill registration form with landholding details (Patta/Chitta)',
+      'Enter active Aadhaar-seeded bank account credentials',
+      'Get land ownership verified by local revenue officer (VAO)',
+      'Receive ₹6,000 annual income support in three installments'
+    ]
+  },
+  {
+    id: 13,
+    category: 'Agriculture & Farmers',
+    title: 'PM Fasal Bima Yojana (PMFBY)',
+    highlight: 'SUBSIDIZED PREMIUM COVER',
+    overview: 'A crop insurance scheme that protects farmers from financial losses due to natural disasters, crop diseases, pests, or localized bad weather.',
+    tags: ['Agriculture Security', '🌧️ Natural Calamity Cover', '1.5% - 2% Premium Cap'],
+    eligibility: 'Subsidized premium rates capped at 1.5% to 2% for food crops, oilseeds, and pulses. Provides comprehensive financial protection from sowing to post-harvest.',
+    documents: [
+      'Aadhaar Card',
+      'Sowing/Land Holding Certificate',
+      'Bank Passbook & Account Details'
+    ],
+    steps: [
+      'Ensure crop is sown and notified for insurance coverage',
+      'Visit pmfby.gov.in or nearest bank/CSC within deadline',
+      'Submit land chitta/adangal and crop sowing certificate',
+      'Pay heavily subsidized premium (1.5% to 2% for food crops)',
+      'File claim within 72 h'
+    ]
+  }
+];
+
+function BrochurePanel({ onBack }) {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeCategory, setActiveCategory] = useState('All');
+  const [expandedId, setExpandedId] = useState(null);
+
+  const categories = [
+    'All',
+    'Women & Child Welfare',
+    'Education & Research',
+    'Artisans & Small Business',
+    'Healthcare & Energy',
+    'Agriculture & Farmers'
+  ];
+
+  const filteredSchemes = SCHEMES.filter(s => {
+    const matchesCategory = activeCategory === 'All' || s.category === activeCategory;
+    const matchesSearch = s.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      s.overview.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      s.tags.some(t => t.toLowerCase().includes(searchQuery.toLowerCase()));
+    return matchesCategory && matchesSearch;
+  });
+
+  return (
+    <div className="chatbot-container brochure-panel">
+      <header className="brochure-header">
+        <div className="brochure-title">
+          <i className="bi bi-book-fill brochure-title-orange" />
+          <span>BJP Brochure</span>
+        </div>
+        <button className="btn-brochure-back" onClick={onBack}>
+          <i className="bi bi-chat-dots-fill" /> Back to Chat
+        </button>
+      </header>
+
+      <div className="brochure-content">
+        <div className="brochure-controls">
+          <div className="brochure-search-wrapper">
+            <i className="bi bi-search brochure-search-icon" />
+            <input 
+              type="text" 
+              className="brochure-search-input" 
+              placeholder="Search Central Welfare Schemes..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+
+          <div className="brochure-categories">
+            {categories.map(cat => (
+              <button 
+                key={cat} 
+                className={`category-pill ${activeCategory === cat ? 'active' : ''}`}
+                onClick={() => { setActiveCategory(cat); setExpandedId(null); }}
+              >
+                {cat === 'All' ? 'All Schemes' : cat}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="schemes-list">
+          {filteredSchemes.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--color-ash)' }}>
+              <i className="bi bi-clipboard-x" style={{ fontSize: 32, marginBottom: 12, display: 'block' }} />
+              No schemes found matching your search.
+            </div>
+          ) : (
+            filteredSchemes.map((scheme, index) => {
+              const isExpanded = expandedId === scheme.id;
+              return (
+                <div 
+                  key={scheme.id} 
+                  className="scheme-card"
+                  onClick={() => setExpandedId(isExpanded ? null : scheme.id)}
+                >
+                  <div className="scheme-card-header">
+                    <div>
+                      <div className="scheme-meta-cat">{scheme.category}</div>
+                      <h3 className="scheme-title">{index + 1}. {scheme.title}</h3>
+                    </div>
+                    {scheme.highlight && <span className="scheme-badge">{scheme.highlight}</span>}
+                  </div>
+
+                  <div className="scheme-tags-row">
+                    {scheme.tags.map((t, idx) => (
+                      <span key={idx} className="scheme-tag">{t}</span>
+                    ))}
+                  </div>
+
+                  <p className="scheme-overview">{scheme.overview}</p>
+
+                  <button className="scheme-toggle-btn" onClick={(e) => { e.stopPropagation(); setExpandedId(isExpanded ? null : scheme.id); }}>
+                    <i className={`bi bi-chevron-${isExpanded ? 'up' : 'down'}`} />
+                    <span>{isExpanded ? 'Hide Steps & Documents' : 'View Requirements & 5-Step Application'}</span>
+                  </button>
+
+                  {isExpanded && (
+                    <div className="scheme-details-expanded" onClick={(e) => e.stopPropagation()}>
+                      <div>
+                        <div className="details-section-title">
+                          <i className="bi bi-info-circle-fill" /> Eligibility & Benefits
+                        </div>
+                        <p className="details-text">{scheme.eligibility}</p>
+                      </div>
+
+                      <div>
+                        <div className="details-section-title">
+                          <i className="bi bi-file-earmark-check-fill" /> Required Documents
+                        </div>
+                        <div className="documents-list">
+                          {scheme.documents.map((doc, idx) => (
+                            <div key={idx} className="doc-item">
+                              <i className="bi bi-check-circle-fill" />
+                              <span>{doc}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="details-section-title">
+                          <i className="bi bi-lightning-fill" /> How to Apply (5 Steps)
+                        </div>
+                        <div className="steps-list">
+                          {scheme.steps.map((step, idx) => (
+                            <div key={idx} className="step-item">
+                              <span className="step-num">{idx + 1}</span>
+                              <span className="details-text">{step}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FullLetterPanel({ type, name, date, onBack }) {
+  const handlePrint = () => {
+    const iframe = document.getElementById('full-letter-iframe')
+    if (iframe && iframe.contentWindow) {
+      iframe.contentWindow.focus()
+      iframe.contentWindow.print()
+    }
+  }
+
+  const isAppreciation = type === 'appreciation';
+  const letterUrl = isAppreciation
+    ? `/Appreciation_letter.html?name=${encodeURIComponent(name)}&date=${encodeURIComponent(date)}&hideControls=true`
+    : `/Welcome_letter.html?name=${encodeURIComponent(name)}&date=${encodeURIComponent(date)}&hideControls=true`;
+
+  return (
+    <div className="chatbot-container brochure-panel">
+      <header className="brochure-header">
+        <div className="brochure-title">
+          <i className={`bi bi-${isAppreciation ? 'award-fill' : 'envelope-paper-fill'} brochure-title-orange`} />
+          <span>{isAppreciation ? 'Letter of Appreciation' : 'Welcome Letter'}</span>
+        </div>
+        <div style={{ display: 'flex', gap: 12 }}>
+          <button 
+            className="btn-brochure-back" 
+            onClick={handlePrint}
+            style={{ 
+              borderColor: 'var(--color-signal-mint)', 
+              color: 'var(--color-signal-mint)' 
+            }}
+          >
+            <i className="bi bi-file-earmark-pdf-fill" /> Download PDF / Print
+          </button>
+          <button className="btn-brochure-back" onClick={onBack}>
+            <i className="bi bi-chat-dots-fill" /> Back to Chat
+          </button>
+        </div>
+      </header>
+      <div style={{ flex: 1, background: '#f5f5f5', overflow: 'hidden', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+        <iframe
+          id="full-letter-iframe"
+          src={letterUrl}
+          style={{ width: '100%', height: '100%', border: 'none' }}
+          title={isAppreciation ? 'Appreciation Letter' : 'Welcome Letter'}
+        />
+      </div>
+    </div>
+  );
+}
+
+function FullBoothPanel({ epicNo, onBack }) {
+  const [boothData, setBoothData] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+
+  useEffect(() => {
+    if (!epicNo) {
+      setError('No booth data available. Please complete registration first.')
+      setLoading(false)
+      return
+    }
+    chat.getBooth(epicNo)
+      .then((data) => {
+        setBoothData(data)
+      })
+      .catch((err) => {
+        setError(err.message || 'Unable to load booth information.')
+      })
+      .finally(() => {
+        setLoading(false)
+      })
+  }, [epicNo])
+
+  const getFieldIcon = (key) => {
+    const k = key.toLowerCase();
+    if (k.includes('assembly_name') || k.includes('assembly')) return 'geo-alt';
+    if (k.includes('assembly_no') || k.includes('number')) return 'hash';
+    if (k.includes('district')) return 'map';
+    if (k.includes('part_no') || k.includes('part')) return 'pin-map';
+    return 'info-circle';
+  }
+
+  const SKIP_KEYS = new Set(['success', 'polling_station'])
+  const entries = boothData ? Object.entries(boothData).filter(([k, v]) => !SKIP_KEYS.has(k) && v !== null && v !== undefined && v !== '') : [];
+
+  return (
+    <div className="chatbot-container brochure-panel">
+      <header className="brochure-header">
+        <div className="brochure-title">
+          <i className="bi bi-building brochure-title-orange" />
+          <span>Booth Information</span>
+        </div>
+        <button className="btn-brochure-back" onClick={onBack}>
+          <i className="bi bi-chat-dots-fill" /> Back to Chat
+        </button>
+      </header>
+
+      <div className="brochure-content">
+        {loading ? (
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 200 }}>
+            <div style={{ width: 32, height: 32, border: '3px solid rgba(46, 204, 113, 0.15)', borderTopColor: 'var(--color-signal-mint)', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+          </div>
+        ) : error ? (
+          <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--color-ash)' }}>
+            <i className="bi bi-exclamation-triangle" style={{ fontSize: 32, color: '#ff3b30', marginBottom: 12, display: 'block' }} />
+            {error}
+          </div>
+        ) : (
+          <div style={{ 
+            width: '100%', 
+            maxWidth: '640px',
+            margin: '20px auto 0 auto',
+            display: 'flex', 
+            flexDirection: 'column', 
+            alignItems: 'center', 
+            gap: 24,
+            background: 'transparent',
+            border: 'none',
+            borderRadius: 0,
+            padding: '20px 0',
+            boxShadow: 'none'
+          }}>
+            {/* Header Icon & Title */}
+            <div style={{ textAlign: 'center', marginBottom: 8 }}>
+              <div style={{
+                width: 72,
+                height: 72,
+                borderRadius: '50%',
+                background: 'rgba(255, 153, 51, 0.1)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: '0 auto 12px auto'
+              }}>
+                <i className="bi bi-building" style={{ fontSize: 36, color: '#FF9933' }} />
+              </div>
+              <h3 style={{ fontSize: 20, fontWeight: 700, color: 'var(--color-chalk)', marginBottom: 4 }}>Polling Booth Details</h3>
+              <p style={{ fontSize: 13, color: 'var(--color-ash)', margin: 0 }}>Registered election booth location and part details</p>
+            </div>
+
+            {/* Details Grid */}
+            <div style={{ 
+              width: '100%', 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(2, 1fr)', 
+              gap: 12 
+            }}>
+              {entries.length > 0 ? entries.map(([k, v]) => (
+                <div key={k} style={{ 
+                  background: 'var(--color-carbon)', 
+                  border: '1px solid var(--color-graphite)',
+                  borderRadius: 12,
+                  padding: '12px 16px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 4
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--color-ash)' }}>
+                    <i className={`bi bi-${getFieldIcon(k)}`} style={{ color: '#FF9933' }} />
+                    <span style={{ textTransform: 'capitalize' }}>{k.replace(/_/g, ' ')}</span>
+                  </div>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-chalk)' }}>{String(v)}</span>
+                </div>
+              )) : (
+                <div style={{ gridColumn: 'span 2', textAlign: 'center', padding: '24px', color: 'var(--color-ash)' }}>
+                  No details found.
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function FullProfilePanel({ epicNo, mobile, referredCount, onBack }) {
+  const [profileData, setProfileData] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+
+  useEffect(() => {
+    if (!epicNo) {
+      setError('No profile data available.')
+      setLoading(false)
+      return
+    }
+    chat.profile(epicNo, mobile)
+      .then((data) => {
+        setProfileData(data)
+      })
+      .catch((err) => {
+        setError(err.message || 'Unable to load profile.')
+      })
+      .finally(() => {
+        setLoading(false)
+      })
+  }, [epicNo, mobile])
+
+  return (
+    <div className="chatbot-container brochure-panel">
+      <header className="brochure-header">
+        <div className="brochure-title">
+          <i className="bi bi-person-circle brochure-title-orange" />
+          <span>My Profile</span>
+        </div>
+        <button className="btn-brochure-back" onClick={onBack}>
+          <i className="bi bi-chat-dots-fill" /> Back to Chat
+        </button>
+      </header>
+
+      <div className="brochure-content">
+        {loading ? (
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 200 }}>
+            <div style={{ width: 32, height: 32, border: '3px solid rgba(46, 204, 113, 0.15)', borderTopColor: 'var(--color-signal-mint)', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+          </div>
+        ) : error ? (
+          <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--color-ash)' }}>
+            <i className="bi bi-exclamation-triangle" style={{ fontSize: 32, color: '#ff3b30', marginBottom: 12, display: 'block' }} />
+            {error}
+          </div>
+        ) : (
+          <div style={{ 
+            width: '100%', 
+            maxWidth: '640px',
+            margin: '20px auto 0 auto',
+            display: 'flex', 
+            flexDirection: 'row', 
+            alignItems: 'center', 
+            gap: 32,
+            background: 'transparent',
+            border: 'none',
+            borderRadius: 0,
+            padding: '20px 0',
+            boxShadow: 'none',
+            flexWrap: 'wrap'
+          }}>
+            {/* Left Column: Avatar & Name */}
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: 16,
+              width: '160px',
+              margin: '0 auto',
+              textAlign: 'center',
+              flexShrink: 0
+            }}>
+              {/* Profile Photo */}
+              <div style={{ position: 'relative' }}>
+                {profileData.photo_url ? (
+                  <img 
+                    src={profileData.photo_url} 
+                    alt={profileData.name} 
+                    style={{ 
+                      width: 96, 
+                      height: 96, 
+                      borderRadius: '50%', 
+                      objectFit: 'cover', 
+                      border: referredCount >= 5 ? '2.5px solid #FF9933' : '2px solid var(--color-graphite)',
+                      boxShadow: referredCount >= 5 ? '0 0 16px rgba(255, 153, 51, 0.35)' : 'none'
+                    }} 
+                  />
+                ) : (
+                  <div style={{ 
+                    width: 96, 
+                    height: 96, 
+                    borderRadius: '50%', 
+                    background: '#252d27', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center', 
+                    border: '2px solid var(--color-graphite)' 
+                  }}>
+                    <i className="bi bi-person-fill" style={{ color: 'var(--color-ash)', fontSize: 44 }} />
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <h3 style={{ fontSize: 18, fontWeight: 700, color: 'var(--color-chalk)', marginBottom: 4 }}>{profileData.name || 'Member'}</h3>
+                <p style={{ fontSize: 12, color: 'var(--color-signal-mint)', fontWeight: 600, margin: 0 }}>
+                  {referredCount >= 5 ? 'BJP Volunteer Agent' : 'BJP Registered Member'}
+                </p>
+              </div>
+            </div>
+
+            {/* Right Column: Grid Details */}
+            <div style={{ 
+              flex: 1, 
+              minWidth: '280px', 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(2, 1fr)', 
+              gap: 12 
+            }}>
+              <div style={{ 
+                background: 'var(--color-carbon)', 
+                border: '1px solid var(--color-graphite)',
+                borderRadius: 12,
+                padding: '10px 14px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 4
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--color-ash)' }}>
+                  <i className="bi bi-hash" style={{ color: '#FF9933' }} />
+                  <span>Member Code</span>
+                </div>
+                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-chalk)', fontFamily: 'monospace' }}>{profileData.wtl_code || profileData.ptc_code || 'N/A'}</span>
+              </div>
+
+              <div style={{ 
+                background: 'var(--color-carbon)', 
+                border: '1px solid var(--color-graphite)',
+                borderRadius: 12,
+                padding: '10px 14px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 4
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--color-ash)' }}>
+                  <i className="bi bi-card-text" style={{ color: '#FF9933' }} />
+                  <span>EPIC Number</span>
+                </div>
+                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-chalk)', fontFamily: 'monospace' }}>{profileData.epic_no || 'N/A'}</span>
+              </div>
+
+              <div style={{ 
+                background: 'var(--color-carbon)', 
+                border: '1px solid var(--color-graphite)',
+                borderRadius: 12,
+                padding: '10px 14px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 4
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--color-ash)' }}>
+                  <i className="bi bi-phone" style={{ color: '#FF9933' }} />
+                  <span>Mobile Number</span>
+                </div>
+                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-chalk)', fontFamily: 'monospace' }}>{profileData.mobile || mobile || 'N/A'}</span>
+              </div>
+
+              <div style={{ 
+                background: 'var(--color-carbon)', 
+                border: '1px solid var(--color-graphite)',
+                borderRadius: 12,
+                padding: '10px 14px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 4
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--color-ash)' }}>
+                  <i className="bi bi-geo" style={{ color: '#FF9933' }} />
+                  <span>State</span>
+                </div>
+                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-chalk)' }}>Tamil Nadu</span>
+              </div>
+
+              <div style={{ 
+                background: 'var(--color-carbon)', 
+                border: '1px solid var(--color-graphite)',
+                borderRadius: 12,
+                padding: '10px 14px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 4
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--color-ash)' }}>
+                  <i className="bi bi-geo-alt" style={{ color: '#FF9933' }} />
+                  <span>Assembly</span>
+                </div>
+                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-chalk)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={profileData.assembly}>{profileData.assembly || 'N/A'}</span>
+              </div>
+
+              <div style={{ 
+                background: 'var(--color-carbon)', 
+                border: '1px solid var(--color-graphite)',
+                borderRadius: 12,
+                padding: '10px 14px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 4
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--color-ash)' }}>
+                  <i className="bi bi-map" style={{ color: '#FF9933' }} />
+                  <span>District</span>
+                </div>
+                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-chalk)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={profileData.district}>{profileData.district || 'N/A'}</span>
+              </div>
+
+              <div style={{ 
+                background: 'rgba(46,204,113,0.04)', 
+                border: '1px solid rgba(46,204,113,0.1)',
+                borderRadius: 12,
+                padding: 14,
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                gridColumn: 'span 2'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <i className="bi bi-people-fill" style={{ color: 'var(--color-signal-mint)', fontSize: 16 }} />
+                  <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-chalk)' }}>Total Referrals</span>
+                </div>
+                <span style={{ fontSize: 18, fontWeight: 800, color: 'var(--color-signal-mint)' }}>{referredCount}</span>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+      <style>{`
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+function FullCardPanel({ card, onBack }) {
+  const c = card || {}
+  const [fullCardData, setFullCardData] = useState(null)
+  const cardRef3D = useRef(null)
+
+  useEffect(() => {
+    const hasName = c.name || c.voter_name || c.VOTER_NAME;
+    const hasAssembly = c.assembly_name || c.assembly || c.ASSEMBLY_NAME;
+    if (hasName && hasAssembly) {
+      setFullCardData(c)
+    } else if (c.epic_no) {
+      publicApi.getCardData(c.epic_no)
+        .then((data) => setFullCardData(data))
+        .catch(() => setFullCardData(c))
+    }
+  }, [c])
+
+  return (
+    <div className="chatbot-container brochure-panel">
+      <header className="brochure-header">
+        <div className="brochure-title">
+          <i className="bi bi-credit-card-2-front brochure-title-orange" />
+          <span>My Member Card</span>
+        </div>
+        <div style={{ display: 'flex', gap: 12 }}>
+          <button 
+            className="btn-brochure-back" 
+            onClick={() => cardRef3D.current?.download()}
+            style={{ 
+              borderColor: 'var(--color-signal-mint)', 
+              color: 'var(--color-signal-mint)' 
+            }}
+          >
+            <i className="bi bi-download" /> Download ID Card
+          </button>
+          <button className="btn-brochure-back" onClick={onBack}>
+            <i className="bi bi-chat-dots-fill" /> Back to Chat
+          </button>
+        </div>
+      </header>
+
+      <div className="brochure-content" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 24, padding: '40px 20px', minHeight: 400 }}>
+        {fullCardData ? (
+          <>
+            <FlipCard3D
+              ref={cardRef3D}
+              cardData={fullCardData}
+              backUrl={c.back_url || fullCardData.back_url}
+              width={540}
+              autoFlip={false}
+              showActions={false}
+            />
+            <div style={{ color: 'var(--color-ash)', fontSize: 13, textAlign: 'center', maxWidth: 360, marginTop: 12 }}>
+              <i className="bi bi-info-circle-fill" style={{ color: '#FF9933', marginRight: 6 }} />
+              Hover or click on the card to flip it and view the backside voter details.
+            </div>
+          </>
+        ) : (
+          <div style={{ width: 32, height: 32, border: '3px solid rgba(46, 204, 113, 0.15)', borderTopColor: 'var(--color-signal-mint)', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function FullFormPanel({ title, icon, onBack, children }) {
+  return (
+    <div className="chatbot-container brochure-panel">
+      <header className="brochure-header">
+        <div className="brochure-title">
+          <i className={`bi bi-${icon} brochure-title-orange`} />
+          <span>{title}</span>
+        </div>
+        <button className="btn-brochure-back" onClick={onBack}>
+          <i className="bi bi-chat-dots-fill" /> Back to Chat
+        </button>
+      </header>
+
+      <div className="brochure-content" style={{ display: 'flex', justifyContent: 'center', alignItems: 'flex-start', paddingTop: 24, overflowY: 'auto' }}>
+        <div style={{ width: '100%', maxWidth: '440px', background: 'var(--color-carbon)', border: '1px solid var(--color-graphite)', borderRadius: 20, padding: 20 }}>
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function BestPerformersPanel({ onBack }) {
+  const [performers, setPerformers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [selectedMember, setSelectedMember] = useState(null);
+
+  useEffect(() => {
+    chat.getBestPerformers()
+      .then((data) => {
+        setPerformers(data.performers || []);
+      })
+      .catch((err) => {
+        setError(err.message || 'Unable to load leaderboard.');
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, []);
+
+  return (
+    <div className="chatbot-container brochure-panel">
+      <header className="brochure-header">
+        <div className="brochure-title">
+          <i className="bi bi-trophy-fill brochure-title-orange" />
+          <span>Best Performers</span>
+        </div>
+        <button className="btn-brochure-back" onClick={onBack}>
+          <i className="bi bi-chat-dots-fill" /> Back to Chat
+        </button>
+      </header>
+
+      <div className="brochure-content">
+        {loading ? (
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 200 }}>
+            <div style={{ width: 32, height: 32, border: '3px solid rgba(46, 204, 113, 0.15)', borderTopColor: 'var(--color-signal-mint)', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+          </div>
+        ) : error ? (
+          <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--color-ash)' }}>
+            <i className="bi bi-exclamation-triangle" style={{ fontSize: 32, color: '#ff3b30', marginBottom: 12, display: 'block' }} />
+            {error}
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div style={{ textAlign: 'center', padding: '10px 0' }}>
+              <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--color-chalk)', marginBottom: 6 }}>Referral Champions 👑</h2>
+              <p style={{ fontSize: 13, color: 'var(--color-ash)', maxWidth: 440, margin: '0 auto' }}>
+                Leading volunteers who are driving local outreach and expanding our digital footprint across Tamil Nadu.
+              </p>
+            </div>
+
+            {performers.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--color-ash)' }}>
+                <i className="bi bi-people-fill" style={{ fontSize: 40, color: 'var(--color-graphite)', marginBottom: 12, display: 'block' }} />
+                <p>No referrals recorded yet. Be the first performer!</p>
+              </div>
+            ) : (
+              performers.map((p, index) => {
+                const rank = index + 1;
+                
+                const rankStyles = {
+                  1: { border: '2px solid #FF9933', badge: '#FF9933', emoji: '👑' },
+                  2: { border: '1px solid #c0c0c0', badge: '#c0c0c0', emoji: '🥈' },
+                  3: { border: '1px solid #cd7f32', badge: '#cd7f32', emoji: '🥉' },
+                  4: { border: '1px solid var(--color-graphite)', badge: 'var(--color-ash)', emoji: '' },
+                  5: { border: '1px solid var(--color-graphite)', badge: 'var(--color-ash)', emoji: '' }
+                };
+
+                const style = rankStyles[rank] || rankStyles[5];
+
+                return (
+                  <div 
+                    key={p.wtl_code}
+                    onClick={() => setSelectedMember(p)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 16,
+                      padding: '12px 18px',
+                      background: 'var(--color-carbon)',
+                      border: style.border,
+                      borderRadius: '16px',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    <div style={{
+                      width: 28,
+                      height: 28,
+                      borderRadius: '50%',
+                      border: `1.5px solid ${style.badge}`,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: 13,
+                      fontWeight: 'bold',
+                      color: style.badge,
+                      flexShrink: 0
+                    }}>
+                      {rank}
+                    </div>
+
+                    <div style={{ position: 'relative', flexShrink: 0 }}>
+                      {p.photo_url ? (
+                        <img src={p.photo_url} alt={p.name} style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', border: '1.5px solid var(--color-graphite)' }} />
+                      ) : (
+                        <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#252d27', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1.5px solid var(--color-graphite)' }}>
+                          <i className="bi bi-person-fill" style={{ color: 'var(--color-ash)', fontSize: 18 }} />
+                        </div>
+                      )}
+                      {style.emoji && (
+                        <span style={{ position: 'absolute', top: -6, right: -6, fontSize: 12 }}>{style.emoji}</span>
+                      )}
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, textAlign: 'left' }}>
+                      <span style={{ fontSize: 14, fontWeight: 'bold', color: 'var(--color-chalk)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</span>
+                      <span style={{ fontSize: 11, color: 'var(--color-ash)', fontFamily: 'monospace' }}>BJP Code: <span style={{ color: 'var(--color-signal-mint)', fontWeight: 600 }}>{p.wtl_code}</span></span>
+                    </div>
+
+                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                      <div style={{ fontSize: 16, fontWeight: 'bold', color: 'var(--color-signal-mint)' }}>{p.referrals || p.referred_count || 0}</div>
+                      <div style={{ fontSize: 9, color: 'var(--color-ash)', textTransform: 'uppercase' }}>Invited</div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+
+            {selectedMember && (
+              <div 
+                className="appointment-modal-overlay"
+                onClick={() => setSelectedMember(null)}
+              >
+                <div 
+                  className="appointment-modal-content"
+                  onClick={(e) => e.stopPropagation()}
+                  style={{ 
+                    width: '580px', 
+                    maxWidth: '95%',
+                    padding: '24px 20px', 
+                    display: 'flex', 
+                    flexDirection: 'row', 
+                    alignItems: 'center', 
+                    gap: 20,
+                    background: 'var(--color-carbon)',
+                    border: '1px solid var(--color-graphite)',
+                    borderRadius: 24,
+                    boxShadow: '0 20px 40px rgba(0, 0, 0, 0.5)',
+                    position: 'relative',
+                    flexWrap: 'wrap'
+                  }}
+                >
+                  <button className="modal-close-btn" style={{ color: '#ff3b30' }} onClick={() => setSelectedMember(null)}>×</button>
+                  
+                  {/* Left Column: Avatar & Rank */}
+                  <div style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: 12,
+                    width: '140px',
+                    margin: '0 auto',
+                    textAlign: 'center',
+                    flexShrink: 0
+                  }}>
+                    {/* Profile Photo */}
+                    <div style={{ position: 'relative' }}>
+                      {selectedMember.photo_url ? (
+                        <img 
+                          src={selectedMember.photo_url} 
+                          alt={selectedMember.name} 
+                          style={{ 
+                            width: 80, 
+                            height: 80, 
+                            borderRadius: '50%', 
+                            objectFit: 'cover', 
+                            border: selectedMember.rank === 1 ? '2.5px solid #FF9933' : '2px solid var(--color-graphite)',
+                            boxShadow: selectedMember.rank === 1 ? '0 0 16px rgba(255, 153, 51, 0.35)' : 'none'
+                          }} 
+                        />
+                      ) : (
+                        <div style={{ 
+                          width: 80, 
+                          height: 80, 
+                          borderRadius: '50%', 
+                          background: '#252d27', 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          justifyContent: 'center', 
+                          border: '2px solid var(--color-graphite)' 
+                        }}>
+                          <i className="bi bi-person-fill" style={{ color: 'var(--color-ash)', fontSize: 36 }} />
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Rank Badge */}
+                    <div style={{
+                      background: selectedMember.rank === 1 ? 'linear-gradient(135deg, #FF9933 0%, #d47a1c 100%)' : 'rgba(255,255,255,0.06)',
+                      border: selectedMember.rank === 1 ? 'none' : '1px solid var(--color-graphite)',
+                      color: selectedMember.rank === 1 ? '#000' : 'var(--color-chalk)',
+                      padding: '4px 10px',
+                      borderRadius: '16px',
+                      fontSize: '10px',
+                      fontWeight: 700,
+                      letterSpacing: '0.05em',
+                      textTransform: 'uppercase',
+                      whiteSpace: 'nowrap'
+                    }}>
+                      {selectedMember.rank === 1 ? '👑 Champion' : `Rank #${selectedMember.rank}`}
+                    </div>
+
+                    <div>
+                      <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-chalk)', marginBottom: 2, wordBreak: 'break-all' }}>{selectedMember.name}</h3>
+                      <p style={{ fontSize: 11, color: 'var(--color-signal-mint)', fontWeight: 600, margin: 0 }}>Volunteer Agent</p>
+                    </div>
+                  </div>
+
+                  {/* Right Column: Details Grid */}
+                  <div style={{ 
+                    flex: 1, 
+                    minWidth: '280px', 
+                    display: 'grid', 
+                    gridTemplateColumns: 'repeat(2, 1fr)', 
+                    gap: 10 
+                  }}>
+                    <div style={{ 
+                      background: 'rgba(255,255,255,0.02)', 
+                      border: '1px solid rgba(255,255,255,0.04)',
+                      borderRadius: 10,
+                      padding: '8px 12px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 2
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: 'var(--color-ash)' }}>
+                        <i className="bi bi-hash" style={{ color: '#FF9933' }} />
+                        <span>Member Code</span>
+                      </div>
+                      <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-chalk)', fontFamily: 'monospace' }}>{selectedMember.wtl_code}</span>
+                    </div>
+
+                    <div style={{ 
+                      background: 'rgba(255,255,255,0.02)', 
+                      border: '1px solid rgba(255,255,255,0.04)',
+                      borderRadius: 10,
+                      padding: '8px 12px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 2
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: 'var(--color-ash)' }}>
+                        <i className="bi bi-card-text" style={{ color: '#FF9933' }} />
+                        <span>EPIC Number</span>
+                      </div>
+                      <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-chalk)', fontFamily: 'monospace' }}>{selectedMember.epic_no}</span>
+                    </div>
+
+                    <div style={{ 
+                      background: 'rgba(255,255,255,0.02)', 
+                      border: '1px solid rgba(255,255,255,0.04)',
+                      borderRadius: 10,
+                      padding: '8px 12px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 2
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: 'var(--color-ash)' }}>
+                        <i className="bi bi-geo-alt" style={{ color: '#FF9933' }} />
+                        <span>Assembly</span>
+                      </div>
+                      <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-chalk)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={selectedMember.assembly_name}>{selectedMember.assembly_name}</span>
+                    </div>
+
+                    <div style={{ 
+                      background: 'rgba(255,255,255,0.02)', 
+                      border: '1px solid rgba(255,255,255,0.04)',
+                      borderRadius: 10,
+                      padding: '8px 12px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 2
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: 'var(--color-ash)' }}>
+                        <i className="bi bi-map" style={{ color: '#FF9933' }} />
+                        <span>District</span>
+                      </div>
+                      <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-chalk)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={selectedMember.district}>{selectedMember.district}</span>
+                    </div>
+
+                    <div style={{ 
+                      background: 'rgba(255,255,255,0.02)', 
+                      border: '1px solid rgba(255,255,255,0.04)',
+                      borderRadius: 10,
+                      padding: '8px 12px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 2
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: 'var(--color-ash)' }}>
+                        <i className="bi bi-pin-map" style={{ color: '#FF9933' }} />
+                        <span>Part Number</span>
+                      </div>
+                      <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-chalk)', fontFamily: 'monospace' }}>{selectedMember.part_no}</span>
+                    </div>
+
+                    <div style={{ 
+                      background: 'rgba(46,204,113,0.04)', 
+                      border: '1px solid rgba(46,204,113,0.1)',
+                      borderRadius: 10,
+                      padding: '8px 12px',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <i className="bi bi-people-fill" style={{ color: 'var(--color-signal-mint)', fontSize: 14 }} />
+                        <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-chalk)' }}>Total Refs</span>
+                      </div>
+                      <span style={{ fontSize: 16, fontWeight: 800, color: 'var(--color-signal-mint)' }}>{selectedMember.referrals}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+      <style>{`
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
+    </div>
+  );
+}
+
 // ── Main ChatbotPage ────────────────────────────────────────
 export default function ChatbotPage() {
   const navigate = useNavigate()
@@ -901,11 +2368,78 @@ export default function ChatbotPage() {
   const [messages, setMessages]     = useState([])
   const [inputValue, setInputValue] = useState('')
   const [isTyping, setIsTyping]     = useState(false)
+  const [activeView, setActiveView] = useState('chat')
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [isFlipped, setIsFlipped]   = useState(false)
   const [cropSrc, setCropSrc]       = useState('')
   const [cropOpen, setCropOpen]     = useState(false)
   const [modalCard, setModalCard]   = useState(null)
+
+  // Milestones and Appointment state
+  const [referredCount, setReferredCount] = useState(0)
+  const [hasAppointment, setHasAppointment] = useState(false)
+  const [showModal, setShowModal] = useState(false)
+  const [bookingStep, setBookingStep] = useState(1) // 1: Info, 2: Book Form, 3: Success
+  const [selectedDate, setSelectedDate] = useState('')
+  const [selectedTime, setSelectedTime] = useState('')
+  const [isBooking, setIsBooking] = useState(false)
+  const [bookingError, setBookingError] = useState('')
+
+  const fetchMemberStatus = async (code) => {
+    if (!code) return
+    try {
+      const res = await chat.getMemberStatus(code)
+      if (res.success) {
+        setReferredCount(res.referred_count || 0)
+        setHasAppointment(res.has_appointment || false)
+        if (res.has_appointment && res.appointment) {
+          setSelectedDate(res.appointment.date || '')
+          setSelectedTime(res.appointment.time || '')
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to fetch member status:', err)
+    }
+  }
+
+  const handleBellClick = () => {
+    if (hasAppointment) {
+      setBookingStep(3)
+    } else {
+      setBookingStep(1)
+      setSelectedDate('')
+      setSelectedTime('')
+    }
+    setBookingError('')
+    setShowModal(true)
+  }
+
+  const handleBookAppointment = async () => {
+    if (!selectedDate) {
+      setBookingError('Please choose a date.')
+      return
+    }
+    if (!selectedTime) {
+      setBookingError('Please choose a time slot.')
+      return
+    }
+    setBookingError('')
+    setIsBooking(true)
+    const wtlCode = cardRef.current?.wtl_code || cardRef.current?.ptc_code || profileRef.current?.wtl_code || profileRef.current?.ptc_code
+    try {
+      const res = await chat.bookAppointment(wtlCode, selectedDate, selectedTime)
+      setIsBooking(false)
+      if (res.success) {
+        setHasAppointment(true)
+        setBookingStep(3)
+      } else {
+        setBookingError(res.message || 'Failed to book appointment. Please try again.')
+      }
+    } catch (err) {
+      setIsBooking(false)
+      setBookingError(err.message || 'Network error booking appointment.')
+    }
+  }
 
   useEffect(() => {
     const handler = (e) => setModalCard(e.detail)
@@ -964,6 +2498,10 @@ export default function ChatbotPage() {
       epicRef.current    = cache.card.epic_no || ''
       // Note: mobile is NOT stored in localStorage for PII protection
       addMsg('bot', 'text', { text: '👋 Welcome back to *BJP Tamil Nadu!*' })
+      const wtlCode = cache.card.wtl_code || cache.card.ptc_code
+      if (wtlCode) {
+        fetchMemberStatus(wtlCode)
+      }
       setTimeout(() => {
         addMsg('bot', 'generated_card', { card: cache.card })
         setChatState(S.DONE)
@@ -1009,6 +2547,12 @@ export default function ChatbotPage() {
         }
         cardRef.current = card
         saveCache(card, {})
+        if (res.referred_count !== undefined) {
+          setReferredCount(res.referred_count)
+        }
+        if (card.wtl_code) {
+          fetchMemberStatus(card.wtl_code)
+        }
         await botSay('✅ You are already a registered member! Here is your Digital Member ID Card:', 300)
         addMsg('bot', 'generated_card', { card })
         setChatState(S.DONE)
@@ -1052,6 +2596,9 @@ export default function ChatbotPage() {
         }
         cardRef.current = card
         saveCache(card, {})
+        if (card.wtl_code) {
+          fetchMemberStatus(card.wtl_code)
+        }
         await botSay('✅ You are already a registered member! Here is your Digital Member ID Card:', 300)
         addMsg('bot', 'generated_card', { card })
         setChatState(S.DONE)
@@ -1122,7 +2669,7 @@ export default function ChatbotPage() {
     setCropSrc('')
     addMsg('user', 'text', { text: '📸 Photo uploaded' })
     setChatState(S.GENERATING)
-    await botSay('⏳ Generating your card… This may take up to a minute.', 400)
+    await botSay('⏳ Generating your card… please wait a moment.', 400)
 
     try {
       const formData = new FormData()
@@ -1152,6 +2699,9 @@ export default function ChatbotPage() {
       }
       cardRef.current = card
       saveCache(card, profileRef.current || {})
+      if (card.wtl_code) {
+        fetchMemberStatus(card.wtl_code)
+      }
 
       // Clear referral storage since card is successfully generated under this referral
       try {
@@ -1161,16 +2711,15 @@ export default function ChatbotPage() {
       await botSay('🎉 Your Digital Member ID Card is ready!', 200)
       addMsg('bot', 'generated_card', { card, isNew: true })
 
-      // Auto-show referral link after a short delay so the card message settles
-      if (res.referral_link) {
-        await sleep(900)
-        await botSay(
-          '👥 *Invite others to join BJP Tamil Nadu!*\nShare your personal referral link below — every person who generates their card using your link will appear in your *My Members* list.',
-          300,
-        )
-        await sleep(400)
-        addMsg('bot', 'referral_link', { link: res.referral_link, wtlCode: res.wtl_code || res.ptc_code })
-      }
+      // Send Welcome Letter PDF attachment
+      await sleep(1000)
+      await botSay(
+        '✉️ *Welcome to BJP Tamil Nadu!*\nWe have prepared your official welcome letter. Click below to view, print, or save it as a PDF:',
+        300
+      )
+      await sleep(400)
+      const todayDate = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+      addMsg('bot', 'welcome_letter', { name: card.name, date: todayDate })
 
       setChatState(S.DONE)
     } catch (err) {
@@ -1200,40 +2749,48 @@ export default function ChatbotPage() {
   // ── Sidebar actions ───────────────────────────────────────
   const handleSidebarAction = async (action) => {
     setSidebarOpen(false)
+    if (action === 'brochure') {
+      setActiveView('brochure')
+      return
+    }
+    if (action === 'profile') {
+      setActiveView('profile')
+      return
+    }
+    if (action === 'my_card') {
+      setActiveView('my_card')
+      return
+    }
+    if (action === 'welcome_letter') {
+      setActiveView('welcome_letter')
+      return
+    }
+    if (action === 'appreciation_letter') {
+      setActiveView('appreciation_letter')
+      return
+    }
+    if (action === 'best_performers') {
+      setActiveView('best_performers')
+      return
+    }
+    if (action === 'volunteer') {
+      setActiveView('volunteer')
+      return
+    }
+    if (action === 'booth_agent') {
+      setActiveView('booth_agent')
+      return
+    }
+    if (action === 'booth_info') {
+      setActiveView('booth_info')
+      return
+    }
+    setActiveView('chat')
     const wtlCode = cardRef.current?.wtl_code || cardRef.current?.ptc_code || profileRef.current?.wtl_code || profileRef.current?.ptc_code
 
     switch (action) {
-      case 'profile': {
-        if (!epicRef.current) { await botSay('ℹ️ No profile data available.', 200); return }
-        setIsTyping(true)
-        try {
-          const res = await chat.profile(epicRef.current, mobileRef.current)
-          setIsTyping(false)
-          addMsg('bot', 'profile_card', { profile: res })
-        } catch {
-          setIsTyping(false)
-          await botSay('❌ Unable to load profile.', 200)
-        }
-        break
-      }
-      case 'my_card': {
-        if (cardRef.current) addMsg('bot', 'generated_card', { card: cardRef.current })
-        else await botSay('ℹ️ No card generated yet.', 200)
-        break
-      }
-      case 'booth_info': {
-        if (!epicRef.current) { await botSay('ℹ️ No booth data available.', 200); return }
-        setIsTyping(true)
-        try {
-          const res = await chat.getBooth(epicRef.current)
-          setIsTyping(false)
-          addMsg('bot', 'booth_info', { booth: res })
-        } catch {
-          setIsTyping(false)
-          await botSay('❌ Unable to load booth information.', 200)
-        }
-        break
-      }
+
+
       case 'referral': {
         if (!wtlCode) { await botSay('ℹ️ Referral link unavailable.', 200); return }
         // Use cached link from card if available — avoids a session-auth round-trip
@@ -1259,16 +2816,6 @@ export default function ChatbotPage() {
       case 'my_members': {
         if (!wtlCode) { await botSay('ℹ️ Members list unavailable.', 200); return }
         navigate(`/my-members/${wtlCode}`)
-        break
-      }
-      case 'volunteer': {
-        if (!wtlCode || !epicRef.current) { await botSay('ℹ️ Volunteer request unavailable.', 200); return }
-        addMsg('bot', 'select_wing', { wtlCode, epicNo: epicRef.current })
-        break
-      }
-      case 'booth_agent': {
-        if (!wtlCode || !epicRef.current) { await botSay('ℹ️ Booth Agent request unavailable.', 200); return }
-        addMsg('bot', 'booth_agent_flow', { wtlCode, epicNo: epicRef.current })
         break
       }
       default: break
@@ -1359,6 +2906,10 @@ export default function ChatbotPage() {
       }
       case 'generated_card':
         return <GeneratedCardMsg card={msg.card} isNew={msg.isNew || false} />
+      case 'welcome_letter':
+        return <WelcomeLetterMsg name={msg.name} date={msg.date} />
+      case 'appreciation_letter':
+        return <AppreciationLetterMsg name={msg.name} date={msg.date} />
       case 'profile_card':
         return (
           <div className="profile-card">
@@ -1414,6 +2965,47 @@ export default function ChatbotPage() {
           </div>
         )
       }
+      case 'best_performers': {
+        const performers = msg.performers || []
+        return (
+          <div className="members-card info-card best-performers-card">
+            <div className="info-card-header">
+              <i className="bi bi-trophy-fill text-warning me-2" /> Top 5 Referrers
+            </div>
+            {performers.length === 0 ? (
+              <p className="members-empty">No referrals generated yet. Invite members to lead the board!</p>
+            ) : (
+              <ul className="members-list best-performers-list" style={{ listStyle: 'none', padding: 0 }}>
+                {performers.map((p, i) => (
+                  <li key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', borderBottom: i < performers.length - 1 ? '1px solid var(--border-dim)' : 'none' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <span className={`rank-badge rank-${p.rank}`} style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        width: 22,
+                        height: 22,
+                        borderRadius: '50%',
+                        fontSize: 11,
+                        fontWeight: 'bold',
+                        background: p.rank === 1 ? '#ffd700' : p.rank === 2 ? '#c0c0c0' : p.rank === 3 ? '#cd7f32' : 'var(--admin-surface-raise)',
+                        color: p.rank <= 3 ? '#000' : 'var(--text-secondary)'
+                      }}>{p.rank}</span>
+                      <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        <span style={{ fontSize: 13, fontWeight: '500' }}>{p.name}</span>
+                        <span style={{ fontSize: 10, opacity: 0.6 }}>BJP Code: {p.wtl_code}</span>
+                      </div>
+                    </div>
+                    <span className="badge-status badge-generated" style={{ fontSize: 12, fontWeight: 'bold' }}>
+                      {p.referred_count} {p.referred_count === 1 ? 'referral' : 'referrals'}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )
+      }
       case 'select_wing': {
         const isLatest = messages[messages.length - 1]?.id === msg.id
         return (
@@ -1461,7 +3053,24 @@ export default function ChatbotPage() {
                 </div>
               </div>
             </div>
-            <div className="left-menu-header-actions">
+            <div className="left-menu-header-actions" style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+              {isDone && referredCount >= 5 && (
+                <button
+                  className={`chat-header-btn bell-alert-btn ${hasAppointment ? 'bell-booked-btn' : 'pulsing-vibrate'}`}
+                  onClick={handleBellClick}
+                  title={hasAppointment ? 'Meeting Scheduled! Click to view details' : 'Milestone Achieved! Click to Schedule Meeting with President'}
+                  style={{ 
+                    fontSize: 18, 
+                    color: hasAppointment ? '#2ecc71' : '#D1B078', 
+                    border: 'none', 
+                    background: 'none', 
+                    cursor: 'pointer' 
+                  }}
+                >
+                  <i className="bi bi-bell-fill" />
+                  {!hasAppointment && <span className="bell-badge" />}
+                </button>
+              )}
               {isDone && (
                 <button
                   className="chat-header-btn"
@@ -1498,14 +3107,18 @@ export default function ChatbotPage() {
             {[
               { icon: 'person-circle',       label: 'My Profile',       action: 'profile',     desc: 'View registration details' },
               { icon: 'credit-card-2-front', label: 'My Card',          action: 'my_card',      desc: 'View and download ID card' },
+              { icon: 'envelope-paper-fill', label: 'My Welcome Letter', action: 'welcome_letter', desc: 'View and download welcome letter' },
+              { icon: 'book-fill',           label: 'BJP Brochure',     action: 'brochure',     desc: 'Official Central Welfare Schemes Booklet' },
+              { icon: 'award-fill',          label: 'My Appreciation Letter', action: 'appreciation_letter', desc: 'Earned at 5 successful referrals' },
               { icon: 'building',            label: 'Booth Info',        action: 'booth_info',   desc: 'Get your booth details' },
               { icon: 'link-45deg',          label: 'Referral Link',     action: 'referral',     desc: 'Share and invite others' },
               { icon: 'people-fill',         label: 'My Members',        action: 'my_members',   desc: 'Voters registered via your link' },
-              { icon: 'hand-thumbs-up-fill', label: 'Be a Volunteer',    action: 'volunteer',    desc: 'Apply to be a BJP Volunteer' },
+              { icon: 'trophy-fill',         label: 'Best Performers',   action: 'best_performers', desc: 'Top 5 referrers list' },
+              { icon: 'hand-thumbs-up-fill', label: 'Be an Organizer',    action: 'volunteer',    desc: 'Apply to be a BJP Organizer' },
               { icon: 'building-fill-check', label: 'Be a Booth Agent',  action: 'booth_agent',  desc: 'Apply to be a Booth Agent' },
             ].map((item) => {
               const isComingSoon = false
-              const locked = !isDone
+              const locked = !isDone || (item.action === 'appreciation_letter' && referredCount < 5)
               return (
                 <div
                   key={item.action}
@@ -1515,7 +3128,7 @@ export default function ChatbotPage() {
                   aria-disabled={locked}
                   onClick={() => !locked && handleSidebarAction(item.action)}
                   onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && !locked) { e.preventDefault(); handleSidebarAction(item.action) } }}
-                  title={isComingSoon ? 'Coming Soon' : locked ? 'Complete registration to unlock' : item.desc}
+                  title={isComingSoon ? 'Coming Soon' : (item.action === 'appreciation_letter' && referredCount < 5) ? 'Invite 5 members to unlock appreciation letter' : locked ? 'Complete registration to unlock' : item.desc}
                 >
                   <div className="left-chat-avatar option-avatar">
                     <i className={`bi bi-${item.icon}`} />
@@ -1538,7 +3151,56 @@ export default function ChatbotPage() {
 
         {/* Right Chatbot Panel */}
         <div className="right-chat-panel">
-          <div className="chatbot-container">
+          {activeView === 'brochure' ? (
+            <BrochurePanel onBack={() => setActiveView('chat')} />
+          ) : activeView === 'booth_info' ? (
+            <FullBoothPanel 
+              epicNo={epicRef.current || cardRef.current?.epic_no || profileRef.current?.epic_no} 
+              onBack={() => setActiveView('chat')} 
+            />
+          ) : activeView === 'profile' ? (
+            <FullProfilePanel 
+              epicNo={epicRef.current || cardRef.current?.epic_no || profileRef.current?.epic_no} 
+              mobile={mobileRef.current || cardRef.current?.mobile || profileRef.current?.mobile} 
+              referredCount={referredCount} 
+              onBack={() => setActiveView('chat')} 
+            />
+          ) : activeView === 'my_card' ? (
+            <FullCardPanel card={cardRef.current} onBack={() => setActiveView('chat')} />
+          ) : activeView === 'welcome_letter' ? (
+            <FullLetterPanel 
+              type="welcome" 
+              name={cardRef.current?.name || cardRef.current?.voter_name || profileRef.current?.name || 'Member'}
+              date={new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+              onBack={() => setActiveView('chat')} 
+            />
+          ) : activeView === 'appreciation_letter' ? (
+            <FullLetterPanel 
+              type="appreciation" 
+              name={cardRef.current?.name || cardRef.current?.voter_name || profileRef.current?.name || 'Member'}
+              date={new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+              onBack={() => setActiveView('chat')} 
+            />
+          ) : activeView === 'best_performers' ? (
+            <BestPerformersPanel onBack={() => setActiveView('chat')} />
+          ) : activeView === 'volunteer' ? (
+            <FullFormPanel title="Be a BJP Organizer" icon="hand-thumbs-up-fill" onBack={() => setActiveView('chat')}>
+              <SelectWingMsg
+                wtlCode={cardRef.current?.wtl_code || cardRef.current?.ptc_code || profileRef.current?.wtl_code || profileRef.current?.ptc_code}
+                epicNo={epicRef.current}
+                isLatest={true}
+              />
+            </FullFormPanel>
+          ) : activeView === 'booth_agent' ? (
+            <FullFormPanel title="Be a Booth Agent" icon="building-fill-check" onBack={() => setActiveView('chat')}>
+              <BoothAgentSetupMsg
+                wtlCode={cardRef.current?.wtl_code || cardRef.current?.ptc_code || profileRef.current?.wtl_code || profileRef.current?.ptc_code}
+                epicNo={epicRef.current}
+                isLatest={true}
+              />
+            </FullFormPanel>
+          ) : (
+            <div className="chatbot-container">
 
 
             {/* Header */}
@@ -1561,7 +3223,24 @@ export default function ChatbotPage() {
                   )}
                 </div>
               </div>
-              <div className="chat-header-actions">
+              <div className="chat-header-actions" style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                {isDone && referredCount >= 5 && (
+                  <button
+                    className={`chat-header-btn bell-alert-btn ${hasAppointment ? 'bell-booked-btn' : 'pulsing-vibrate'}`}
+                    onClick={handleBellClick}
+                    title={hasAppointment ? 'Meeting Scheduled! Click to view details' : 'Milestone Achieved! Click to Schedule Meeting with President'}
+                    style={{ 
+                      fontSize: 18, 
+                      color: hasAppointment ? '#2ecc71' : '#D1B078', 
+                      border: 'none', 
+                      background: 'none', 
+                      cursor: 'pointer' 
+                    }}
+                  >
+                    <i className="bi bi-bell-fill" />
+                    {!hasAppointment && <span className="bell-badge" />}
+                  </button>
+                )}
                 {isDone && (
                   <>
                     <button
@@ -1625,7 +3304,7 @@ export default function ChatbotPage() {
                     key={msg.id}
                     className={`msg-row ${msg.from}`}
                   >
-                    <div className={`msg-bubble ${['voter_card','generated_card','booth_info','referral_link','members_list','profile_card','welcome_banner'].includes(msg.type) ? 'wide' : ''}`}>
+                    <div className={`msg-bubble ${['voter_card','generated_card','booth_info','referral_link','members_list','profile_card','welcome_banner','welcome_letter','appreciation_letter'].includes(msg.type) ? 'wide' : ''}`}>
                       {renderMsgContent(msg)}
                       <div className="msg-time">
                         {fmtTime(msg.ts)}
@@ -1716,6 +3395,7 @@ export default function ChatbotPage() {
               ) : null}
             </footer>
           </div>
+          )}
         </div>
       </div>
 
@@ -1735,19 +3415,23 @@ export default function ChatbotPage() {
               {[
                 { icon: 'person-circle',       label: 'My Profile',       action: 'profile' },
                 { icon: 'credit-card-2-front', label: 'My Card',          action: 'my_card' },
+                { icon: 'envelope-paper-fill', label: 'My Welcome Letter', action: 'welcome_letter' },
+                { icon: 'book-fill',           label: 'BJP Brochure',     action: 'brochure' },
+                { icon: 'award-fill',          label: 'My Appreciation Letter', action: 'appreciation_letter' },
                 { icon: 'building',            label: 'Booth Info',        action: 'booth_info' },
                 { icon: 'link-45deg',          label: 'Referral Link',     action: 'referral' },
                 { icon: 'people-fill',         label: 'My Members',        action: 'my_members' },
-                { icon: 'hand-thumbs-up-fill', label: 'Be a Volunteer',    action: 'volunteer' },
+                { icon: 'hand-thumbs-up-fill', label: 'Be an Organizer',    action: 'volunteer' },
                 { icon: 'building-fill-check', label: 'Be a Booth Agent',  action: 'booth_agent' },
               ].map((item) => {
                 const isComingSoon = false
+                const isLocked = item.action === 'appreciation_letter' && referredCount < 5
                 return (
                   <button
                     key={item.action}
-                    className={`sidebar-nav-item ${isComingSoon ? 'locked' : ''}`}
-                    onClick={() => !isComingSoon && handleSidebarAction(item.action)}
-                    style={isComingSoon ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
+                    className={`sidebar-nav-item ${isComingSoon || isLocked ? 'locked' : ''}`}
+                    onClick={() => !isComingSoon && !isLocked && handleSidebarAction(item.action)}
+                    style={isComingSoon || isLocked ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
@@ -1755,7 +3439,7 @@ export default function ChatbotPage() {
                         <span>{item.label}</span>
                         {isComingSoon && <span className="coming-soon-badge">Coming Soon</span>}
                       </div>
-                      {isComingSoon && <i className="bi bi-lock-fill" style={{ fontSize: 12, opacity: 0.8 }} />}
+                      {(isComingSoon || isLocked) && <i className="bi bi-lock-fill" style={{ fontSize: 12, opacity: 0.8 }} />}
                     </div>
                   </button>
                 )
@@ -1785,6 +3469,107 @@ export default function ChatbotPage() {
           cardData={modalCard}
           onClose={() => setModalCard(null)}
         />
+      )}
+
+      {/* Appointment Booking Modal */}
+      {showModal && (
+        <div className="appointment-modal-overlay" onClick={() => setShowModal(false)}>
+          <div className="appointment-modal-content" onClick={(e) => e.stopPropagation()}>
+            <button className="modal-close-btn" onClick={() => setShowModal(false)}>&times;</button>
+            
+            {bookingStep === 1 && (
+              <div className="modal-step-congrats">
+                <div className="modal-icon-wrapper congrats">
+                  <i className="bi bi-trophy-fill congrats-icon" />
+                </div>
+                <h2>Congratulations! 🎉</h2>
+                <p className="congrats-text">
+                  You have successfully completed <strong>5 referrals</strong>! As a token of appreciation for your outstanding support, you have earned a special opportunity to meet the State President.
+                </p>
+                <div className="modal-actions-row">
+                  <button className="btn-modal-action btn-schedule" onClick={() => setBookingStep(2)}>
+                    Schedule
+                  </button>
+                  <button className="btn-modal-action btn-cancel" onClick={() => setShowModal(false)}>
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {bookingStep === 2 && (
+              <div className="modal-step-form">
+                <h2>Schedule President Meeting 📅</h2>
+                <p className="schedule-desc">Select a date and time slot (available from 10:00 AM to 6:00 PM) to confirm your appointment.</p>
+                
+                <div className="form-group" style={{ marginBottom: 16, textAlign: 'left' }}>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 'bold', color: 'var(--color-chalk)', marginBottom: 6 }}>Select Date</label>
+                  <input 
+                    type="date" 
+                    className="modal-input" 
+                    value={selectedDate}
+                    min={new Date().toISOString().split('T')[0]}
+                    onChange={(e) => setSelectedDate(e.target.value)}
+                    style={{ width: '100%', padding: '10px 14px', borderRadius: 12, border: '1px solid var(--color-graphite)', background: 'var(--color-bg-light)', color: 'var(--color-chalk)', outline: 'none' }}
+                  />
+                </div>
+
+                <div className="form-group" style={{ marginBottom: 20, textAlign: 'left' }}>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 'bold', color: 'var(--color-chalk)', marginBottom: 6 }}>Select Time Slot</label>
+                  <select 
+                    className="modal-input" 
+                    value={selectedTime}
+                    onChange={(e) => setSelectedTime(e.target.value)}
+                    style={{ width: '100%', padding: '10px 14px', borderRadius: 12, border: '1px solid var(--color-graphite)', background: 'var(--color-bg-light)', color: 'var(--color-chalk)', outline: 'none' }}
+                  >
+                    <option value="">-- Choose a time slot --</option>
+                    <option value="10:00 AM">10:00 AM</option>
+                    <option value="11:00 AM">11:00 AM</option>
+                    <option value="12:00 PM">12:00 PM</option>
+                    <option value="01:00 PM">01:00 PM</option>
+                    <option value="02:00 PM">02:00 PM</option>
+                    <option value="03:00 PM">03:00 PM</option>
+                    <option value="04:00 PM">04:00 PM</option>
+                    <option value="05:00 PM">05:00 PM</option>
+                    <option value="06:00 PM">06:00 PM</option>
+                  </select>
+                </div>
+
+                {bookingError && <p className="modal-error-text" style={{ color: '#ff3b30', fontSize: 12, marginBottom: 16 }}>⚠️ {bookingError}</p>}
+
+                <div className="modal-actions-row">
+                  <button 
+                    className="btn-modal-action btn-schedule" 
+                    onClick={handleBookAppointment}
+                    disabled={isBooking}
+                  >
+                    {isBooking ? 'Booking...' : 'Book Appointment'}
+                  </button>
+                  <button className="btn-modal-action btn-cancel" onClick={() => setBookingStep(1)}>
+                    Back
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {bookingStep === 3 && (
+              <div className="modal-step-success">
+                <div className="modal-icon-wrapper success">
+                  <i className="bi bi-check-circle-fill success-icon" />
+                </div>
+                <h2>Appointment Booked! 🗓️</h2>
+                <p className="success-text">
+                  Your appointment has been successfully scheduled for <strong>{selectedDate}</strong> at <strong>{selectedTime}</strong>. We look forward to meeting you!
+                </p>
+                <div className="modal-actions-row">
+                  <button className="btn-modal-action btn-schedule" onClick={() => setShowModal(false)}>
+                    Done
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
       )}
     </div>
   )

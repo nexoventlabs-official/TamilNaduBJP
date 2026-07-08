@@ -5,6 +5,7 @@ import CardPage from './pages/CardPage'
 import VerifyPage from './pages/VerifyPage'
 import ReferralPage from './pages/ReferralPage'
 import MyMembersPage from './pages/MyMembersPage'
+import BestPerformersPage from './pages/BestPerformersPage'
 import AdminLayout from './pages/admin/AdminLayout'
 import LoginPage from './pages/admin/LoginPage'
 import DashboardPage from './pages/admin/DashboardPage'
@@ -25,6 +26,7 @@ export default function App() {
       <Route path="/verify/:epicNo" element={<VerifyPage />} />
       <Route path="/refer/:wtlCode/:referralId" element={<ReferralPage />} />
       <Route path="/my-members/:wtlCode" element={<MyMembersPage />} />
+      <Route path="/best-performers" element={<BestPerformersPage />} />
       <Route path="/admin/login" element={<LoginPage />} />
       <Route path="/admin" element={<AdminLayout />}>
         <Route index element={<Navigate to="/admin/dashboard" replace />} />

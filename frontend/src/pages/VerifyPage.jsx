@@ -134,7 +134,7 @@ export default function VerifyPage() {
           <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
             {isVolunteer && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'transparent', border: '1px solid var(--color-graphite)', borderRadius: 20, padding: '5px 12px', fontSize: 12, color: 'var(--color-signal-mint)', fontWeight: 500 }}>
-                <i className="bi bi-hand-thumbs-up-fill" /> Volunteer
+                <i className="bi bi-hand-thumbs-up-fill" /> Organizer
               </div>
             )}
             {isBoothAgent && (

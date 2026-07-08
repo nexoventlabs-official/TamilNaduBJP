@@ -6,6 +6,9 @@ const rateLimit = require('express-rate-limit');
  * @param {number} windowSeconds - window duration in seconds
  */
 function createRateLimiter(maxRequests, windowSeconds) {
+  if (process.env.DISABLE_RATE_LIMITER === 'true') {
+    return (req, res, next) => next();
+  }
   return rateLimit({
     windowMs: windowSeconds * 1000,
     max: maxRequests,

@@ -1,350 +1,134 @@
-# Voter ID Card Generator
+# BJP Tamil Nadu Member ID Card Generator
 
-Dynamic ID card generation system with async processing, horizontal scaling, enterprise-grade security, and AI-powered face detection.
-
-## 🎯 Current Status
-
-- **Version:** v4.5 (Phase 2 + Face Detection)
-- **Capacity:** 100,000 concurrent users
-- **Security Score:** 9/10
-- **Status:** ✅ PRODUCTION READY
-- **New:** ✅ AI-Powered Face Detection
-
-## 🚀 Quick Start
-
-### Prerequisites
-
-- Python 3.11+
-- Redis
-- MongoDB Atlas (M10+ with 3 nodes)
-- Cloudinary account
-- 2Factor.in SMS API
-
-### Local Development
-
-```bash
-# 1. Clone repository
-git clone <your-repo>
-cd voter-id-generator
-
-# 2. Install dependencies
-pip install -r requirements.txt
-
-# 3. Configure environment
-cp .env.example .env
-nano .env  # Edit with your credentials
-
-# 4. Start Redis
-redis-server
-
-# 5. Start Celery worker
-celery -A tasks worker --loglevel=info --concurrency=4
-
-# 6. Start Flask app
-python app.py
-```
-
-Visit: http://localhost:5000
-
-### Docker Deployment
-
-```bash
-# 1. Configure environment
-cp .env.example .env
-nano .env
-
-# 2. Start all services
-docker-compose up -d
-
-# 3. Verify
-docker-compose ps
-curl http://localhost:8080/health
-```
-
-Visit: http://localhost:8080
-
-### Heroku Deployment
-
-```bash
-# 1. Create app
-heroku create your-app-name
-
-# 2. Add Redis
-heroku addons:create heroku-redis:mini
-
-# 3. Set environment variables
-heroku config:set FLASK_ENV=production
-heroku config:set MONGO_URI="mongodb+srv://..."
-# ... set all other variables
-
-# 4. Deploy
-git push heroku main
-
-# 5. Scale instances
-heroku ps:scale web=3 worker=1
-
-# 6. Verify
-heroku logs --tail
-```
-
-## 📋 Environment Variables
-
-Required variables in `.env`:
-
-```bash
-# MongoDB
-MONGO_URI=mongodb+srv://user:pass@cluster.mongodb.net/voters
-GEN_MONGO_URI=mongodb+srv://user:pass@cluster.mongodb.net/generated
-
-# Cloudinary
-CLOUDINARY_CLOUD_NAME=your-cloud-name
-CLOUDINARY_API_KEY=your-api-key
-CLOUDINARY_API_SECRET=your-api-secret
-
-# SMS API
-SMS_API_KEY=your-2factor-api-key
-
-# Redis
-REDIS_URL=redis://localhost:6379/0
-
-# Flask
-FLASK_SECRET=your-secret-key-here
-FLASK_ENV=production
-
-# Admin
-ADMIN_USERNAME=admin
-ADMIN_PASSWORD=your-strong-password
-
-# CORS
-ALLOWED_ORIGINS=https://your-domain.com
-```
-
-## 🏗️ Architecture
-
-```
-Internet → CDN → Load Balancer → [Web1, Web2, Web3] → Redis + MongoDB + Celery
-```
-
-### Components
-
-- **Web Instances (3-5):** Flask app with Gunicorn
-- **Celery Workers:** Async card generation
-- **Redis:** Sessions, rate limiting, job queue
-- **MongoDB:** Primary + 2 read replicas
-- **Cloudinary:** Photo and card storage
-- **Nginx:** Load balancer (Docker deployment)
-
-## 📊 Features
-
-### Photo Quality Validation (NEW in v4.5)
-- ✅ AI-powered face detection using OpenCV
-- ✅ Rejects photos without clear faces
-- ✅ Validates single face only (no multiple faces)
-- ✅ Checks face size, lighting, and clarity
-- ✅ User-friendly error messages
-- ✅ 95%+ accuracy for face detection
-
-### Security
-- ✅ IDOR protection with authorization checks
-- ✅ PII masking (mobile numbers)
-- ✅ Cryptographically secure OTP
-- ✅ Input sanitization
-- ✅ HTTPS enforcement
-- ✅ Security headers (CSP, HSTS, etc.)
-- ✅ CORS configuration
-- ✅ Rate limiting (Redis-based)
-
-### Scalability
-- ✅ Horizontal scaling (3-5 instances)
-- ✅ Async card generation (Celery)
-- ✅ MongoDB read replicas
-- ✅ Connection pooling (200 max)
-- ✅ CDN-ready cache headers
-- ✅ Load balancing (Nginx/ALB)
-
-### Reliability
-- ✅ Circuit breakers (Cloudinary, SMS)
-- ✅ Health check endpoints
-- ✅ Auto-restart on failure
-- ✅ Retryable reads/writes
-- ✅ 99.99% availability
-
-## 🔧 API Endpoints
-
-### User Endpoints
-
-```bash
-# Send OTP
-POST /api/chat/send-otp
-Body: {"mobile": "9876543210"}
-
-# Verify OTP
-POST /api/chat/verify-otp
-Body: {"mobile": "9876543210", "otp": "123456"}
-
-# Generate card (async)
-POST /api/chat/generate-card
-Form: epic_no, mobile, photo (file)
-Response: {"success": true, "job_id": "abc-123", "status": "processing"}
-
-# Check card status
-GET /api/chat/card-status/<job_id>
-Response: {"status": "completed", "card_url": "https://..."}
-```
-
-### Admin Endpoints
-
-```bash
-# Login
-POST /admin/login
-Body: username, password
-
-# Dashboard
-GET /admin/dashboard
-
-# Import voters
-POST /admin/import
-Form: file (XLSX/CSV)
-
-# View voters
-GET /admin/voters?page=1&search=query
-```
-
-### Health Endpoints
-
-```bash
-# Basic health
-GET /health
-
-# Readiness check
-GET /health/ready
-
-# Liveness check
-GET /health/live
-
-# Metrics
-GET /health/metrics
-```
-
-## 📈 Performance
-
-### Capacity
-- **Concurrent Users:** 100,000
-- **Card Generations:** 500+ concurrent
-- **Response Time:** <200ms (API), <300ms (pages)
-- **Availability:** 99.99%
-
-### Resource Usage
-- **CPU:** <70%
-- **Memory:** <80%
-- **Database Connections:** <180/200
-- **Redis Memory:** <80%
-
-## 💰 Cost
-
-### Heroku
-- Web Dynos (3x): $21/month
-- Worker Dyno: $7/month
-- Redis: $15/month
-- **Total: ~$43/month**
-
-### VPS + Docker
-- VPS (4 CPU, 8GB): $40/month
-- **Total: ~$40/month**
-
-### AWS
-- ECS + ALB + Redis + CDN: ~$95/month
-
-### MongoDB Atlas (All Options)
-- M10 Cluster: $57/month
-
-## 📚 Documentation
-
-- **AUDIT.md** - Complete audit, changes, and fixes (comprehensive)
-- **CHANGES_SUMMARY.txt** - Quick summary of all changes
-- **.env.example** - Environment variable template
-
-## 🧪 Testing
-
-```bash
-# Test health
-curl http://localhost:5000/health
-
-# Test async card generation
-curl -X POST http://localhost:5000/api/chat/generate-card \
-  -F "epic_no=TEST123" \
-  -F "mobile=9876543210" \
-  -F "photo=@test.jpg"
-
-# Test rate limiting
-for i in {1..6}; do
-  curl -X POST http://localhost:5000/api/chat/send-otp \
-    -H "Content-Type: application/json" \
-    -d '{"mobile":"9876543210"}'
-done
-```
-
-## 🐛 Troubleshooting
-
-### App won't start
-```bash
-# Check logs
-heroku logs --tail  # Heroku
-docker-compose logs -f  # Docker
-
-# Verify environment variables
-heroku config  # Heroku
-cat .env  # Local/Docker
-```
-
-### Celery worker not processing
-```bash
-# Check worker status
-heroku ps | grep worker  # Heroku
-docker-compose ps worker  # Docker
-
-# Restart worker
-heroku ps:restart worker  # Heroku
-docker-compose restart worker  # Docker
-```
-
-### Sessions not persisting
-```bash
-# Test Redis connection
-redis-cli ping  # Local
-heroku redis:cli  # Heroku
-
-# Restart app
-heroku restart  # Heroku
-docker-compose restart  # Docker
-```
-
-## 📞 Support
-
-For detailed information, see **AUDIT.md** which includes:
-- Complete audit of all 45 issues
-- All fixes applied with code examples
-- Deployment guides for Heroku/Docker/AWS
-- Verification and testing procedures
-- Troubleshooting guide
-
-## 🔐 Security
-
-- All critical security issues fixed
-- Security score: 9/10
-- OWASP Top 10 compliance
-- Regular security audits recommended
-
-## 📄 License
-
-[Your License Here]
-
-## 👥 Contributors
-
-[Your Team Here]
+A modern, high-performance web and WhatsApp-integrated citizen registration chatbot and admin dashboard for generating BJP digital membership ID cards in Tamil Nadu.
 
 ---
 
-**Status:** ✅ PRODUCTION READY  
-**Version:** v4.5  
-**Last Updated:** March 7, 2026
+## 🎯 Project Overview
+
+This repository contains the complete codebase for the BJP Tamil Nadu Member ID Card Generator. The application consists of two main parts:
+1. **Frontend**: A fast React SPA built with Vite, styled with custom vanilla CSS and Bootstrap. It features an interactive chatbot-like registration flow for citizens, modal previewing overlays, and a comprehensive secure Administrator Control Panel.
+2. **Backend**: A Node.js Express application communicating with dual MongoDB databases:
+   - **Voter Roll DB (DB1)**: A read-only sharded database containing 58+ million voter records across 233 assembly constituency collections.
+   - **App DB (DB2)**: A read-write database for generated voters, OTP sessions, distributed locks, organizer requests, and booth agent registrations.
+
+---
+
+## 🚀 Tech Stack
+
+### Frontend
+- **Framework**: React (Vite SPA)
+- **Styling**: Vanilla CSS + Bootstrap 5 (Icons via Bootstrap Icons)
+- **State Management & Routing**: React Router v6
+- **Performance**: High-resolution client-side canvas rendering (via html2canvas) to bypass backend generation overhead on the web flow.
+
+### Backend
+- **Runtime**: Node.js v22.x
+- **Framework**: Express.js
+- **Database ORM**: Mongoose / MongoDB Native Driver
+- **Image Processing**: Sharp
+- **Automation / Webhook Rendering**: Puppeteer (Chromium) for generating high-fidelity combined cards asynchronously.
+- **Process Manager**: PM2
+
+---
+
+## 📋 Environment Variables
+
+Create a `.env` file in the `backend/` directory. Refer to the table below for configuration:
+
+```bash
+# General
+PORT=5000
+NODE_ENV=production
+BASE_URL=https://tamilnadubjp.live
+FRONTEND_URL=https://tamilnadubjp.live
+
+# Admin Panel Credentials
+ADMIN_USERNAME=BJP
+ADMIN_PASSWORD=your-secure-password
+JWT_SECRET=your-jwt-signing-secret
+SESSION_SECRET=your-session-secret
+
+# Databases
+# DB2: Primary Write App Database (Local or Atlas)
+MONGO_URI="mongodb://127.0.0.1:27017/bjptamilnadu"
+MONGO_DB=bjptamilnadu
+
+# DB1: Read-Only 58M Voter Roll Database (DigitalOcean)
+MONGO_VOTER_URL="mongodb+srv://..."
+MONGO_VOTER_DB_NAME=voter_db
+
+# SMS Gateway (2Factor.in)
+# Leave blank in development to use console-logged OTP mocks
+SMS_API_KEY=
+
+# Cloudinary Storage
+CLOUDINARY_CLOUD_NAME=your-cloud-name
+CLOUDINARY_API_KEY=your-api-key
+CLOUDINARY_API_SECRET=your-api-secret
+CLOUDINARY_PHOTO_FOLDER=member_photos
+CLOUDINARY_CARDS_FOLDER=generated_cards
+
+# WhatsApp Cloud API Integration
+WHATSAPP_ACCESS_TOKEN=your-token
+WHATSAPP_PHONE_NUMBER_ID=your-phone-id
+WHATSAPP_WABA_ID=your-waba-id
+WHATSAPP_VERIFY_TOKEN=your-webhook-verify-token
+WHATSAPP_FLOW_REGISTRATION_ID=your-flow-reg-id
+WHATSAPP_FLOW_LOGIN_ID=your-flow-login-id
+```
+
+---
+
+## 🛠️ Quick Start
+
+### 1. Install Dependencies
+```bash
+# Install backend dependencies
+cd backend
+npm install
+
+# Install frontend dependencies
+cd ../frontend
+npm install
+```
+
+### 2. Run Local Development
+```bash
+# Start backend server (port 5000)
+cd backend
+npm run dev
+
+# Start frontend Vite server (port 5173)
+cd ../frontend
+npm run dev
+```
+
+### 3. Build & Deploy
+```bash
+# Compile production build of the frontend
+cd frontend
+npm run build
+```
+This builds static assets into `frontend/dist/`. Copy or map this directory to your web server path (e.g., `/var/www/bjptn/dist/` under Nginx).
+
+---
+
+## 📊 Performance & Capacity Summary
+
+A thorough capacity audit performed in **July 2026** outlines the limits and behaviors of the staging server (1 vCPU, 2GB RAM):
+
+- **Web Registration Flow**: High-performance. By shifting card rendering to client-side canvas iframes, backend processing time was reduced from ~10 seconds to **under 2 seconds**.
+- **EPIC Lookup limits**: Capped by DB1 connection pool size (10 connections). It handles up to **200 concurrent lookups** smoothly before scaling queue latency triggers query timeouts.
+- **Card Rendering (Backend Puppeteer)**: Backend Puppeteer rendering is restricted to low-volume WhatsApp requests. It sustains up to **5 concurrent renders** smoothly; going over **20 concurrent processes** risks crashing the server due to OOM constraints.
+
+For more details, see [STRESS_TEST_FINDINGS.md](file:///c:/Users/Admin/Desktop/bjptn/STRESS_TEST_FINDINGS.md).
+
+---
+
+## 🔐 Security & Hardening Features
+
+- **Distributed Locks**: MongoDB-based distributed generation locks protect the card generation endpoint from race conditions.
+- **Rate Limiting**: Custom express-rate-limit middleware protects login, OTP request, and validation endpoints.
+- **PII Protection**: SMS OTPs are cryptographically hashed using SHA-256 before storage and deleted immediately upon first-time verification.
+- **File Integrity**: Passport photos uploaded on registration are validated at the byte-level via magic-bytes checks to prevent shell uploads.

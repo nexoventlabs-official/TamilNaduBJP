@@ -161,7 +161,7 @@ export default function GeneratedVoterDetailPage() {
           {/* Quick status badges */}
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <span className={`badge-status badge-${volReq ? volReq.status : 'rejected'}`} style={{ padding: '6px 12px', borderRadius: 8, fontSize: 12 }}>
-              <i className="bi bi-hand-thumbs-up-fill me-1.5" /> Volunteer: {volReq ? volReq.status.toUpperCase() : 'NO'}
+              <i className="bi bi-hand-thumbs-up-fill me-1.5" /> Organizer: {volReq ? volReq.status.toUpperCase() : 'NO'}
             </span>
             <span className={`badge-status badge-${baReq ? baReq.status : 'rejected'}`} style={{ padding: '6px 12px', borderRadius: 8, fontSize: 12 }}>
               <i className="bi bi-building-fill-check me-1.5" /> Booth Agent: {baReq ? baReq.status.toUpperCase() : 'NO'}
@@ -225,7 +225,7 @@ export default function GeneratedVoterDetailPage() {
             </div>
           </div>
 
-          {/* Volunteer Application Card */}
+          {/* Organizer Application Card */}
           {volReq ? (
             <div className="admin-card" style={{ margin: 0, border: '1px solid rgba(0,160,64,0.2)' }}>
               <div className="admin-card-header" style={{
@@ -237,7 +237,7 @@ export default function GeneratedVoterDetailPage() {
                 justifyContent: 'space-between'
               }}>
                 <h6 className="admin-card-title" style={{ color: '#00a040' }}>
-                  <i className="bi bi-hand-thumbs-up-fill me-2" /> Volunteer Application
+                  <i className="bi bi-hand-thumbs-up-fill me-2" /> Organizer Application
                 </h6>
                 <span className={`badge-status badge-${volReq.status}`}>{volReq.status}</span>
               </div>
@@ -290,12 +290,12 @@ export default function GeneratedVoterDetailPage() {
             <div className="admin-card" style={{ margin: 0, opacity: 0.9 }}>
               <div className="admin-card-header" style={{ borderBottom: '1px solid var(--border-dim)', padding: '16px 20px' }}>
                 <h6 className="admin-card-title" style={{ color: 'var(--text-secondary)' }}>
-                  <i className="bi bi-hand-thumbs-up me-2" /> Volunteer Application
+                  <i className="bi bi-hand-thumbs-up me-2" /> Organizer Application
                 </h6>
               </div>
               <div style={{ padding: '20px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 10 }}>
                 <i className="bi bi-info-circle" style={{ fontSize: 18, color: 'var(--text-secondary)' }} />
-                <span>This member has <strong>not requested</strong> to become a Volunteer.</span>
+                <span>This member has <strong>not requested</strong> to become an Organizer.</span>
               </div>
             </div>
           )}

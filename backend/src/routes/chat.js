@@ -252,7 +252,7 @@ router.post('/check-mobile', async (req, res) => {
 
     // Fallback: WhatsApp registrations may have card but MOBILE_NO not indexed by web
     // Check pending_registrations for the EPIC, then look up generated_voters by EPIC
-    if (!genDoc || !genDoc.card_url) {
+    if (!genDoc) {
       const pending = await db.collection('pending_registrations').findOne(
         { mobile }, { projection: { epic_no: 1, status: 1 } }
       );
@@ -260,7 +260,7 @@ router.post('/check-mobile', async (req, res) => {
         const byEpic = await db.collection('generated_voters').findOne(
           { EPIC_NO: pending.epic_no }
         );
-        if (byEpic?.card_url) {
+        if (byEpic) {
           genDoc = byEpic;
           // Backfill MOBILE_NO so future lookups are instant
           db.collection('generated_voters').updateOne(
@@ -271,20 +271,29 @@ router.post('/check-mobile', async (req, res) => {
       }
     }
 
-    const hasCard = Boolean((stat && stat.card_url) || (genDoc && genDoc.card_url));
+    const hasCard = Boolean(genDoc || (stat && stat.epic_no));
 
     // Always establish the verified session mobile on check-mobile success
     req.session.verified_mobile = mobile;
     req.session.cookie.maxAge   = 86400 * 1000;
 
     if (hasCard) {
-      const s      = stat || {};
-      const g      = genDoc || {};
-      const hasPin = Boolean(s.secret_pin || g.secret_pin);
-      
-      if (hasPin) {
-        return res.json({ success: true, has_card: true, has_pin: true });
-      }
+      const g = genDoc || {};
+      const name = g.VOTER_NAME || `${g.FM_NAME_EN || ''} ${g.LASTNAME_EN || ''}`.trim();
+      return res.json({
+        success:       true,
+        has_card:      true,
+        has_pin:       false,
+        epic_no:       g.EPIC_NO || (stat && stat.epic_no) || '',
+        voter_name:    name,
+        card_url:      g.card_url || '',
+        back_url:      g.back_url || '',
+        combined_url:  g.combined_url || g.card_url || '',
+        photo_url:     g.photo_url || '',
+        wtl_code:      g.wtl_code || '',
+        referral_link: g.referral_link || '',
+        referred_count: g.referred_members_count || 0,
+      });
     }
 
     return res.json({ success: true, has_card: false, has_pin: false });
@@ -592,9 +601,9 @@ router.post('/validate-epic', chatValidateEpicLimiter, async (req, res) => {
 
     const existing = await db.collection('generated_voters').findOne(
       { EPIC_NO: epicNo, MOBILE_NO: mobile },
-      { projection: { card_url: 1, back_url: 1, combined_url: 1, photo_url: 1, wtl_code: 1, VOTER_NAME: 1, referral_link: 1 } },
+      { projection: { card_url: 1, back_url: 1, combined_url: 1, photo_url: 1, wtl_code: 1, VOTER_NAME: 1, ASSEMBLY_NAME: 1, DISTRICT_NAME: 1, PART_NO: 1, referral_link: 1 } },
     );
-    if (existing?.card_url) {
+    if (existing?.photo_url) {
       return res.status(409).json({
         success:     false,
         already_registered: true,
@@ -606,6 +615,9 @@ router.post('/validate-epic', chatValidateEpicLimiter, async (req, res) => {
         wtl_code:    existing.wtl_code    || '',
         voter_name:  existing.VOTER_NAME  || '',
         epic_no:     epicNo,
+        assembly_name: existing.ASSEMBLY_NAME || '',
+        district:    existing.DISTRICT_NAME || '',
+        part_no:     String(existing.PART_NO || ''),
         referral_link: existing.referral_link || '',
       });
     }
@@ -650,10 +662,10 @@ router.post('/generate-card', chatGenerateCardLimiter, upload.single('photo'), a
 
     // ── Hard block: one card per mobile number ───────────────────────────────────
     const existingCard = await db.collection('generated_voters').findOne(
-      { MOBILE_NO: mobile, card_url: { $exists: true, $ne: '' } },
-      { projection: { card_url: 1, back_url: 1, combined_url: 1, wtl_code: 1, referral_link: 1, VOTER_NAME: 1, EPIC_NO: 1 } },
+      { MOBILE_NO: mobile, photo_url: { $exists: true, $ne: '' } },
+      { projection: { card_url: 1, back_url: 1, combined_url: 1, photo_url: 1, wtl_code: 1, referral_link: 1, VOTER_NAME: 1, EPIC_NO: 1, ASSEMBLY_NAME: 1, DISTRICT_NAME: 1, PART_NO: 1 } },
     );
-    if (existingCard?.card_url) {
+    if (existingCard?.photo_url) {
       if (existingCard.EPIC_NO !== epicNo) {
         return res.status(400).json({
           success: false,
@@ -667,10 +679,14 @@ router.post('/generate-card', chatGenerateCardLimiter, upload.single('photo'), a
         card_url:           existingCard.card_url,
         back_url:           existingCard.back_url      || '',
         combined_url:       existingCard.combined_url  || '',
+        photo_url:          existingCard.photo_url     || '',
         wtl_code:           existingCard.wtl_code      || '',
         referral_link:      existingCard.referral_link || '',
         voter_name:         existingCard.VOTER_NAME    || '',
         epic_no:            existingCard.EPIC_NO       || epicNo,
+        assembly_name:      existingCard.ASSEMBLY_NAME || '',
+        district:           existingCard.DISTRICT_NAME || '',
+        part_no:            String(existingCard.PART_NO || ''),
       });
     }
 
@@ -839,6 +855,9 @@ router.post('/generate-card', chatGenerateCardLimiter, upload.single('photo'), a
         photo_url:     photoUrl,
         epic_no:       epicNo,
         voter_name:    voter.name,
+        assembly_name: voter.assembly_name,
+        district:      voter.district,
+        part_no:       voter.part_no,
         wtl_code:      wtlCode,
         referral_id:   referralId,
         referral_link: referralLink,
@@ -1029,24 +1048,81 @@ router.get('/my-members/:wtlCode', async (req, res) => {
       return res.status(403).json({ success: false, message: 'Access denied.' });
     }
 
-    const members = await db.collection('generated_voters')
+    // 1. Fetch Root Member
+    const rootDoc = await db.collection('generated_voters').findOne(
+      { wtl_code: wtlCode },
+      { projection: { VOTER_NAME: 1, FM_NAME_EN: 1, LASTNAME_EN: 1, EPIC_NO: 1, wtl_code: 1, photo_url: 1, ASSEMBLY_NAME: 1, DISTRICT_NAME: 1, PART_NO: 1 } }
+    );
+    if (!rootDoc) return res.status(404).json({ success: false, message: 'Member details not found' });
+
+    const root = {
+      name:          rootDoc.VOTER_NAME || `${rootDoc.FM_NAME_EN || ''} ${rootDoc.LASTNAME_EN || ''}`.trim() || 'A Member',
+      epic_no:       rootDoc.EPIC_NO || '',
+      wtl_code:      rootDoc.wtl_code || '',
+      photo_url:     rootDoc.photo_url || '',
+      assembly_name: rootDoc.ASSEMBLY_NAME || '',
+      district:      rootDoc.DISTRICT_NAME || '',
+      part_no:       rootDoc.PART_NO || '',
+    };
+
+    // 2. Fetch Layer 2 Members
+    const layer2Docs = await db.collection('generated_voters')
       .find(
         { referred_by_wtl: wtlCode },
-        { projection: { VOTER_NAME: 1, FM_NAME_EN: 1, LASTNAME_EN: 1, EPIC_NO: 1, wtl_code: 1, generated_at: 1, photo_url: 1 } }
+        { projection: { VOTER_NAME: 1, FM_NAME_EN: 1, LASTNAME_EN: 1, EPIC_NO: 1, wtl_code: 1, photo_url: 1, ASSEMBLY_NAME: 1, DISTRICT_NAME: 1, PART_NO: 1, generated_at: 1 } }
       )
       .sort({ generated_at: -1 })
-      .limit(50)
       .toArray();
 
-    const result = members.map(m => ({
-      name:         m.VOTER_NAME || `${m.FM_NAME_EN || ''} ${m.LASTNAME_EN || ''}`.trim() || 'A Member',
-      epic_no:      m.EPIC_NO || '',
-      wtl_code:     m.wtl_code || '',
-      generated_at: m.generated_at || null,
-      photo_url:    m.photo_url || '',
-    }));
+    const layer2Wtls = layer2Docs.map(m => m.wtl_code).filter(Boolean);
 
-    return res.json({ success: true, members: result, total: result.length });
+    // 3. Fetch Layer 3 Members
+    let layer3Docs = [];
+    if (layer2Wtls.length > 0) {
+      layer3Docs = await db.collection('generated_voters')
+        .find(
+          { referred_by_wtl: { $in: layer2Wtls } },
+          { projection: { VOTER_NAME: 1, FM_NAME_EN: 1, LASTNAME_EN: 1, EPIC_NO: 1, wtl_code: 1, photo_url: 1, ASSEMBLY_NAME: 1, DISTRICT_NAME: 1, PART_NO: 1, referred_by_wtl: 1, generated_at: 1 } }
+        )
+        .toArray();
+    }
+
+    // Map Layer 3 members by their referrer's WTL code
+    const layer3Map = {};
+    for (const m3 of layer3Docs) {
+      const parentWtl = m3.referred_by_wtl;
+      if (!layer3Map[parentWtl]) {
+        layer3Map[parentWtl] = [];
+      }
+      layer3Map[parentWtl].push({
+        name:          m3.VOTER_NAME || `${m3.FM_NAME_EN || ''} ${m3.LASTNAME_EN || ''}`.trim() || 'A Member',
+        epic_no:       m3.EPIC_NO || '',
+        wtl_code:      m3.wtl_code || '',
+        photo_url:     m3.photo_url || '',
+        assembly_name: m3.ASSEMBLY_NAME || '',
+        district:      m3.DISTRICT_NAME || '',
+        part_no:       m3.PART_NO || '',
+        generated_at:  m3.generated_at || null,
+      });
+    }
+
+    // Build the tree
+    const tree = layer2Docs.map(m2 => {
+      const w2 = m2.wtl_code;
+      return {
+        name:          m2.VOTER_NAME || `${m2.FM_NAME_EN || ''} ${m2.LASTNAME_EN || ''}`.trim() || 'A Member',
+        epic_no:       m2.EPIC_NO || '',
+        wtl_code:      w2 || '',
+        photo_url:     m2.photo_url || '',
+        assembly_name: m2.ASSEMBLY_NAME || '',
+        district:      m2.DISTRICT_NAME || '',
+        part_no:       m2.PART_NO || '',
+        generated_at:  m2.generated_at || null,
+        referrals:     layer3Map[w2] || [],
+      };
+    });
+
+    return res.json({ success: true, root, tree });
   } catch (err) {
     console.error('my-members error:', err.message);
     return res.status(500).json({ success: false, message: 'Server error' });
@@ -1163,10 +1239,111 @@ router.post('/request-booth-agent', async (req, res) => {
 });
 
 // ────────────────────────────────────────────────────────────────
+//  GET /best-performers  — requires verified session
+// ────────────────────────────────────────────────────────────────
+router.get('/best-performers', async (req, res) => {
+  try {
+    if (!req.session?.verified_mobile) {
+      return res.status(401).json({ success: false, message: 'Authentication required.' });
+    }
+
+    const db = getDb();
+    const performers = await db.collection('generated_voters')
+      .find({ referred_members_count: { $gt: 0 } }, {
+        projection: { 
+          VOTER_NAME: 1, 
+          FM_NAME_EN: 1, 
+          LASTNAME_EN: 1, 
+          referred_members_count: 1, 
+          wtl_code: 1, 
+          photo_url: 1,
+          EPIC_NO: 1,
+          ASSEMBLY_NAME: 1,
+          DISTRICT_NAME: 1,
+          PART_NO: 1
+        }
+      })
+      .sort({ referred_members_count: -1 })
+      .limit(5)
+      .toArray();
+
+    const result = performers.map((p, index) => ({
+      rank:                 index + 1,
+      name:                 p.VOTER_NAME || `${p.FM_NAME_EN || ''} ${p.LASTNAME_EN || ''}`.trim() || 'BJP Member',
+      referred_count:       p.referred_members_count || 0,
+      referrals:            p.referred_members_count || 0,
+      wtl_code:             p.wtl_code || '',
+      photo_url:            p.photo_url || '',
+      epic_no:              p.EPIC_NO || '',
+      assembly_name:        p.ASSEMBLY_NAME || '',
+      district:             p.DISTRICT_NAME || '',
+      part_no:              p.PART_NO || ''
+    }));
+
+    return res.json({ success: true, performers: result });
+  } catch (err) {
+    console.error('best-performers error:', err.message);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// ────────────────────────────────────────────────────────────────
 //  GET /card-status/:jobId
 // ────────────────────────────────────────────────────────────────
 router.get('/card-status/:jobId', (req, res) => {
   return res.status(404).json({ status: 'error', message: 'Job not found or expired' });
+});
+
+// ────────────────────────────────────────────────────────────────
+//  GET /member-status/:wtlCode
+// ────────────────────────────────────────────────────────────────
+router.get('/member-status/:wtlCode', async (req, res) => {
+  try {
+    const wtlCode = req.params.wtlCode;
+    const db = getDb();
+    const voter = await db.collection('generated_voters').findOne({ wtl_code: wtlCode });
+    if (!voter) {
+      return res.status(404).json({ success: false, message: 'Member not found' });
+    }
+    const appointment = await db.collection('appointments').findOne({ wtl_code: wtlCode });
+    return res.json({
+      success: true,
+      referred_count: voter.referred_members_count || 0,
+      has_appointment: !!appointment,
+      appointment: appointment ? { date: appointment.date, time: appointment.time } : null
+    });
+  } catch (err) {
+    console.error('member-status error:', err.message);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// ────────────────────────────────────────────────────────────────
+//  POST /book-appointment
+// ────────────────────────────────────────────────────────────────
+router.post('/book-appointment', async (req, res) => {
+  try {
+    const { wtl_code, date, time } = req.body;
+    if (!wtl_code || !date || !time) {
+      return res.status(400).json({ success: false, message: 'Missing required parameters' });
+    }
+    const db = getDb();
+    // Check if appointment already exists
+    const existing = await db.collection('appointments').findOne({ wtl_code });
+    if (existing) {
+      return res.json({ success: true, message: 'Appointment already booked' });
+    }
+    await db.collection('appointments').insertOne({
+      wtl_code,
+      date,
+      time,
+      created_at: new Date()
+    });
+    return res.json({ success: true, message: 'Appointment booked successfully' });
+  } catch (err) {
+    console.error('book-appointment error:', err.message);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
 });
 
 module.exports = router;

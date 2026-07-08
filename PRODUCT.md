@@ -43,3 +43,11 @@ Emotional goal: civic pride and a sense of belonging. The member should feel rec
 - Touch targets minimum 44×44px
 - No time-limited actions (OTP flow to be added later via 2factor.in — keep the placeholder state accessible)
 - Tamil language support consideration for future iteration (UI currently in English)
+
+## Performance & Scalability Constraints
+
+Based on the July 2026 Capacity Audit, the following architectural boundaries are established:
+
+1. **Client-Side Rendering Priority**: Backend-based card generation (Puppeteer) is limited to a concurrency of **5** before latency becomes unacceptable (>10s) and crashes entirely at **20+ concurrent renders** (droplet memory exhaustion). All web-based registrations must utilize the client-side canvas rendering engine to bypass this limit.
+2. **Voter DB Lookup Limits**: The parallel search across 234 assembly collections is connection-pool bound. With a `maxPoolSize` of `10`, the system experiences query timeouts and false 404s starting at **200 concurrent lookups**.
+3. **Recovery Characteristics**: Droplet recovery is not automatic following a Puppeteer overload. A hard reboot is required. Production deployment requires resource scaling (RAM/CPU) and connection pool limits raised to at least 50.

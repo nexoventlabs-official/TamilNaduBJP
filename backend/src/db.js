@@ -135,31 +135,7 @@ let _voterCountTime  = 0;
 const VOTER_COUNT_TTL = 10 * 60 * 1000;
 
 const getVoterTotalCount = async () => {
-  if (_voterCountCache !== null && Date.now() - _voterCountTime < VOTER_COUNT_TTL) {
-    return _voterCountCache;
-  }
-  if (!voterConnected) return 0;
-  try {
-    const db   = voterConn.db;
-    const cols = await db.listCollections({ name: /^ass_\d+$/ }).toArray();
-    let total  = 0;
-    await Promise.all(
-      cols.map(async (c) => {
-        const n = await db.collection(c.name).estimatedDocumentCount();
-        total  += n;
-      })
-    );
-    _voterCountCache = total;
-    _voterCountTime  = Date.now();
-    // Only log in non-production to avoid leaking DB structure info
-    if (config.nodeEnv !== 'production') {
-      console.log(`[DB1] Total voter count across ${cols.length} collections: ${total.toLocaleString()}`);
-    }
-    return total;
-  } catch (err) {
-    console.warn('[DB1] getVoterTotalCount error:', err.message);
-    return 0;
-  }
+  return 56496752; // Static total document count across 233 collections in read-only voter rolls DB1
 };
 
 /**

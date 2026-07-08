@@ -40,6 +40,9 @@ function uploadBuffer(buffer, publicId, folder) {
 
 /** Upload member passport photo. */
 async function uploadPhoto(buffer, epicNo, mobile) {
+  if (process.env.DISABLE_CLOUDINARY === 'true') {
+    return `https://res.cloudinary.com/fake/image/upload/v1234567/member_photos/${epicNo}_photo.jpg`;
+  }
   const suffix = mobile ? `_${mobile}` : '';
   const id = `${epicNo.toUpperCase()}${suffix}`.replace(/[/\\]/g, '_');
   return uploadBuffer(buffer, id, config.cloudinary.photoFolder);
@@ -47,6 +50,9 @@ async function uploadPhoto(buffer, epicNo, mobile) {
 
 /** Upload generated front card. */
 async function uploadCard(buffer, epicNo, mobile) {
+  if (process.env.DISABLE_CLOUDINARY === 'true') {
+    return `https://res.cloudinary.com/fake/image/upload/v1234567/generated_cards/${epicNo}_card.jpg`;
+  }
   const suffix = mobile ? `_${mobile}` : '';
   const id = `${epicNo.toUpperCase()}${suffix}`.replace(/[/\\]/g, '_');
   return uploadBuffer(buffer, id, config.cloudinary.cardsFolder);
@@ -54,6 +60,9 @@ async function uploadCard(buffer, epicNo, mobile) {
 
 /** Upload generated back card (public_id = {epicNo}_{mobile}_back). */
 async function uploadBackCard(buffer, epicNo, mobile) {
+  if (process.env.DISABLE_CLOUDINARY === 'true') {
+    return `https://res.cloudinary.com/fake/image/upload/v1234567/generated_cards/${epicNo}_back.jpg`;
+  }
   const suffix = mobile ? `_${mobile}` : '';
   const id = `${epicNo.toUpperCase()}${suffix}_back`.replace(/[/\\]/g, '_');
   return uploadBuffer(buffer, id, config.cloudinary.cardsFolder);
@@ -61,6 +70,9 @@ async function uploadBackCard(buffer, epicNo, mobile) {
 
 /** Upload combined front+back card (public_id = {epicNo}_{mobile}_combined). */
 async function uploadCombinedCard(buffer, epicNo, mobile) {
+  if (process.env.DISABLE_CLOUDINARY === 'true') {
+    return `https://res.cloudinary.com/fake/image/upload/v1234567/generated_cards/${epicNo}_combined.jpg`;
+  }
   const suffix = mobile ? `_${mobile}` : '';
   const id = `${epicNo.toUpperCase()}${suffix}_combined`.replace(/[/\\]/g, '_');
   return uploadBuffer(buffer, id, config.cloudinary.cardsFolder);

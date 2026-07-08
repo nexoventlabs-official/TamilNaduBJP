@@ -50,14 +50,14 @@ export default function ConfirmedVolunteersPage() {
   return (
     <div>
       <div className="page-header">
-        <h1><i className="bi bi-check-circle-fill me-2 text-coral" />Confirmed Volunteers</h1>
-        <p>All approved volunteer members</p>
+        <h1><i className="bi bi-check-circle-fill me-2 text-coral" />Confirmed Organizers</h1>
+        <p>All approved organizer members</p>
       </div>
 
       <div className="admin-card">
         <div className="admin-card-header">
           <h6 className="admin-card-title">
-            <i className="bi bi-check-circle" /> Volunteers
+            <i className="bi bi-check-circle" /> Organizers
             <span className="badge-status badge-confirmed ms-2" style={{ fontSize: 11 }}>{data.total}</span>
           </h6>
           <form className="admin-card-tools" onSubmit={handleSearch}>
@@ -80,7 +80,7 @@ export default function ConfirmedVolunteersPage() {
         {loading ? (
           <div style={{ padding: 32, textAlign: 'center' }}><div className="spinner-border spinner-border-sm text-danger" /></div>
         ) : volunteers.length === 0 ? (
-          <div className="empty-state"><i className="bi bi-check-circle" /><p>No confirmed volunteers found{search ? ` for "${search}"` : ''}.</p></div>
+          <div className="empty-state"><i className="bi bi-check-circle" /><p>No confirmed organizers found{search ? ` for "${search}"` : ''}.</p></div>
         ) : (
           <>
             <div className="admin-table-wrap">

@@ -68,6 +68,9 @@ export const chat = {
   getMyMembers: (wtlCode) =>
     api.get(`/api/my-members/${wtlCode}`),
 
+  getBestPerformers: () =>
+    api.get('/api/best-performers'),
+
   getDistrictsData: () =>
     api.get('/api/districts-data'),
 
@@ -85,6 +88,12 @@ export const chat = {
       assembly,
       district,
     }),
+
+  getMemberStatus: (wtlCode) =>
+    api.get(`/api/member-status/${wtlCode}`),
+
+  bookAppointment: (wtlCode, date, time) =>
+    api.post('/api/book-appointment', { wtl_code: wtlCode, date, time }),
 }
 
 export const admin = {

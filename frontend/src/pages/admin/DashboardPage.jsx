@@ -72,8 +72,8 @@ export default function DashboardPage() {
 
       {/* Volunteer & Booth stats */}
       <div className="stat-cards-grid">
-        <StatCard icon="hand-thumbs-up"        label="Pending Volunteers"    value={s.pending_volunteers}    color="#fbc02d" bg="rgba(251,192,45,0.1)" />
-        <StatCard icon="check-circle-fill"     label="Confirmed Volunteers"  value={s.confirmed_volunteers}  color="#43a047" bg="rgba(46,125,50,0.1)" />
+        <StatCard icon="hand-thumbs-up"        label="Pending Organizers"    value={s.pending_volunteers}    color="#fbc02d" bg="rgba(251,192,45,0.1)" />
+        <StatCard icon="check-circle-fill"     label="Confirmed Organizers"  value={s.confirmed_volunteers}  color="#43a047" bg="rgba(46,125,50,0.1)" />
         <StatCard icon="building"              label="Pending Booth Agents"  value={s.pending_booth_agents}  color="#fbc02d" bg="rgba(251,192,45,0.1)" />
         <StatCard icon="shield-fill-check"     label="Confirmed Booth Agents" value={s.confirmed_booth_agents} color="#1565c0" bg="rgba(21,101,192,0.1)" />
       </div>

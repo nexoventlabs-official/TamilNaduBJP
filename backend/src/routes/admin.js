@@ -28,6 +28,16 @@ function cacheSet(key, value, ttlSeconds = 60) {
   _cache.set(key, { value, expires: Date.now() / 1000 + ttlSeconds });
 }
 
+const _staticColCounts = new Map();
+async function getCollectionSize(voterDb, colName) {
+  let count = _staticColCounts.get(colName);
+  if (count === undefined) {
+    count = await voterDb.collection(colName).estimatedDocumentCount();
+    _staticColCounts.set(colName, count);
+  }
+  return count;
+}
+
 // ────────────────────────────────────────────────────────────────
 //  POST /admin/api/login
 // ────────────────────────────────────────────────────────────────
@@ -207,6 +217,47 @@ router.get('/api/voters', async (req, res) => {
     // Build filter
     const filt = {};
     if (district) filt.DISTRICT_NAME = district;
+
+    // ── Optimization: Exact EPIC Search Bypass ──
+    const cleanSearch = search.trim().toUpperCase();
+    const isEpicPattern = /^[A-Z0-9\/\-]+$/.test(cleanSearch) && cleanSearch.length >= 6;
+    if (isEpicPattern && !assembly && !district) {
+      const doc = await findVoterByEpic(cleanSearch);
+      if (doc) {
+        const voter = docToVoter(doc);
+        const stat = await db.collection('generation_stats').findOne({ epic_no: voter.epic_no }) || {};
+        voter.gen_count      = stat.count || 0;
+        voter.last_generated = stat.last_generated ? String(stat.last_generated).slice(0, 19).replace('T', ' ') : '';
+        voter.photo_url      = stat.photo_url  || '';
+        voter.card_url       = stat.card_url   || '';
+        voter.auth_mobile    = stat.auth_mobile || '';
+        
+        const assemblies = await getAssemblyListCached(voterDb);
+        return res.json({
+          voters: [voter],
+          total: 1,
+          per_page: perPage,
+          page: 1,
+          total_pages: 1,
+          assemblies,
+          districts: [],
+          cursor_mode: false
+        });
+      } else {
+        const assemblies = await getAssemblyListCached(voterDb);
+        return res.json({
+          voters: [],
+          total: 0,
+          per_page: perPage,
+          page: 1,
+          total_pages: 1,
+          assemblies,
+          districts: [],
+          cursor_mode: false
+        });
+      }
+    }
+
     if (search) {
       // Escape regex special chars to prevent ReDoS
       const escaped = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -253,7 +304,7 @@ router.get('/api/voters', async (req, res) => {
       let needed    = perPage;
       for (const col of targetCols) {
         if (needed <= 0) break;
-        const colCount = await voterDb.collection(col).countDocuments(filt);
+        const colCount = Object.keys(filt).length === 0 ? await getCollectionSize(voterDb, col) : await voterDb.collection(col).countDocuments(filt);
         if (remaining >= colCount) { remaining -= colCount; continue; }
         const colDocs = await voterDb.collection(col).find(filt).skip(remaining).limit(needed).toArray();
         docs.push(...colDocs);

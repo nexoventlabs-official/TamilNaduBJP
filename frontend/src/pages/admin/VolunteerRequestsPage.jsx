@@ -40,7 +40,7 @@ export default function VolunteerRequestsPage() {
   useEffect(() => { loadData() }, [loadData])
 
   const handleAction = async (wtlCode, action) => {
-    if (!window.confirm(`Are you sure you want to ${action} this volunteer request?`)) return
+    if (!window.confirm(`Are you sure you want to ${action} this organizer request?`)) return
     setActionLoading((prev) => ({ ...prev, [wtlCode]: action }))
     try {
       if (action === 'confirm') await admin.confirmVolunteer(wtlCode)
@@ -58,8 +58,8 @@ export default function VolunteerRequestsPage() {
   return (
     <div>
       <div className="page-header">
-        <h1><i className="bi bi-hand-thumbs-up-fill me-2 text-coral" />Volunteer Requests</h1>
-        <p>Review and manage volunteer applications</p>
+        <h1><i className="bi bi-hand-thumbs-up-fill me-2 text-coral" />Organizer Requests</h1>
+        <p>Review and manage organizer applications</p>
       </div>
 
       <div className="admin-card">
@@ -83,7 +83,7 @@ export default function VolunteerRequestsPage() {
         {loading ? (
           <div style={{ padding: 32, textAlign: 'center' }}><div className="spinner-border spinner-border-sm text-danger" /></div>
         ) : requests.length === 0 ? (
-          <div className="empty-state"><i className="bi bi-hand-thumbs-up" /><p>No {statusFilter} volunteer requests found.</p></div>
+          <div className="empty-state"><i className="bi bi-hand-thumbs-up" /><p>No {statusFilter} organizer requests found.</p></div>
         ) : (
           <>
             <div className="admin-table-wrap">

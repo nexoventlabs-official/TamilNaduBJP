@@ -7,8 +7,8 @@ const NAV_ITEMS = [
   { path: '/admin/dashboard',          icon: 'grid-1x2-fill',       label: 'Dashboard' },
   { path: '/admin/voters',             icon: 'people-fill',          label: 'Voters' },
   { path: '/admin/generated-voters',   icon: 'card-list',            label: 'Generated Members' },
-  { path: '/admin/volunteer-requests', icon: 'hand-thumbs-up-fill',  label: 'Volunteer Requests' },
-  { path: '/admin/confirmed-volunteers', icon: 'check-circle-fill',  label: 'Confirmed Volunteers' },
+  { path: '/admin/volunteer-requests', icon: 'hand-thumbs-up-fill',  label: 'Organizer Requests' },
+  { path: '/admin/confirmed-volunteers', icon: 'check-circle-fill',  label: 'Confirmed Organizers' },
   { path: '/admin/booth-agent-requests', icon: 'building-fill',      label: 'Booth Agent Requests' },
   { path: '/admin/confirmed-booth-agents', icon: 'shield-fill-check', label: 'Confirmed Booth Agents' },
 ]
