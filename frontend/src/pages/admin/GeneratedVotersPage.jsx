@@ -55,7 +55,7 @@ export default function GeneratedVotersPage() {
     <div>
       <div className="page-header">
         <h1><i className="bi bi-card-list me-2 text-coral" />Generated Members</h1>
-        <p>Voters who have successfully generated their WTL ID card</p>
+        <p>Voters who have successfully generated their BJP ID card</p>
       </div>
 
       <div className="admin-card">
@@ -69,11 +69,11 @@ export default function GeneratedVotersPage() {
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
             />
-            <button type="submit" style={{ background: 'var(--color-coral-pulse)', border: 'none', color: '#fff', padding: '7px 14px', borderRadius: 7, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
+            <button type="submit" style={{ background: 'var(--color-coral-pulse)', border: 'none', color: '#fff', padding: '7px 14px', borderRadius: 'var(--radius-buttons)', fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
               <i className="bi bi-search" /> Search
             </button>
             {search && (
-              <button type="button" onClick={() => { setSearch(''); setSearchInput(''); setPage(1) }} style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: '#8696a0', padding: '7px 12px', borderRadius: 7, fontSize: 13, cursor: 'pointer' }}>Clear</button>
+              <button type="button" onClick={() => { setSearch(''); setSearchInput(''); setPage(1) }} style={{ background: 'var(--admin-surface-raise)', border: '1px solid var(--border-dim)', color: 'var(--text-secondary)', padding: '7px 12px', borderRadius: 'var(--radius-buttons)', fontSize: 13, cursor: 'pointer' }}>Clear</button>
             )}
           </form>
         </div>
@@ -93,7 +93,7 @@ export default function GeneratedVotersPage() {
                     <th>EPIC No</th>
                     <th>Mobile</th>
                     <th>Assembly</th>
-                    <th>WTL Code</th>
+                    <th>BJP Code</th>
                     <th>Generated At</th>
                     <th>Actions</th>
                   </tr>
@@ -105,7 +105,7 @@ export default function GeneratedVotersPage() {
                       <tr key={codeVal || v.epic_no || i}>
                         <td style={{ color: 'var(--admin-ink-dim)' }}>{(page - 1) * 20 + i + 1}</td>
                         <td>{v.name || v.Name}</td>
-                        <td><code style={{ color: 'var(--admin-ink)', background: 'rgba(255,255,255,0.05)', padding: '2px 6px', borderRadius: 4, fontSize: 11 }}>{v.epic_no || v.EpicNo}</code></td>
+                        <td><code style={{ color: 'var(--admin-ink)', background: 'var(--admin-surface-raise)', border: '1px solid var(--border-dim)', padding: '2px 6px', borderRadius: 4, fontSize: 11 }}>{v.epic_no || v.EpicNo}</code></td>
                         <td style={{ color: 'var(--admin-ink-dim)', fontSize: 12 }}>{v.mobile || '—'}</td>
                         <td style={{ color: 'var(--admin-ink-dim)' }}>{v.assembly || v.AssemblyName}</td>
                         <td>

@@ -92,7 +92,7 @@ export default function BoothAgentRequestsPage() {
                     <th>#</th>
                     <th>Name</th>
                     <th>EPIC No</th>
-                    <th>WTL Code</th>
+                    <th>BJP Code</th>
                     <th>Booth No</th>
                     <th>Mobile</th>
                     <th>Requested At</th>
@@ -109,9 +109,22 @@ export default function BoothAgentRequestsPage() {
                     return (
                       <tr key={key}>
                         <td style={{ color: '#8696a0' }}>{(page - 1) * 20 + i + 1}</td>
-                        <td>{r.name || r.Name}</td>
                         <td>
-                          <Link to={`/admin/voters/${r.epic_no}`} style={{ color: '#64b5f6', fontSize: 12 }}>{r.epic_no}</Link>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            {r.photo_url ? (
+                              <img src={r.photo_url} alt="Photo" style={{ width: 28, height: 28, borderRadius: '50%', objectFit: 'cover' }} />
+                            ) : (
+                              <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'rgba(255,102,0,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <i className="bi bi-person" style={{ color: 'var(--color-coral)' }} />
+                              </div>
+                            )}
+                            <Link to={`/admin/generated-voters/${codeVal}`} style={{ color: '#ffffff', textDecoration: 'none', fontWeight: 500 }}>
+                              {r.name || r.Name || '—'}
+                            </Link>
+                          </div>
+                        </td>
+                        <td>
+                          <Link to={`/admin/generated-voters/${codeVal}`} style={{ color: '#64b5f6', fontSize: 12 }}>{r.epic_no}</Link>
                         </td>
                         <td>
                           {codeVal

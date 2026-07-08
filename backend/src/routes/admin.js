@@ -414,7 +414,31 @@ router.get('/api/volunteer-requests', async (req, res) => {
     if (status) filt.status = status;
     const db = getDb();
     const { items, total, totalPages } = await paginatedList(db, 'volunteer_requests', filt, { requested_at: -1 }, page, perPage);
-    return res.json({ items, requests: items, total, page, per_page: perPage, total_pages: totalPages });
+
+    // Enriched with voter details (name fallbacks + photo url)
+    const wtlCodes = items.map(x => x.wtl_code).filter(Boolean);
+    const voters = await db.collection('generated_voters')
+      .find({ wtl_code: { $in: wtlCodes } })
+      .toArray();
+
+    const voterMap = new Map(voters.map(v => [
+      v.wtl_code,
+      {
+        name: v.VOTER_NAME || `${v.FM_NAME_EN || ''} ${v.LASTNAME_EN || ''}`.trim(),
+        photo_url: v.photo_url || ''
+      }
+    ]));
+
+    const enrichedItems = items.map(item => {
+      const profile = voterMap.get(item.wtl_code) || {};
+      return {
+        ...item,
+        name: item.name || profile.name || '—',
+        photo_url: profile.photo_url || ''
+      };
+    });
+
+    return res.json({ items: enrichedItems, requests: enrichedItems, total, page, per_page: perPage, total_pages: totalPages });
   } catch (err) {
     console.error('volunteer-requests error:', err);
     return res.status(500).json({ success: false, message: 'Server error' });
@@ -489,7 +513,31 @@ router.get('/api/booth-agent-requests', async (req, res) => {
     if (status) filt.status = status;
     const db = getDb();
     const { items, total, totalPages } = await paginatedList(db, 'booth_agent_requests', filt, { requested_at: -1 }, page, perPage);
-    return res.json({ items, requests: items, total, page, per_page: perPage, total_pages: totalPages });
+
+    // Enriched with voter details (name fallbacks + photo url)
+    const wtlCodes = items.map(x => x.wtl_code).filter(Boolean);
+    const voters = await db.collection('generated_voters')
+      .find({ wtl_code: { $in: wtlCodes } })
+      .toArray();
+
+    const voterMap = new Map(voters.map(v => [
+      v.wtl_code,
+      {
+        name: v.VOTER_NAME || `${v.FM_NAME_EN || ''} ${v.LASTNAME_EN || ''}`.trim(),
+        photo_url: v.photo_url || ''
+      }
+    ]));
+
+    const enrichedItems = items.map(item => {
+      const profile = voterMap.get(item.wtl_code) || {};
+      return {
+        ...item,
+        name: item.name || profile.name || '—',
+        photo_url: profile.photo_url || ''
+      };
+    });
+
+    return res.json({ items: enrichedItems, requests: enrichedItems, total, page, per_page: perPage, total_pages: totalPages });
   } catch (err) {
     console.error('booth-agent-requests error:', err);
     return res.status(500).json({ success: false, message: 'Server error' });
@@ -614,8 +662,8 @@ function genDocToDict(doc) {
   base.referred_by_wtl        = doc.referred_by_wtl || '';
   base.referred_members_count = doc.referred_members_count || 0;
   base.source                 = doc.source       || '';
-  base.generated_at           = doc.generated_at ? String(doc.generated_at).slice(0, 19).replace('T', ' ') : '';
-  base.created_at             = doc.created_at   ? String(doc.created_at).slice(0, 19).replace('T', ' ')   : '';
+  base.generated_at           = doc.generated_at ? (doc.generated_at instanceof Date ? doc.generated_at.toISOString() : new Date(doc.generated_at).toISOString()) : '';
+  base.created_at             = doc.created_at   ? (doc.created_at instanceof Date ? doc.created_at.toISOString() : new Date(doc.created_at).toISOString()) : '';
   base.id                     = String(doc._id   || '');
   base.volunteer_status       = doc.volunteer_status    || '';
   base.booth_agent_status     = doc.booth_agent_status  || '';
@@ -627,8 +675,8 @@ function serialiseDoc(doc) {
   if (!doc) return null;
   const out = { ...doc };
   out._id = String(out._id || '');
-  if (out.requested_at) out.requested_at = String(out.requested_at);
-  if (out.reviewed_at)  out.reviewed_at  = String(out.reviewed_at);
+  if (out.requested_at) out.requested_at = out.requested_at instanceof Date ? out.requested_at.toISOString() : new Date(out.requested_at).toISOString();
+  if (out.reviewed_at)  out.reviewed_at  = out.reviewed_at instanceof Date ? out.reviewed_at.toISOString() : new Date(out.reviewed_at).toISOString();
   // Never send sensitive fields to the admin client
   delete out.secret_pin;
   delete out.otp;

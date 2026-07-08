@@ -79,9 +79,6 @@
 .chat-header-avatar {
   width: 32px;
   height: 32px;
-  border-radius: 50%;
-  overflow: hidden;
-  background: var(--color-graphite);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -91,7 +88,7 @@
 .chat-header-avatar img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
 }
 
 .chat-header-info {
@@ -806,9 +803,7 @@
 .sidebar-logo {
   width: 40px;
   height: 40px;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 1px solid var(--color-graphite);
+  object-fit: contain;
 }
 
 .sidebar-brand {
@@ -954,13 +949,13 @@
 
 /* ── WTL Theme (ID Card style) ───────────────────────────── */
 .chatbot-app.wtl-theme {
-  --color-abyss:       #FFF8F2; /* chat/input bg — saffron-tinted neutral */
-  --color-carbon:      #ffffff;
-  --color-graphite:    rgba(204, 82, 0, 0.15);
-  --color-ash:         #555555;
-  --color-chalk:       #111111;
-  --color-signal-mint: #CC5200; /* BJP saffron — 4.52:1 on white (WCAG AA) */
-  --color-ink-dim:     #666666; /* muted text — 5.74:1 on white */
+  --color-abyss:       #fff8f1; /* chat/input bg — saffron-tinted cream canvas */
+  --color-carbon:      #ffffff; /* Floating cards bg */
+  --color-graphite:    rgba(250, 93, 0, 0.12); /* Saffron hairline borders */
+  --color-ash:         #615f5c; /* Warm stone secondary text */
+  --color-chalk:       #1d1e1c; /* Warm near-black primary text */
+  --color-signal-mint: #fa5d00; /* BJP Harvest Flame accent color */
+  --color-ink-dim:     #615f5c; /* Secondary body text */
   font-family: 'Barlow', sans-serif !important;
 }
 
@@ -1041,9 +1036,7 @@
 .chatbot-app.wtl-theme .left-menu-profile img {
   width: 36px;
   height: 36px;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 1px solid rgba(255, 102, 0, 0.15);
+  object-fit: contain;
 }
 
 .chatbot-app.wtl-theme .left-menu-profile-info {

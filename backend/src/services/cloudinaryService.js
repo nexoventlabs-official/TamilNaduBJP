@@ -39,26 +39,30 @@ function uploadBuffer(buffer, publicId, folder) {
 }
 
 /** Upload member passport photo. */
-async function uploadPhoto(buffer, epicNo) {
-  const id = epicNo.toUpperCase().replace(/[/\\]/g, '_');
+async function uploadPhoto(buffer, epicNo, mobile) {
+  const suffix = mobile ? `_${mobile}` : '';
+  const id = `${epicNo.toUpperCase()}${suffix}`.replace(/[/\\]/g, '_');
   return uploadBuffer(buffer, id, config.cloudinary.photoFolder);
 }
 
 /** Upload generated front card. */
-async function uploadCard(buffer, epicNo) {
-  const id = epicNo.toUpperCase().replace(/[/\\]/g, '_');
+async function uploadCard(buffer, epicNo, mobile) {
+  const suffix = mobile ? `_${mobile}` : '';
+  const id = `${epicNo.toUpperCase()}${suffix}`.replace(/[/\\]/g, '_');
   return uploadBuffer(buffer, id, config.cloudinary.cardsFolder);
 }
 
-/** Upload generated back card (public_id = {epicNo}_back). */
-async function uploadBackCard(buffer, epicNo) {
-  const id = `${epicNo.toUpperCase().replace(/[/\\]/g, '_')}_back`;
+/** Upload generated back card (public_id = {epicNo}_{mobile}_back). */
+async function uploadBackCard(buffer, epicNo, mobile) {
+  const suffix = mobile ? `_${mobile}` : '';
+  const id = `${epicNo.toUpperCase()}${suffix}_back`.replace(/[/\\]/g, '_');
   return uploadBuffer(buffer, id, config.cloudinary.cardsFolder);
 }
 
-/** Upload combined front+back card (public_id = {epicNo}_combined). */
-async function uploadCombinedCard(buffer, epicNo) {
-  const id = `${epicNo.toUpperCase().replace(/[/\\]/g, '_')}_combined`;
+/** Upload combined front+back card (public_id = {epicNo}_{mobile}_combined). */
+async function uploadCombinedCard(buffer, epicNo, mobile) {
+  const suffix = mobile ? `_${mobile}` : '';
+  const id = `${epicNo.toUpperCase()}${suffix}_combined`.replace(/[/\\]/g, '_');
   return uploadBuffer(buffer, id, config.cloudinary.cardsFolder);
 }
 

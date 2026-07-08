@@ -40,8 +40,8 @@ export default function VerifyPage() {
   }
 
   const v = voter?.voter || voter || {}
-  const hasCard = !!(v.card_url || voter?.card_url)
-  const isRegistered = !!(v.wtl_code || v.ptc_code || hasCard)
+  const isRegistered = !!(v.wtl_code || v.ptc_code || v.card_url || voter?.card_url)
+  const hasCard = isRegistered
   const isVolunteer = voter?.is_volunteer || v.is_volunteer
   const isBoothAgent = voter?.is_booth_agent || v.is_booth_agent
   const photoUrl = v.photo_url || voter?.photo_url
@@ -55,7 +55,7 @@ export default function VerifyPage() {
       <div style={{ maxWidth: 520, margin: '0 auto' }}>
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
-          <img src="/bjp_logo.svg" alt="BJP" style={{ width: 40, height: 40, borderRadius: '50%', border: '1px solid var(--color-graphite)' }} />
+          <img src="/bjp_logo.svg" alt="BJP" style={{ width: 40, height: 40, objectFit: 'contain' }} />
           <div>
             <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--color-chalk)', letterSpacing: '0.1em' }}>BJP TAMIL NADU</div>
             <div style={{ fontSize: 11, color: 'var(--color-signal-mint)' }}>Member Verification</div>

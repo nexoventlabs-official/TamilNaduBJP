@@ -54,7 +54,7 @@ export default function CardPage() {
 
       {/* Header */}
       <div style={{ display:'flex', alignItems:'center', gap:12 }}>
-        <img src="/bjp_logo.svg" alt="BJP" style={{ width:40, height:40, borderRadius:'50%', border:'1px solid var(--color-graphite)' }} />
+        <img src="/bjp_logo.svg" alt="BJP" style={{ width: 40, height: 40, objectFit: 'contain' }} />
         <div>
           <div style={{ fontSize:16, fontWeight:500, color:'var(--color-chalk)', letterSpacing:'0.1em' }}>BJP TAMIL NADU</div>
           <div style={{ fontSize:11, color:'var(--color-signal-mint)' }}>Digital Member ID Card</div>

@@ -25,7 +25,7 @@ const connectDB = async () => {
   try {
     await appConn.openUri(config.mongoUri, {
       dbName:                   config.mongoDb,
-      tls:                      true,
+      tls:                      config.mongoUri.startsWith('mongodb+srv://'),
       tlsAllowInvalidCertificates: false,
       maxPoolSize:              50,
       minPoolSize:              5,
@@ -95,7 +95,8 @@ async function ensureAppIndexes() {
     await db.collection('processed_wamids').createIndex({ ts: 1 },     { expireAfterSeconds: 86400, background: true });
 
     // Generation locks for card generation race-condition guard (TTL 5 min)
-    await db.collection('generation_locks').createIndex({ epic_no: 1 },     { unique: true, background: true });
+    await db.collection('generation_locks').dropIndex('epic_no_1').catch(() => {});
+    await db.collection('generation_locks').createIndex({ mobile: 1 },       { unique: true, background: true });
     await db.collection('generation_locks').createIndex({ locked_until: 1 }, { expireAfterSeconds: 300, background: true });
 
     console.log('[DB2] MongoDB indexes ensured.');

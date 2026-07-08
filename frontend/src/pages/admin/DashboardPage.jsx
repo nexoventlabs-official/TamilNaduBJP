@@ -16,13 +16,13 @@ function StatCard({ icon, label, value, color, bg }) {
 function StatusRow({ label, status, detail }) {
   const cls = status === 'ok' ? 'ok' : status === 'warning' ? 'warning' : 'error'
   return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#d1d7db' }}>
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', borderBottom: '1px solid rgba(29, 30, 28, 0.06)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--text-primary)' }}>
         <span className={`status-dot ${cls}`} />
         {label}
       </div>
       {detail !== undefined && (
-        <span style={{ fontSize: 12, color: '#8696a0' }}>{detail}</span>
+        <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{detail}</span>
       )}
     </div>
   )

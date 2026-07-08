@@ -68,11 +68,11 @@ export default function ConfirmedVolunteersPage() {
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
             />
-            <button type="submit" style={{ background: 'var(--color-coral-pulse)', border: 'none', color: '#fff', padding: '7px 14px', borderRadius: 7, fontSize: 13, cursor: 'pointer' }}>
+            <button type="submit" style={{ background: 'var(--color-coral-pulse)', border: 'none', color: '#fff', padding: '7px 14px', borderRadius: 'var(--radius-buttons)', fontSize: 13, cursor: 'pointer' }}>
               <i className="bi bi-search" />
             </button>
             {search && (
-              <button type="button" onClick={() => { setSearch(''); setSearchInput(''); setPage(1) }} style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: '#8696a0', padding: '7px 12px', borderRadius: 7, fontSize: 13, cursor: 'pointer' }}>Clear</button>
+              <button type="button" onClick={() => { setSearch(''); setSearchInput(''); setPage(1) }} style={{ background: 'var(--admin-surface-raise)', border: '1px solid var(--border-dim)', color: 'var(--text-secondary)', padding: '7px 12px', borderRadius: 'var(--radius-buttons)', fontSize: 13, cursor: 'pointer' }}>Clear</button>
             )}
           </form>
         </div>
@@ -90,7 +90,7 @@ export default function ConfirmedVolunteersPage() {
                     <th>#</th>
                     <th>Name</th>
                     <th>EPIC No</th>
-                    <th>WTL Code</th>
+                    <th>BJP Code</th>
                     <th>Mobile</th>
                     <th>Assembly</th>
                     <th>Confirmed At</th>

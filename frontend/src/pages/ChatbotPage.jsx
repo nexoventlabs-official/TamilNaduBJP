@@ -759,6 +759,141 @@ function BoothAgentSetupMsg({ wtlCode, epicNo, isLatest }) {
   )
 }
 
+// ── Card Full View Modal Component ──────────────────────────
+function CardModal({ cardData, onClose }) {
+  const modalRef = useRef(null)
+  const [downloading, setDownloading] = useState(false)
+  const [cardWidth, setCardWidth] = useState(Math.min(window.innerWidth - 48, 520))
+
+  useEffect(() => {
+    const handleResize = () => setCardWidth(Math.min(window.innerWidth - 48, 520))
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.85)',
+        backdropFilter: 'blur(4px)',
+        zIndex: 9999,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 24,
+      }}
+      onClick={onClose}
+    >
+      <div
+        style={{
+          background: 'var(--color-carbon)',
+          border: '1px solid var(--color-graphite)',
+          borderRadius: 24,
+          padding: 24,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: 20,
+          maxWidth: '100%',
+          position: 'relative',
+          boxShadow: '0 20px 50px rgba(0,0,0,0.3)',
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button
+          onClick={onClose}
+          style={{
+            position: 'absolute',
+            top: 16,
+            right: 16,
+            background: 'transparent',
+            border: 'none',
+            color: 'var(--color-ash)',
+            fontSize: 20,
+            cursor: 'pointer',
+            zIndex: 10,
+            transition: 'color 0.15s',
+          }}
+          onMouseEnter={(e) => e.target.style.color = 'var(--color-chalk)'}
+          onMouseLeave={(e) => e.target.style.color = 'var(--color-ash)'}
+          aria-label="Close"
+        >
+          <i className="bi bi-x-lg" />
+        </button>
+
+        <div style={{ alignSelf: 'flex-start', marginTop: 4 }}>
+          <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-ash)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            <i className="bi bi-credit-card-2-front" /> Digital Member Card
+          </div>
+        </div>
+
+        <FlipCard3D
+          ref={modalRef}
+          cardData={cardData}
+          width={cardWidth}
+          showActions={false}
+        />
+
+        <div style={{ display: 'flex', gap: 12, width: '100%', justifyContent: 'center' }}>
+          <button
+            onClick={async () => {
+              setDownloading(true)
+              try {
+                await modalRef.current?.download()
+              } finally {
+                setDownloading(false)
+              }
+            }}
+            disabled={downloading}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 8,
+              background: 'var(--color-signal-mint)',
+              color: 'var(--color-abyss)',
+              border: 'none',
+              padding: '10px 24px',
+              minHeight: 44,
+              borderRadius: 16,
+              fontSize: 14,
+              fontWeight: 500,
+              cursor: 'pointer',
+            }}
+          >
+            {downloading ? (
+              <span className="spinner-border spinner-border-sm" style={{ width: 12, height: 12, borderWidth: 2 }} />
+            ) : (
+              <i className="bi bi-download" />
+            )}
+            Download Card
+          </button>
+          <button
+            onClick={onClose}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 8,
+              background: 'transparent',
+              border: '1px solid var(--color-graphite)',
+              color: 'var(--color-chalk)',
+              padding: '10px 20px',
+              minHeight: 44,
+              borderRadius: 16,
+              fontSize: 14,
+              fontWeight: 500,
+              cursor: 'pointer',
+            }}
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Main ChatbotPage ────────────────────────────────────────
 export default function ChatbotPage() {
   const navigate = useNavigate()
@@ -770,6 +905,13 @@ export default function ChatbotPage() {
   const [isFlipped, setIsFlipped]   = useState(false)
   const [cropSrc, setCropSrc]       = useState('')
   const [cropOpen, setCropOpen]     = useState(false)
+  const [modalCard, setModalCard]   = useState(null)
+
+  useEffect(() => {
+    const handler = (e) => setModalCard(e.detail)
+    window.addEventListener('show-card-modal', handler)
+    return () => window.removeEventListener('show-card-modal', handler)
+  }, [])
 
   // Persistent refs (avoid stale closures)
   const initializedRef = useRef(false)
@@ -1634,6 +1776,14 @@ export default function ChatbotPage() {
           src={cropSrc}
           onCrop={handleCropComplete}
           onCancel={() => { setCropOpen(false); setCropSrc('') }}
+        />
+      )}
+
+      {/* Card Full View Modal */}
+      {modalCard && (
+        <CardModal
+          cardData={modalCard}
+          onClose={() => setModalCard(null)}
         />
       )}
     </div>

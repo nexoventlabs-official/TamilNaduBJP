@@ -24,16 +24,11 @@ export const FlipCard3D = forwardRef(function FlipCard3D(
   const scale  = width / ORIG_W
   const height = Math.round(ORIG_H * scale)
 
-  // Auto-flip: show back at 800ms, return at 2600ms
-  useEffect(() => {
-    if (!autoFlip) return
-    const t1 = setTimeout(() => setFlipped(true),  800)
-    const t2 = setTimeout(() => setFlipped(false), 2600)
-    return () => { clearTimeout(t1); clearTimeout(t2) }
-  }, [autoFlip])
+  // Auto-flip: disabled for front-side only card
+  useEffect(() => {}, [])
 
   useImperativeHandle(ref, () => ({
-    flip:     () => setFlipped((f) => !f),
+    flip:     () => {},
     download: () => handleDownload(),
   }))
 
@@ -125,7 +120,7 @@ export const FlipCard3D = forwardRef(function FlipCard3D(
       const h2c = iframe.contentWindow.html2canvas
       if (!h2c) throw new Error('html2canvas not loaded')
 
-      // 1. Capture front card via html2canvas (full res 1576×998)
+      // Capture front card via html2canvas (full res 1576×998)
       // Temporarily remove scaling so it captures at full size
       const wrap = iframeDoc.querySelector('.card-wrap')
       if (wrap) { wrap.style.transform = 'none'; wrap.style.margin = '0' }
@@ -139,45 +134,11 @@ export const FlipCard3D = forwardRef(function FlipCard3D(
         height: ORIG_H,
       })
 
-      // 2. Load back image
-      let backCanvas = null
-      if (backUrl) {
-        backCanvas = await new Promise((resolve) => {
-          const img = new Image()
-          img.crossOrigin = 'anonymous'
-          img.onload = () => {
-            // Scale back image to same height as front
-            const bw = Math.round(img.naturalWidth  * (frontCanvas.height / img.naturalHeight))
-            const bh = frontCanvas.height
-            const c  = document.createElement('canvas')
-            c.width  = bw
-            c.height = bh
-            c.getContext('2d').drawImage(img, 0, 0, bw, bh)
-            resolve(c)
-          }
-          img.onerror = () => resolve(null)
-          img.src = backUrl
-        })
-      }
-
-      // 3. Combine side-by-side
-      const GAP     = 40
-      const totalW  = frontCanvas.width + (backCanvas ? GAP + backCanvas.width : 0)
-      const totalH  = frontCanvas.height
-      const combined = document.createElement('canvas')
-      combined.width  = totalW
-      combined.height = totalH
-      const ctx = combined.getContext('2d')
-      ctx.fillStyle = '#111111'
-      ctx.fillRect(0, 0, totalW, totalH)
-      ctx.drawImage(frontCanvas, 0, 0)
-      if (backCanvas) ctx.drawImage(backCanvas, frontCanvas.width + GAP, 0)
-
-      // 4. Trigger download
+      // Trigger download of front canvas directly (no backside combine)
       const epic = String(cardData?.epic_no || cardData?.EPIC_NO || 'member').toUpperCase()
       const a    = document.createElement('a')
       a.download = `BJP_Card_${epic}.png`
-      a.href     = combined.toDataURL('image/png', 1.0)
+      a.href     = frontCanvas.toDataURL('image/png', 1.0)
       a.click()
     } catch (err) {
       console.error('Download failed:', err)
@@ -194,62 +155,28 @@ export const FlipCard3D = forwardRef(function FlipCard3D(
   return (
     <div className="flip-card-wrapper" style={{ width: `${width}px` }}>
 
-      {/* 3D scene */}
+      {/* Card Display Container */}
       <div
-        className={`flip-card-scene ${flipped ? 'is-flipped' : ''}`}
         style={cardStyle}
-        role="button"
-        tabIndex={0}
-        aria-label={flipped ? 'Card back — press to flip to front' : 'Card front — press to flip to back'}
-        onClick={() => setFlipped((f) => !f)}
-        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setFlipped((f) => !f) } }}
-        title="Click to flip"
       >
-        {/* FRONT */}
-        <div className="flip-card-face flip-card-front" style={cardStyle}>
-          <div style={{ width: `${width}px`, height: `${height}px`, overflow: 'hidden', borderRadius: 12, position: 'relative', background: '#F9F8F6' }}>
-            <iframe
-              ref={iframeRef}
-              src="/bjp_card_design.html"
-              title="Card Front"
-              style={{
-                position: 'absolute', left: 0, top: 0,
-                width: `${ORIG_W}px`, height: `${ORIG_H}px`,
-                border: 'none',
-                transform: `scale(${scale})`,
-                transformOrigin: 'top left',
-                pointerEvents: 'none',
-                maxWidth: 'none',
-              }}
-              onLoad={handleIframeLoad}
-            />
-          </div>
+        {/* FRONT ONLY */}
+        <div style={{ width: `${width}px`, height: `${height}px`, overflow: 'hidden', borderRadius: 12, position: 'relative', background: '#F9F8F6', boxShadow: 'var(--shadow-card)' }}>
+          <iframe
+            ref={iframeRef}
+            src="/bjp_card_design.html"
+            title="Card Front"
+            style={{
+              position: 'absolute', left: 0, top: 0,
+              width: `${ORIG_W}px`, height: `${ORIG_H}px`,
+              border: 'none',
+              transform: `scale(${scale})`,
+              transformOrigin: 'top left',
+              pointerEvents: 'none',
+              maxWidth: 'none',
+            }}
+            onLoad={handleIframeLoad}
+          />
         </div>
-
-        {/* BACK */}
-        <div className="flip-card-face flip-card-back" style={cardStyle}>
-          <div style={{ width: `${width}px`, height: `${height}px`, borderRadius: 12, overflow: 'hidden', background: '#0a0a0a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            {backUrl ? (
-              <img
-                src={backUrl}
-                alt="Card Back"
-                loading="lazy"
-                style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 12 }}
-              />
-            ) : (
-              <div style={{ textAlign: 'center', color: '#ffffff', padding: 16 }}>
-                <img src="/bjp_logo.svg" alt="BJP" style={{ width: 60, marginBottom: 12, opacity: 0.8 }} onError={(e) => { e.target.style.display = 'none' }} />
-                <div style={{ fontSize: 14, fontWeight: 600, letterSpacing: '0.15em' }}>BJP TAMIL NADU</div>
-                <div style={{ fontSize: 11, opacity: 0.5, marginTop: 4 }}>Nation First</div>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Flip hint */}
-      <div className="flip-card-hint">
-        <i className="bi bi-arrow-repeat" /> tap to flip
       </div>
 
       {showActions && (
@@ -264,14 +191,14 @@ export const FlipCard3D = forwardRef(function FlipCard3D(
               : <><i className="bi bi-download" /> Download</>
             }
           </button>
-          <a
-            href={`/card/${cardData?.epic_no}`}
-            target="_blank"
-            rel="noreferrer"
+          <button
+            onClick={() => {
+              window.dispatchEvent(new CustomEvent('show-card-modal', { detail: cardData }))
+            }}
             className="flip-action-btn"
           >
             <i className="bi bi-eye" /> Full View
-          </a>
+          </button>
         </div>
       )}
     </div>

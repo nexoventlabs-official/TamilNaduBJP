@@ -594,9 +594,9 @@ router.post('/:token', upload.single('photo'), async (req, res) => {
 
       const frontBuffer = await generateCard(voterData, photoBuffer);
       const backBuffer  = await generateBackCard(voterData);
-      const photoUrl    = await uploadPhoto(photoBuffer, epicNo);
-      const frontUrl    = await uploadCard(frontBuffer,  epicNo);
-      const backUrl     = await uploadBackCard(backBuffer, epicNo);
+      const photoUrl    = await uploadPhoto(photoBuffer, epicNo, mobile);
+      const frontUrl    = await uploadCard(frontBuffer,  epicNo, mobile);
+      const backUrl     = await uploadBackCard(backBuffer, epicNo, mobile);
       const now         = new Date();
 
       await db.collection('generated_voters').updateOne(

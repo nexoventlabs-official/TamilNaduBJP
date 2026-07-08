@@ -76,7 +76,7 @@ export default function LoginPage() {
                 type="button"
                 aria-label={showPass ? 'Hide password' : 'Show password'}
                 onClick={() => setShowPass((s) => !s)}
-                style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#8696a0', cursor: 'pointer', fontSize: 16 }}
+                style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--admin-ink-dim)', cursor: 'pointer', fontSize: 16 }}
               >
                 <i className={`bi bi-eye${showPass ? '-slash' : ''}`} />
               </button>
@@ -84,7 +84,7 @@ export default function LoginPage() {
           </div>
 
           {error && (
-            <div role="alert" style={{ background: 'rgba(229,57,53,0.1)', border: '1px solid rgba(229,57,53,0.2)', borderRadius: 7, padding: '9px 12px', fontSize: 13, color: '#ef9a9a', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 7 }}>
+            <div role="alert" style={{ background: 'rgba(242,101,34,0.06)', border: '1px solid rgba(242,101,34,0.2)', borderRadius: 'var(--radius-buttons)', padding: '9px 12px', fontSize: 13, color: 'var(--color-harvest-flame)', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 7 }}>
               <i className="bi bi-exclamation-circle" /> {error}
             </div>
           )}
@@ -97,7 +97,7 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <p style={{ textAlign: 'center', marginTop: 20, fontSize: 12, color: '#8696a0' }}>
+        <p style={{ textAlign: 'center', marginTop: 20, fontSize: 12, color: 'var(--text-secondary)' }}>
           <i className="bi bi-lock" /> Secure admin access only
         </p>
       </div>

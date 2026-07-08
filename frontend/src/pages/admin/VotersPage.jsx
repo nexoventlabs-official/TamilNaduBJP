@@ -69,11 +69,11 @@ export default function VotersPage() {
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
             />
-            <button type="submit" style={{ background: 'var(--color-coral-pulse)', border: 'none', color: '#fff', padding: '7px 14px', borderRadius: 7, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
+            <button type="submit" style={{ background: 'var(--color-coral-pulse)', border: 'none', color: '#fff', padding: '7px 14px', borderRadius: 'var(--radius-buttons)', fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
               <i className="bi bi-search" /> Search
             </button>
             {search && (
-              <button type="button" onClick={() => { setSearch(''); setSearchInput(''); setPage(1) }} style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: '#8696a0', padding: '7px 12px', borderRadius: 7, fontSize: 13, cursor: 'pointer' }}>
+              <button type="button" onClick={() => { setSearch(''); setSearchInput(''); setPage(1) }} style={{ background: 'var(--admin-surface-raise)', border: '1px solid var(--border-dim)', color: 'var(--text-secondary)', padding: '7px 12px', borderRadius: 'var(--radius-buttons)', fontSize: 13, cursor: 'pointer' }}>
                 Clear
               </button>
             )}
@@ -83,7 +83,7 @@ export default function VotersPage() {
         {loading ? (
           <div style={{ padding: 32, textAlign: 'center' }}><div className="spinner-border spinner-border-sm text-danger" /></div>
         ) : voters.length === 0 ? (
-          <div className="empty-state"><i className="bi bi-people" /><p>No voters found{search ? ` for "${search}"` : ''}.</p></div>
+          <div className="empty-state"><i className="bi bi-people" /><p>No voters found.</p></div>
         ) : (
           <>
             <div className="admin-table-wrap">
@@ -96,14 +96,13 @@ export default function VotersPage() {
                     <th>Assembly</th>
                     <th>District</th>
                     <th>Gen Count</th>
-                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {voters.map((v, i) => (
                     <tr key={v.epic_no || v.EpicNo || i}>
                       <td style={{ color: 'var(--admin-ink-dim)' }}>{(page - 1) * 20 + i + 1}</td>
-                      <td><code style={{ color: 'var(--admin-ink)', background: 'rgba(255,255,255,0.05)', padding: '2px 6px', borderRadius: 4, fontSize: 11 }}>{v.epic_no || v.EpicNo}</code></td>
+                      <td><code style={{ color: 'var(--admin-ink)', background: 'var(--admin-surface-raise)', border: '1px solid var(--border-dim)', padding: '2px 6px', borderRadius: 4, fontSize: 11 }}>{v.epic_no || v.EpicNo}</code></td>
                       <td>{v.name || v.Name}</td>
                       <td style={{ color: 'var(--admin-ink-dim)' }}>{v.assembly || v.AssemblyName}</td>
                       <td style={{ color: 'var(--admin-ink-dim)' }}>{v.district || v.DistrictName}</td>
@@ -112,11 +111,6 @@ export default function VotersPage() {
                           ? <span className="badge-status badge-generated">{v.gen_count || v.generation_count}</span>
                           : <span style={{ color: 'var(--admin-ink-dim)', fontSize: 11 }}>0</span>
                         }
-                      </td>
-                      <td>
-                        <Link to={`/admin/voters/${v.epic_no || v.EpicNo}`} className="btn-action btn-view">
-                          <i className="bi bi-eye" /> View
-                        </Link>
                       </td>
                     </tr>
                   ))}

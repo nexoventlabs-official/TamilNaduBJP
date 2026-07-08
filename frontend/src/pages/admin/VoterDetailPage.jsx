@@ -26,7 +26,7 @@ export default function VoterDetailPage() {
   return (
     <div>
       <div className="page-header" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <button onClick={() => navigate(-1)} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.1)', color: '#8696a0', padding: '6px 12px', borderRadius: 7, cursor: 'pointer', fontSize: 13 }}>
+        <button onClick={() => navigate(-1)} style={{ background: 'none', border: '1px solid var(--border-dim)', color: 'var(--text-secondary)', padding: '6px 12px', borderRadius: 'var(--radius-buttons)', cursor: 'pointer', fontSize: 13 }}>
           <i className="bi bi-arrow-left" />
         </button>
         <div>
@@ -67,7 +67,7 @@ export default function VoterDetailPage() {
                 ))}
               </div>
             </div>
-            {v.card_url && (
+            {(v.card_url || v.wtl_code || v.ptc_code) && (
               <div>
                 <div className="detail-label" style={{ marginBottom: 6 }}>Generated Card</div>
                 <CardPreviewIframe cardData={v} width={280} />
@@ -86,14 +86,14 @@ export default function VoterDetailPage() {
           ) : (
             <div className="admin-table-wrap">
               <table className="admin-table">
-                <thead><tr><th>#</th><th>Generated At</th><th>Mobile</th><th>WTL Code</th></tr></thead>
+                <thead><tr><th>#</th><th>Generated At</th><th>Mobile</th><th>BJP Code</th></tr></thead>
                 <tbody>
                   {generations.map((g, i) => {
                     const codeVal = g.wtl_code || g.ptc_code
                     return (
                       <tr key={i}>
                         <td style={{ color: '#8696a0' }}>{i + 1}</td>
-                        <td>{g.generated_at ? new Date(g.generated_at).toLocaleString() : '—'}</td>
+                        <td>{g.generated_at ? new Date(g.generated_at).toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }) : '—'}</td>
                         <td style={{ color: '#8696a0' }}>{g.mobile || '—'}</td>
                         <td>
                           {codeVal

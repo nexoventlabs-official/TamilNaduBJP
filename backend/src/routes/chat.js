@@ -273,29 +273,18 @@ router.post('/check-mobile', async (req, res) => {
 
     const hasCard = Boolean((stat && stat.card_url) || (genDoc && genDoc.card_url));
 
-    if (hasCard) {
-      // Set verified session when mobile check succeeds for a registered user
-      req.session.verified_mobile = mobile;
-      req.session.cookie.maxAge   = 86400 * 1000;
+    // Always establish the verified session mobile on check-mobile success
+    req.session.verified_mobile = mobile;
+    req.session.cookie.maxAge   = 86400 * 1000;
 
+    if (hasCard) {
       const s      = stat || {};
       const g      = genDoc || {};
       const hasPin = Boolean(s.secret_pin || g.secret_pin);
-      const result = { success: true, has_card: true, has_pin: hasPin };
-
-      if (!hasPin) {
-        // Support both web-stored (FM_NAME_EN/LASTNAME_EN) and WhatsApp-stored (VOTER_NAME) name fields
-        const name = (g.VOTER_NAME || `${g.FM_NAME_EN || ''} ${g.LASTNAME_EN || ''}`.trim() || '').trim();
-        result.epic_no      = s.epic_no  || g.EPIC_NO   || '';
-        result.card_url     = s.card_url || g.card_url  || '';
-        result.back_url     = s.back_url || g.back_url  || '';
-        result.combined_url = s.combined_url || g.combined_url || g.card_url || '';
-        result.voter_name   = name;
-        result.photo_url    = g.photo_url || '';
-        result.wtl_code     = g.wtl_code  || '';
-        result.referral_link = g.referral_link || '';
+      
+      if (hasPin) {
+        return res.json({ success: true, has_card: true, has_pin: true });
       }
-      return res.json(result);
     }
 
     return res.json({ success: true, has_card: false, has_pin: false });
@@ -587,6 +576,20 @@ router.post('/validate-epic', chatValidateEpicLimiter, async (req, res) => {
 
     // ── Duplicate check: already registered by this mobile → return existing card ─
     const db       = getDb();
+
+    if (mobile) {
+      const otherEpic = await db.collection('generated_voters').findOne({
+        MOBILE_NO: mobile,
+        EPIC_NO: { $ne: epicNo }
+      });
+      if (otherEpic) {
+        return res.status(400).json({
+          success: false,
+          message: 'This mobile number is already registered under a different EPIC number.'
+        });
+      }
+    }
+
     const existing = await db.collection('generated_voters').findOne(
       { EPIC_NO: epicNo, MOBILE_NO: mobile },
       { projection: { card_url: 1, back_url: 1, combined_url: 1, photo_url: 1, wtl_code: 1, VOTER_NAME: 1, referral_link: 1 } },
@@ -651,6 +654,12 @@ router.post('/generate-card', chatGenerateCardLimiter, upload.single('photo'), a
       { projection: { card_url: 1, back_url: 1, combined_url: 1, wtl_code: 1, referral_link: 1, VOTER_NAME: 1, EPIC_NO: 1 } },
     );
     if (existingCard?.card_url) {
+      if (existingCard.EPIC_NO !== epicNo) {
+        return res.status(400).json({
+          success: false,
+          message: 'This mobile number is already registered under a different EPIC number.'
+        });
+      }
       return res.status(409).json({
         success:            false,
         already_registered: true,
@@ -679,12 +688,12 @@ router.post('/generate-card', chatGenerateCardLimiter, upload.single('photo'), a
     let lockAcquired = false;
     try {
       await db.collection('generation_locks').updateOne(
-        { epic_no: epicNo, locked_until: { $lt: new Date() } },
+        { mobile: mobile, locked_until: { $lt: new Date() } },
         { $set: { locked_until: lockExpiry, locked_by: reqId } },
         { upsert: true }
       );
       // Verify we own the lock
-      const lock = await db.collection('generation_locks').findOne({ epic_no: epicNo });
+      const lock = await db.collection('generation_locks').findOne({ mobile: mobile });
       lockAcquired = lock?.locked_by === reqId;
     } catch (e) {
       if (e.code !== 11000) throw e;
@@ -755,33 +764,18 @@ router.post('/generate-card', chatGenerateCardLimiter, upload.single('photo'), a
         ASSEMBLY_NO:   voter.assembly_no,
       };
 
-      // Upload photo
+      // Upload photo to Cloudinary
       let photoUrl = '';
-      // Generate front + back in parallel, upload photo concurrently
-      const [frontBuffer, backBuffer] = await Promise.all([
-        generateCard(voterData, photoBuffer),
-        generateBackCard(voterData).catch((e) => { console.warn('Back card error:', e.message); return null; }),
-        uploadPhoto(photoBuffer, epicNo).then((u) => { photoUrl = u; }).catch((e) => { console.error('Photo upload failed:', e.message); }),
-      ]).then(([f, b]) => [f, b]);
-
-      // Upload front card
-      const cardUrl = await uploadCard(frontBuffer, epicNo);
-
-      // Upload back + combined (if back generated successfully)
-      let backUrl     = '';
-      let combinedUrl = cardUrl;
-      if (backBuffer) {
-        try {
-          const [uploadedBack, combinedBuffer] = await Promise.all([
-            uploadBackCard(backBuffer, epicNo),
-            generateCombinedCard(frontBuffer, backBuffer),
-          ]);
-          backUrl = uploadedBack;
-          combinedUrl = await uploadCombinedCard(combinedBuffer, epicNo);
-        } catch (e) {
-          console.warn('Back/combined upload error:', e.message);
-        }
+      try {
+        photoUrl = await uploadPhoto(photoBuffer, epicNo, mobile);
+      } catch (e) {
+        console.error('Photo upload failed:', e.message);
       }
+
+      // Card image files are not generated/stored in Cloudinary for web chatbot registrations.
+      const cardUrl     = '';
+      const backUrl     = '';
+      const combinedUrl = '';
 
       const now = nowUTC();
 
@@ -852,7 +846,7 @@ router.post('/generate-card', chatGenerateCardLimiter, upload.single('photo'), a
       });
     } finally {
       // Always release the lock
-      await db.collection('generation_locks').deleteOne({ epic_no: epicNo, locked_by: reqId }).catch(() => {});
+      await db.collection('generation_locks').deleteOne({ mobile: mobile, locked_by: reqId }).catch(() => {});
     }
 
   } catch (err) {
@@ -1081,7 +1075,7 @@ router.post('/request-volunteer', async (req, res) => {
       return res.status(403).json({ success: false, message: 'Access denied.' });
     }
 
-    const name = `${gen.FM_NAME_EN || ''} ${gen.LASTNAME_EN || ''}`.trim();
+    const name = gen.VOTER_NAME || `${gen.FM_NAME_EN || ''} ${gen.LASTNAME_EN || ''}`.trim();
 
     try {
       await db.collection('volunteer_requests').insertOne({
@@ -1139,7 +1133,7 @@ router.post('/request-booth-agent', async (req, res) => {
       return res.status(403).json({ success: false, message: 'Access denied.' });
     }
 
-    const name = `${gen.FM_NAME_EN || ''} ${gen.LASTNAME_EN || ''}`.trim();
+    const name = gen.VOTER_NAME || `${gen.FM_NAME_EN || ''} ${gen.LASTNAME_EN || ''}`.trim();
 
     try {
       await db.collection('booth_agent_requests').insertOne({
