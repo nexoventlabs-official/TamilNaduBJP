@@ -213,13 +213,14 @@ const findVoterByEpic = async (epicNo) => {
       console.warn(`[DB1] EPIC lookup for ${epicNo}: ${err.message}`);
     }
 
-    // Cache the result (even if null)
-    _epicCache.set(epicNo, { data: result, timestamp: Date.now() });
-    
+    // Only cache SUCCESSFUL results — never cache null.
+    // Caching null would cause false "not found" errors for up to 1 hour
+    // if a lookup fails due to a timeout, race condition, or transient DB error.
     if (result) {
-      console.log(`[DB1] ✓ Found ${epicNo}: ${result.VOTER_NAME || result.FM_NAME_EN || 'Unknown'}`);
+      _epicCache.set(epicNo, { data: result, timestamp: Date.now() });
+      console.log(`[DB1] ✓ Found ${epicNo}: ${result.VOTER_NAME || result.FM_NAME_EN || 'Unknown'} — cached ✅`);
     } else {
-      console.log(`[DB1] ✗ EPIC ${epicNo} not found in any collection`);
+      console.log(`[DB1] ✗ EPIC ${epicNo} not found in any collection (not cached — will retry next request)`);
     }
     
     return result;

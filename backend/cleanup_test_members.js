@@ -1,12 +1,12 @@
 /**
- * Cleanup script using backend's own config + services.
- * Run from: /var/www/bjptn/backend/
+ * Cleanup batch 2 — 7 extra test registrations on EPIC KFD3627734
+ * Keep: 7623498076 (real member)
+ * Delete: all others
  */
 const cloudinary = require('cloudinary').v2;
 const { MongoClient } = require('mongodb');
 const config = require('./src/config');
 
-// Configure Cloudinary from backend config
 cloudinary.config({
   cloud_name: config.cloudinary.cloudName,
   api_key:    config.cloudinary.apiKey,
@@ -16,72 +16,50 @@ cloudinary.config({
 
 const MONGO_URI = config.mongoUri;
 
-const MOBILES = [
-  '9003178446','9856280052','9886858575','7358559012',
-  '9899897576','8903162114','9868686767','9782746809','9566752446'
+const MOBILES_TO_DELETE = [
+  '8930393883','8898552255','8906552233',
+  '9797987987','9978879779','9003178446','9879676987'
 ];
 
-const CLOUDINARY_PUBLIC_IDS = [
-  'member_photos/KFD3627734_9003178446',
-  'member_photos/KFD3627734_9856280052',
-  'member_photos/KFD3627734_9886858575',
-  'member_photos/KFD3627734_7358559012',
-  'member_photos/KFD3627734_9899897576',
-  'member_photos/KFD3627734_8903162114',
-  'member_photos/KFD3627734_9868686767',
-  'member_photos/KFD3627734_9782746809',
-  'member_photos/KFD3627734_9566752446',
-];
+const CLOUDINARY_IDS = MOBILES_TO_DELETE.map(m => `member_photos/KFD3627734_${m}`);
 
 async function main() {
-  // Step 1: Delete from Cloudinary
-  console.log('\n🗑️  Deleting photos from Cloudinary...');
-  try {
-    const result = await cloudinary.api.delete_resources(CLOUDINARY_PUBLIC_IDS, {
-      resource_type: 'image',
-      invalidate: true,
-    });
-    const entries = Object.entries(result.deleted || {});
-    entries.forEach(([id, status]) => {
-      console.log(`  ${status === 'deleted' ? '✓' : '✗'} ${id}: ${status}`);
-    });
-    const deleted = entries.filter(([,v]) => v === 'deleted').length;
-    console.log(`✅ Cloudinary: ${deleted}/${entries.length} photos deleted`);
-  } catch (err) {
-    console.error('❌ Cloudinary error:', err.message);
-  }
+  console.log(`\n🗑️  Cleaning up ${MOBILES_TO_DELETE.length} extra test registrations...\n`);
 
-  // Step 2: Delete from MongoDB
-  console.log('\n🗑️  Deleting members from MongoDB...');
+  // Delete from Cloudinary
+  console.log('📷 Deleting Cloudinary photos...');
+  try {
+    const res = await cloudinary.api.delete_resources(CLOUDINARY_IDS, { resource_type: 'image', invalidate: true });
+    Object.entries(res.deleted || {}).forEach(([id, status]) =>
+      console.log(`  ${status === 'deleted' ? '✓' : '✗'} ${id}: ${status}`)
+    );
+  } catch (e) { console.error('Cloudinary error:', e.message); }
+
+  // Delete from MongoDB
+  console.log('\n🗄️  Deleting from MongoDB...');
   const client = new MongoClient(MONGO_URI);
   try {
     await client.connect();
     const db = client.db('bjptamilnadu');
+    const r1 = await db.collection('generated_voters').deleteMany({ MOBILE_NO: { $in: MOBILES_TO_DELETE } });
+    const r2 = await db.collection('generation_stats').deleteMany({ auth_mobile: { $in: MOBILES_TO_DELETE } });
+    const r3 = await db.collection('generation_locks').deleteMany({ mobile: { $in: MOBILES_TO_DELETE } });
+    console.log(`  ✓ generated_voters: ${r1.deletedCount}`);
+    console.log(`  ✓ generation_stats: ${r2.deletedCount}`);
+    console.log(`  ✓ generation_locks: ${r3.deletedCount}`);
 
-    const voters = await db.collection('generated_voters').deleteMany({ MOBILE_NO: { $in: MOBILES } });
-    console.log(`✅ generated_voters:    ${voters.deletedCount} deleted`);
+    // Verify real member still exists
+    const realMember = await db.collection('generated_voters').findOne({ MOBILE_NO: '7623498076' });
+    console.log(`\n✅ Real member (7623498076) still in DB: ${!!realMember} | photo: ${realMember?.photo_url ? 'YES' : 'MISSING'}`);
+    console.log(`   Name: ${realMember?.VOTER_NAME}, wtl_code: ${realMember?.wtl_code}`);
 
-    const stats  = await db.collection('generation_stats').deleteMany({ auth_mobile: { $in: MOBILES } });
-    console.log(`✅ generation_stats:    ${stats.deletedCount} deleted`);
-
-    const locks  = await db.collection('generation_locks').deleteMany({ mobile: { $in: MOBILES } });
-    console.log(`✅ generation_locks:    ${locks.deletedCount} deleted`);
-
-    const volReqs = await db.collection('volunteer_requests').deleteMany({ mobile: { $in: MOBILES } });
-    const baReqs  = await db.collection('booth_agent_requests').deleteMany({ mobile: { $in: MOBILES } });
-    if (volReqs.deletedCount) console.log(`✅ volunteer_requests:  ${volReqs.deletedCount} deleted`);
-    if (baReqs.deletedCount)  console.log(`✅ booth_agent_requests: ${baReqs.deletedCount} deleted`);
-
-    // Verify
-    const remaining = await db.collection('generated_voters').countDocuments({ MOBILE_NO: { $in: MOBILES } });
-    console.log(`\n🔍 Verification: ${remaining} remaining in DB (should be 0)`);
-  } catch (err) {
-    console.error('❌ MongoDB error:', err.message);
+    // Check total for this EPIC
+    const remaining = await db.collection('generated_voters').countDocuments({ EPIC_NO: 'KFD3627734' });
+    console.log(`   Total KFD3627734 registrations remaining: ${remaining} (should be 1)`);
   } finally {
     await client.close();
   }
-
-  console.log('\n✅ Cleanup complete!\n');
+  console.log('\n✅ Done!\n');
 }
 
 main().catch(console.error);

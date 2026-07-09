@@ -163,7 +163,7 @@ export const FlipCard3D = forwardRef(function FlipCard3D(
         <div style={{ width: `${width}px`, height: `${height}px`, overflow: 'hidden', borderRadius: 12, position: 'relative', background: '#F9F8F6', boxShadow: 'var(--shadow-card)' }}>
           <iframe
             ref={iframeRef}
-            src="/bjp_card_design.html"
+            src="/bjp_card_design.html?v=2"
             title="Card Front"
             style={{
               position: 'absolute', left: 0, top: 0,

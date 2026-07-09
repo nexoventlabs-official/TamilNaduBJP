@@ -130,6 +130,24 @@ function verifyOtpHash(otp, mobile, storedHash) {
 }
 
 // ────────────────────────────────────────────────────────────────
+//  POST /logout
+// ────────────────────────────────────────────────────────────────
+router.post('/logout', (req, res) => {
+  if (req.session) {
+    req.session.destroy((err) => {
+      if (err) {
+        console.error('Logout error:', err.message);
+        return res.status(500).json({ success: false, message: 'Failed to log out' });
+      }
+      res.clearCookie('wtl.session');
+      return res.json({ success: true, message: 'Logged out successfully' });
+    });
+  } else {
+    return res.json({ success: true, message: 'No active session' });
+  }
+});
+
+// ────────────────────────────────────────────────────────────────
 //  POST /send-otp
 // ────────────────────────────────────────────────────────────────
 router.post('/send-otp', chatOtpLimiter, async (req, res) => {

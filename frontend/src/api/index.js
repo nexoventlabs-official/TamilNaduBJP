@@ -100,6 +100,9 @@ export const chat = {
 
   saveMeetingInterest: (wtlCode, interest) =>
     api.post('/api/save-meeting-interest', { wtl_code: wtlCode, interest }),
+
+  logout: () =>
+    api.post('/api/logout'),
 }
 
 export const admin = {

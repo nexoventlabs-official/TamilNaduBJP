@@ -135,7 +135,7 @@ export const CardPreviewIframe = React.forwardRef(({ cardData, width = 340 }, re
     }}>
       <iframe
         ref={iframeRef}
-        src="/bjp_card_design.html"
+        src="/bjp_card_design.html?v=2"
         title="Card Preview"
         style={{
           position: 'absolute',

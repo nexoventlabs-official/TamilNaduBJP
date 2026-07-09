@@ -3441,8 +3441,10 @@ export default function ChatbotPage() {
     }
   }
 
-  const handleLogout = () => {
-    clearCache()
+  const handleLogout = async () => {
+    // 1. Clear all in-memory React state
+    clearCache()                           // localStorage CACHE_KEY
+    sessionStorage.clear()                 // any session-level cache
     mobileRef.current  = ''
     epicRef.current    = ''
     cardRef.current    = null
@@ -3453,10 +3455,13 @@ export default function ChatbotPage() {
     setIsFlipped(false)
     setInputValue('')
     setMessages([])
-    setTimeout(() => {
-      addMsg('bot', 'welcome_banner', {})
-      setChatState(S.WELCOME)
-    }, 50)
+
+    // 2. Destroy the backend session cookie (fire-and-forget)
+    try { await chat.logout() } catch (_) {}
+
+    // 3. Full page reload after a tiny delay — ensures a totally clean slate
+    //    so no cached card / photo data bleeds into the next user's session
+    setTimeout(() => window.location.reload(), 300)
   }
 
   // ── Input config ──────────────────────────────────────────
