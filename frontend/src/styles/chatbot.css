@@ -39,14 +39,16 @@
 
 /* ── Mobile touch UX ───────────────────────────────────────── */
 @media (max-width: 640px) {
-  /* Prevent iOS auto-zoom on focus (requires font-size >= 16px) */
-  .chat-input { font-size: 16px; }
-
   /* Send button: bump to 44×44 minimum tap target */
   .chat-send-btn { width: 44px; height: 44px; font-size: 17px; }
 
   /* Input area: tighter horizontal padding on small screens */
   .chat-input-area { padding: var(--spacing-12) var(--spacing-16); }
+
+  /* Prevent iOS auto-zoom: ALL inputs must be >= 16px */
+  input, textarea, select, .chat-input, .brochure-search-input {
+    font-size: 16px !important;
+  }
 }
 
 /* ── Right Onboarding Console ────────────────────────────── */
@@ -284,7 +286,7 @@
   border: none;
   outline: none;
   color: var(--color-chalk);
-  font-size: 15px;
+  font-size: 16px; /* >= 16px prevents iOS Safari auto-zoom on focus */
   font-family: inherit;
   min-width: 0;
   caret-color: var(--color-signal-mint);

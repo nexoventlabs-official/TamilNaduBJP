@@ -33,8 +33,25 @@ const chatOtpLimiter = createRateLimiter(3, 5 * 60);
 const chatVerifyOtpLimiter = createRateLimiter(5, 15 * 60);
 const chatVerifyPinLimiter = createRateLimiter(5, 15 * 60);
 
-// Card generation — 5 per 5 min
-const chatGenerateCardLimiter = createRateLimiter(5, 5 * 60);
+// Card generation — 15 attempts per 10 min, keyed by session mobile (not IP).
+// Multiple members can share the same mobile carrier NAT IP; using session
+// mobile as the key prevents one user from exhausting another's quota.
+const chatGenerateCardLimiter = process.env.DISABLE_RATE_LIMITER === 'true'
+  ? (req, res, next) => next()
+  : rateLimit({
+      windowMs: 10 * 60 * 1000, // 10 minutes
+      max: 15,
+      standardHeaders: true,
+      legacyHeaders: false,
+      // Key by session mobile if available, fall back to IP
+      keyGenerator: (req) => req.session?.verified_mobile || req.ip,
+      handler: (req, res) => {
+        res.status(429).json({
+          success: false,
+          message: 'Too many card generation attempts. Please wait a few minutes and try again.',
+        });
+      },
+    });
 
 // EPIC validation — 10 per 60 s
 const chatValidateEpicLimiter = createRateLimiter(10, 60);

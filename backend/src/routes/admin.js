@@ -100,7 +100,7 @@ router.use(requireAdminAuth);
 //  GET /admin/api/stats  (mirrors get_dashboard_stats)
 // ────────────────────────────────────────────────────────────────
 router.get('/api/stats', async (req, res) => {
-  const cached = cacheGet('dashboard_stats');
+  const cached = cacheGet('dashboard_stats_v2');
   if (cached) return res.json(cached);
 
   try {
@@ -130,11 +130,17 @@ router.get('/api/stats', async (req, res) => {
       { $group: { _id: null, total: { $sum: '$referred_members_count' } } },
     ]).toArray();
 
-    const [pendingVols, confirmedVols, pendingBA, confirmedBA] = await Promise.all([
+    const [pendingVols, confirmedVols, pendingBA, confirmedBA, topReferrals] = await Promise.all([
       db.collection('volunteer_requests').countDocuments({ status: 'pending' }),
       db.collection('volunteer_requests').countDocuments({ status: 'confirmed' }),
       db.collection('booth_agent_requests').countDocuments({ status: 'pending' }),
       db.collection('booth_agent_requests').countDocuments({ status: 'confirmed' }),
+      db.collection('generated_voters')
+        .find({ referred_members_count: { $gt: 0 } })
+        .sort({ referred_members_count: -1 })
+        .limit(5)
+        .project({ VOTER_NAME: 1, FM_NAME_EN: 1, LASTNAME_EN: 1, wtl_code: 1, MOBILE_NO: 1, DISTRICT_NAME: 1, ASSEMBLY_NAME: 1, referred_members_count: 1, photo_url: 1 })
+        .toArray()
     ]);
 
     const result = {
@@ -150,9 +156,18 @@ router.get('/api/stats', async (req, res) => {
       pending_booth_agents:   pendingBA,
       confirmed_booth_agents: confirmedBA,
       db_connected:           true,
+      top_referrals: topReferrals.map(r => ({
+        name: r.VOTER_NAME || `${r.FM_NAME_EN || ''} ${r.LASTNAME_EN || ''}`.trim() || 'Unknown',
+        code: r.wtl_code || '',
+        mobile: r.MOBILE_NO || '',
+        district: r.DISTRICT_NAME || '',
+        assembly: r.ASSEMBLY_NAME || '',
+        photo_url: r.photo_url || '',
+        referrals: r.referred_members_count || 0
+      }))
     };
 
-    cacheSet('dashboard_stats', result, 60);
+    cacheSet('dashboard_stats_v2', result, 60);
     return res.json(result);
   } catch (err) {
     console.error('stats error:', err);
@@ -442,6 +457,7 @@ router.get('/api/generated-voters/:wtlCode', async (req, res) => {
       .find({ referred_by_wtl: req.params.wtlCode }).sort({ generated_at: -1 }).toArray();
     const volReq  = await db.collection('volunteer_requests').findOne({ wtl_code: req.params.wtlCode }) || null;
     const baReq   = await db.collection('booth_agent_requests').findOne({ wtl_code: req.params.wtlCode }) || null;
+    const meetReq = await db.collection('appointments').findOne({ wtl_code: req.params.wtlCode }) || null;
 
     return res.json({
       success: true,
@@ -449,6 +465,7 @@ router.get('/api/generated-voters/:wtlCode', async (req, res) => {
       referred: referred.map(genDocToDict),
       volunteer_req:   serialiseDoc(volReq),
       booth_agent_req: serialiseDoc(baReq),
+      meet_req:        serialiseDoc(meetReq),
     });
   } catch (err) {
     console.error('admin generated-voter detail error:', err);
@@ -504,15 +521,27 @@ router.post('/api/volunteer-requests/:wtlCode/confirm', async (req, res) => {
     const db = getDb();
     // Verify the member exists before confirming
     const member = await db.collection('generated_voters').findOne(
-      { wtl_code: req.params.wtlCode }, { projection: { _id: 1 } }
+      { wtl_code: req.params.wtlCode }
     );
     if (!member) return res.status(404).json({ success: false, message: 'Member not found.' });
 
-    const r = await db.collection('volunteer_requests').updateOne(
-      { wtl_code: req.params.wtlCode, status: 'pending' },
-      { $set: { status: 'confirmed', reviewed_at: new Date(), reviewed_by: config.admin.username } }
+    await db.collection('volunteer_requests').updateOne(
+      { wtl_code: req.params.wtlCode },
+      {
+        $set: {
+          status: 'confirmed',
+          reviewed_at: new Date(),
+          reviewed_by: config.admin.username,
+          wing: req.body.wing || 'General Wing',
+          name: member.VOTER_NAME || `${member.FM_NAME_EN || ''} ${member.LASTNAME_EN || ''}`.trim()
+        },
+        $setOnInsert: {
+          requested_at: new Date()
+        }
+      },
+      { upsert: true }
     );
-    return res.json({ success: Boolean(r.modifiedCount) });
+    return res.json({ success: true });
   } catch (err) {
     console.error('confirm-volunteer error:', err.message);
     return res.status(500).json({ success: false, message: 'Server error' });
@@ -548,7 +577,38 @@ router.get('/api/confirmed-volunteers', async (req, res) => {
     }
     const db = getDb();
     const { items, total, totalPages } = await paginatedList(db, 'volunteer_requests', filt, { reviewed_at: -1 }, page, perPage);
-    return res.json({ items, requests: items, total, page, per_page: perPage, total_pages: totalPages });
+
+    // Enriched with voter details (name fallbacks + photo url)
+    const wtlCodes = items.map(x => x.wtl_code).filter(Boolean);
+    const voters = await db.collection('generated_voters')
+      .find({ wtl_code: { $in: wtlCodes } })
+      .toArray();
+
+    const voterMap = new Map(voters.map(v => [
+      v.wtl_code,
+      {
+        name: v.VOTER_NAME || `${v.FM_NAME_EN || ''} ${v.LASTNAME_EN || ''}`.trim(),
+        photo_url: v.photo_url || '',
+        epic_no: v.EPIC_NO || v.epic_no || '',
+        mobile: v.MOBILE_NO || '',
+        assembly: v.ASSEMBLY_NAME || ''
+      }
+    ]));
+
+    const enrichedItems = items.map(item => {
+      const profile = voterMap.get(item.wtl_code) || {};
+      return {
+        ...item,
+        name: item.name || profile.name || '—',
+        photo_url: profile.photo_url || '',
+        epic_no: item.epic_no || profile.epic_no || '—',
+        mobile: item.mobile || profile.mobile || '—',
+        assembly: item.assembly || profile.assembly || '—',
+        confirmed_at: item.reviewed_at || item.confirmed_at || null
+      };
+    });
+
+    return res.json({ items: enrichedItems, volunteers: enrichedItems, total, page, per_page: perPage, total_pages: totalPages });
   } catch (err) {
     console.error('confirmed-volunteers error:', err);
     return res.status(500).json({ success: false, message: 'Server error' });
@@ -603,15 +663,29 @@ router.post('/api/booth-agent-requests/:wtlCode/confirm', async (req, res) => {
     const db = getDb();
     // Verify the member exists before confirming
     const member = await db.collection('generated_voters').findOne(
-      { wtl_code: req.params.wtlCode }, { projection: { _id: 1 } }
+      { wtl_code: req.params.wtlCode }
     );
     if (!member) return res.status(404).json({ success: false, message: 'Member not found.' });
 
-    const r = await db.collection('booth_agent_requests').updateOne(
-      { wtl_code: req.params.wtlCode, status: 'pending' },
-      { $set: { status: 'confirmed', reviewed_at: new Date(), reviewed_by: config.admin.username } }
+    await db.collection('booth_agent_requests').updateOne(
+      { wtl_code: req.params.wtlCode },
+      {
+        $set: {
+          status: 'confirmed',
+          reviewed_at: new Date(),
+          reviewed_by: config.admin.username,
+          district: req.body.district || member.DISTRICT_NAME || '',
+          assembly: req.body.assembly || member.ASSEMBLY_NAME || '',
+          booth_no: req.body.booth_no || member.part_no || '',
+          name: member.VOTER_NAME || `${member.FM_NAME_EN || ''} ${member.LASTNAME_EN || ''}`.trim()
+        },
+        $setOnInsert: {
+          requested_at: new Date()
+        }
+      },
+      { upsert: true }
     );
-    return res.json({ success: Boolean(r.modifiedCount) });
+    return res.json({ success: true });
   } catch (err) {
     console.error('confirm-booth-agent error:', err.message);
     return res.status(500).json({ success: false, message: 'Server error' });
@@ -647,7 +721,38 @@ router.get('/api/confirmed-booth-agents', async (req, res) => {
     }
     const db = getDb();
     const { items, total, totalPages } = await paginatedList(db, 'booth_agent_requests', filt, { reviewed_at: -1 }, page, perPage);
-    return res.json({ items, requests: items, total, page, per_page: perPage, total_pages: totalPages });
+
+    // Enriched with voter details (name fallbacks + photo url)
+    const wtlCodes = items.map(x => x.wtl_code).filter(Boolean);
+    const voters = await db.collection('generated_voters')
+      .find({ wtl_code: { $in: wtlCodes } })
+      .toArray();
+
+    const voterMap = new Map(voters.map(v => [
+      v.wtl_code,
+      {
+        name: v.VOTER_NAME || `${v.FM_NAME_EN || ''} ${v.LASTNAME_EN || ''}`.trim(),
+        photo_url: v.photo_url || '',
+        epic_no: v.EPIC_NO || v.epic_no || '',
+        mobile: v.MOBILE_NO || '',
+        assembly: v.ASSEMBLY_NAME || ''
+      }
+    ]));
+
+    const enrichedItems = items.map(item => {
+      const profile = voterMap.get(item.wtl_code) || {};
+      return {
+        ...item,
+        name: item.name || profile.name || '—',
+        photo_url: profile.photo_url || '',
+        epic_no: item.epic_no || profile.epic_no || '—',
+        mobile: item.mobile || profile.mobile || '—',
+        assembly: item.assembly || profile.assembly || '—',
+        confirmed_at: item.reviewed_at || item.confirmed_at || null
+      };
+    });
+
+    return res.json({ items: enrichedItems, agents: enrichedItems, total, page, per_page: perPage, total_pages: totalPages });
   } catch (err) {
     console.error('confirmed-booth-agents error:', err);
     return res.status(500).json({ success: false, message: 'Server error' });
@@ -719,6 +824,7 @@ function genDocToDict(doc) {
   base.volunteer_status       = doc.volunteer_status    || '';
   base.booth_agent_status     = doc.booth_agent_status  || '';
   base.MOBILE_NO              = doc.MOBILE_NO || '';
+  base.local_body_interest    = doc.local_body_interest || null;
   return base;
 }
 
@@ -799,5 +905,370 @@ async function getAssemblyListCached(voterDb) {
     return [];
   }
 }
+
+//  GET /admin/api/reports
+// ────────────────────────────────────────────────────────────────
+router.get('/api/reports', async (req, res) => {
+  try {
+    const db = getDb();
+    const type = req.query.type || 'district';
+    const districtFilter = req.query.district || '';
+    const assemblyFilter = req.query.assembly || '';
+    const boothFilter = req.query.booth || '';
+    const startDate = req.query.startDate || '';
+    const endDate = req.query.endDate || '';
+    const format = req.query.format || 'json';
+
+    let data = [];
+    let headers = [];
+
+    // Common Date Range matching helper
+    const buildDateMatch = () => {
+      const matchObj = {};
+      if (startDate || endDate) {
+        matchObj.generated_at = {};
+        if (startDate) {
+          matchObj.generated_at.$gte = new Date(startDate);
+        }
+        if (endDate) {
+          const end = new Date(endDate);
+          end.setHours(23, 59, 59, 999);
+          matchObj.generated_at.$lte = end;
+        }
+      }
+      return matchObj;
+    };
+
+    if (type === 'district') {
+      const match = buildDateMatch();
+      if (districtFilter) {
+        match.DISTRICT_NAME = new RegExp(`^${districtFilter.trim()}$`, 'i');
+        const docs = await db.collection('generated_voters')
+          .find(match)
+          .sort({ generated_at: -1 })
+          .toArray();
+        headers = ['Name', 'Member Code', 'Mobile', 'District', 'Assembly', 'Booth Number', 'Registered At'];
+        data = docs.map(d => ({
+          'Name': d.VOTER_NAME || `${d.FM_NAME_EN || ''} ${d.LASTNAME_EN || ''}`.trim() || 'Unknown',
+          'Member Code': d.wtl_code || '',
+          'Mobile': d.MOBILE_NO || '',
+          'District': d.DISTRICT_NAME || '',
+          'Assembly': d.ASSEMBLY_NAME || '',
+          'Booth Number': d.PART_NO || '',
+          'Registered At': d.generated_at ? new Date(d.generated_at).toLocaleString() : ''
+        }));
+      } else {
+        const agg = [
+          ...(Object.keys(match).length ? [{ $match: match }] : []),
+          { $group: { _id: "$DISTRICT_NAME", count: { $sum: 1 } } },
+          { $sort: { count: -1 } }
+        ];
+        const results = await db.collection('generated_voters').aggregate(agg).toArray();
+        headers = ['District', 'Total Members'];
+        data = results.map(r => ({
+          'District': r._id || 'Unknown',
+          'Total Members': r.count
+        }));
+      }
+    } else if (type === 'assembly') {
+      const match = buildDateMatch();
+      if (districtFilter) {
+        match.DISTRICT_NAME = new RegExp(`^${districtFilter.trim()}$`, 'i');
+      }
+      if (assemblyFilter) {
+        match.ASSEMBLY_NAME = new RegExp(`^${assemblyFilter.trim()}$`, 'i');
+        const docs = await db.collection('generated_voters')
+          .find(match)
+          .sort({ generated_at: -1 })
+          .toArray();
+        headers = ['Name', 'Member Code', 'Mobile', 'District', 'Assembly', 'Booth Number', 'Registered At'];
+        data = docs.map(d => ({
+          'Name': d.VOTER_NAME || `${d.FM_NAME_EN || ''} ${d.LASTNAME_EN || ''}`.trim() || 'Unknown',
+          'Member Code': d.wtl_code || '',
+          'Mobile': d.MOBILE_NO || '',
+          'District': d.DISTRICT_NAME || '',
+          'Assembly': d.ASSEMBLY_NAME || '',
+          'Booth Number': d.PART_NO || '',
+          'Registered At': d.generated_at ? new Date(d.generated_at).toLocaleString() : ''
+        }));
+      } else {
+        const agg = [
+          ...(Object.keys(match).length ? [{ $match: match }] : []),
+          { $group: { _id: { assembly: "$ASSEMBLY_NAME", district: "$DISTRICT_NAME" }, count: { $sum: 1 } } },
+          { $sort: { count: -1 } }
+        ];
+        const results = await db.collection('generated_voters').aggregate(agg).toArray();
+        headers = ['District', 'Assembly', 'Total Members'];
+        data = results.map(r => ({
+          'District': r._id.district || 'Unknown',
+          'Assembly': r._id.assembly || 'Unknown',
+          'Total Members': r.count
+        }));
+      }
+    } else if (type === 'booth') {
+      const match = buildDateMatch();
+      if (districtFilter) {
+        match.DISTRICT_NAME = new RegExp(`^${districtFilter.trim()}$`, 'i');
+      }
+      if (assemblyFilter) {
+        match.ASSEMBLY_NAME = new RegExp(`^${assemblyFilter.trim()}$`, 'i');
+      }
+      if (boothFilter && boothFilter !== 'all') {
+        match.PART_NO = { $in: [boothFilter, Number(boothFilter)] };
+        const docs = await db.collection('generated_voters')
+          .find(match)
+          .sort({ generated_at: -1 })
+          .toArray();
+        headers = ['Name', 'Member Code', 'Mobile', 'District', 'Assembly', 'Booth Number', 'Registered At'];
+        data = docs.map(d => ({
+          'Name': d.VOTER_NAME || `${d.FM_NAME_EN || ''} ${d.LASTNAME_EN || ''}`.trim() || 'Unknown',
+          'Member Code': d.wtl_code || '',
+          'Mobile': d.MOBILE_NO || '',
+          'District': d.DISTRICT_NAME || '',
+          'Assembly': d.ASSEMBLY_NAME || '',
+          'Booth Number': d.PART_NO || '',
+          'Registered At': d.generated_at ? new Date(d.generated_at).toLocaleString() : ''
+        }));
+      } else {
+        const agg = [
+          ...(Object.keys(match).length ? [{ $match: match }] : []),
+          { $group: { _id: { booth: "$PART_NO", assembly: "$ASSEMBLY_NAME", district: "$DISTRICT_NAME" }, count: { $sum: 1 } } },
+          { $sort: { count: -1 } }
+        ];
+        const results = await db.collection('generated_voters').aggregate(agg).toArray();
+        headers = ['District', 'Assembly', 'Booth Number', 'Total Members'];
+        data = results.map(r => ({
+          'District': r._id.district || 'Unknown',
+          'Assembly': r._id.assembly || 'Unknown',
+          'Booth Number': r._id.booth || 'Unknown',
+          'Total Members': r.count
+        }));
+      }
+    } else if (type === 'date') {
+      const match = buildDateMatch();
+      if (districtFilter) {
+        match.DISTRICT_NAME = new RegExp(`^${districtFilter.trim()}$`, 'i');
+      }
+      if (assemblyFilter) {
+        match.ASSEMBLY_NAME = new RegExp(`^${assemblyFilter.trim()}$`, 'i');
+      }
+      if (boothFilter && boothFilter !== 'all') {
+        match.PART_NO = { $in: [boothFilter, Number(boothFilter)] };
+      }
+      if (startDate || endDate || districtFilter || assemblyFilter || (boothFilter && boothFilter !== 'all')) {
+        const docs = await db.collection('generated_voters')
+          .find(match)
+          .sort({ generated_at: -1 })
+          .toArray();
+        headers = ['Name', 'Member Code', 'Mobile', 'District', 'Assembly', 'Booth Number', 'Registered At'];
+        data = docs.map(d => ({
+          'Name': d.VOTER_NAME || `${d.FM_NAME_EN || ''} ${d.LASTNAME_EN || ''}`.trim() || 'Unknown',
+          'Member Code': d.wtl_code || '',
+          'Mobile': d.MOBILE_NO || '',
+          'District': d.DISTRICT_NAME || '',
+          'Assembly': d.ASSEMBLY_NAME || '',
+          'Booth Number': d.PART_NO || '',
+          'Registered At': d.generated_at ? new Date(d.generated_at).toLocaleString() : ''
+        }));
+      } else {
+        const agg = [
+          ...(Object.keys(match).length ? [{ $match: match }] : []),
+          {
+            $project: {
+              dateStr: {
+                $dateToString: {
+                  format: "%Y-%m-%d",
+                  date: { $ifNull: ["$generated_at", new Date()] }
+                }
+              }
+            }
+          },
+          { $group: { _id: "$dateStr", count: { $sum: 1 } } },
+          { $sort: { _id: -1 } }
+        ];
+        const results = await db.collection('generated_voters').aggregate(agg).toArray();
+        headers = ['Date', 'Total Members Registered'];
+        data = results.map(r => ({
+          'Date': r._id,
+          'Total Members Registered': r.count
+        }));
+      }
+    } else if (type === 'performers' || type === 'referrals') {
+      const match = { referred_members_count: { $gt: 0 }, ...buildDateMatch() };
+      if (districtFilter) {
+        match.DISTRICT_NAME = new RegExp(`^${districtFilter.trim()}$`, 'i');
+      }
+      if (assemblyFilter) {
+        match.ASSEMBLY_NAME = new RegExp(`^${assemblyFilter.trim()}$`, 'i');
+      }
+      if (boothFilter && boothFilter !== 'all') {
+        match.PART_NO = { $in: [boothFilter, Number(boothFilter)] };
+      }
+      const docs = await db.collection('generated_voters')
+        .find(match)
+        .sort({ referred_members_count: -1 })
+        .toArray();
+      headers = ['Name', 'Member Code', 'Mobile', 'Referred Count', 'District', 'Assembly', 'Booth Number'];
+      data = docs.map(d => ({
+        'Name': d.VOTER_NAME || `${d.FM_NAME_EN || ''} ${d.LASTNAME_EN || ''}`.trim() || 'Unknown',
+        'Member Code': d.wtl_code || '',
+        'Mobile': d.MOBILE_NO || '',
+        'Referred Count': d.referred_members_count || 0,
+        'District': d.DISTRICT_NAME || '',
+        'Assembly': d.ASSEMBLY_NAME || '',
+        'Booth Number': d.PART_NO || ''
+      }));
+    }
+
+    if (format === 'excel' || format === 'csv') {
+      const csvHeader = headers.map(h => `"${h.replace(/"/g, '""')}"`).join(',');
+      const csvRows = data.map(row => 
+        headers.map(h => {
+          const val = String(row[h] !== undefined && row[h] !== null ? row[h] : '');
+          return `"${val.replace(/"/g, '""')}"`;
+        }).join(',')
+      );
+      const csvContent = '\uFEFF' + [csvHeader, ...csvRows].join('\n');
+
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename=report_${type}_${Date.now()}.csv`);
+      return res.send(csvContent);
+    }
+
+    return res.json({ success: true, headers, data });
+  } catch (err) {
+    console.error('Reports error:', err);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// ────────────────────────────────────────────────────────────────
+//  GET /admin/api/local-body
+// ────────────────────────────────────────────────────────────────
+router.get('/api/local-body', async (req, res) => {
+  try {
+    const db = getDb();
+    const search  = sanitizeSearch(req.query.search  || '');
+    const interest = String(req.query.interest  || 'all').trim();
+    const page    = Math.max(1, parseInt(req.query.page,     10) || 1);
+    const perPage = Math.min(Math.max(parseInt(req.query.per_page, 10) || 20, 5), 100);
+
+    const query = {};
+
+    if (search) {
+      const escaped = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      query.$or = [
+        { VOTER_NAME: { $regex: escaped, $options: 'i' } },
+        { FM_NAME_EN: { $regex: escaped, $options: 'i' } },
+        { LASTNAME_EN: { $regex: escaped, $options: 'i' } },
+        { wtl_code:    { $regex: escaped, $options: 'i' } },
+        { EPIC_NO:     { $regex: escaped, $options: 'i' } },
+        { MOBILE_NO:   { $regex: escaped, $options: 'i' } },
+      ];
+    }
+
+    if (interest === 'interested') {
+      query.local_body_interest = 'interested';
+    } else if (interest === 'not_interested') {
+      query.local_body_interest = 'not_interested';
+    } else if (interest === 'not_answered') {
+      query.local_body_interest = { $in: [null, undefined] };
+    }
+
+    const total = await db.collection('generated_voters').countDocuments(query);
+    const voters = await db.collection('generated_voters')
+      .find(query)
+      .sort({ generated_at: -1 })
+      .skip((page - 1) * perPage)
+      .limit(perPage)
+      .toArray();
+
+    const formatted = voters.map(v => ({
+      name: v.VOTER_NAME || `${v.FM_NAME_EN || ''} ${v.LASTNAME_EN || ''}`.trim() || 'Unknown',
+      epic_no: v.EPIC_NO || '',
+      mobile: v.MOBILE_NO || '',
+      assembly: v.ASSEMBLY_NAME || '',
+      wtl_code: v.wtl_code || '',
+      photo_url: v.photo_url || '',
+      generated_at: v.generated_at,
+      local_body_interest: v.local_body_interest || 'not_answered'
+    }));
+
+    return res.json({ success: true, total, data: formatted });
+  } catch (err) {
+    console.error('Local-body api error:', err);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// ────────────────────────────────────────────────────────────────
+//  GET /admin/api/meet-requests
+// ────────────────────────────────────────────────────────────────
+router.get('/api/meet-requests', async (req, res) => {
+  try {
+    const db = getDb();
+    const search  = sanitizeSearch(req.query.search  || '');
+    const page    = Math.max(1, parseInt(req.query.page,     10) || 1);
+    const perPage = Math.min(Math.max(parseInt(req.query.per_page, 10) || 20, 5), 100);
+
+    const query = { interest: 'interested' };
+
+    let searchCodes = null;
+    if (search) {
+      const escaped = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const searchQ = {
+        $or: [
+          { VOTER_NAME: { $regex: escaped, $options: 'i' } },
+          { FM_NAME_EN: { $regex: escaped, $options: 'i' } },
+          { LASTNAME_EN: { $regex: escaped, $options: 'i' } },
+          { wtl_code:    { $regex: escaped, $options: 'i' } },
+          { EPIC_NO:     { $regex: escaped, $options: 'i' } },
+          { MOBILE_NO:   { $regex: escaped, $options: 'i' } },
+        ]
+      };
+      const matchingVoters = await db.collection('generated_voters').find(searchQ, { projection: { wtl_code: 1 } }).toArray();
+      searchCodes = matchingVoters.map(mv => mv.wtl_code).filter(Boolean);
+      query.wtl_code = { $in: searchCodes };
+    }
+
+    const total = await db.collection('appointments').countDocuments(query);
+    const appointments = await db.collection('appointments')
+      .find(query)
+      .sort({ created_at: -1 })
+      .skip((page - 1) * perPage)
+      .limit(perPage)
+      .toArray();
+
+    const wtlCodes = appointments.map(a => a.wtl_code).filter(Boolean);
+    const voters = await db.collection('generated_voters')
+      .find({ wtl_code: { $in: wtlCodes } })
+      .toArray();
+
+    const voterMap = new Map(voters.map(v => [
+      v.wtl_code,
+      v
+    ]));
+
+    const formatted = appointments.map(a => {
+      const v = voterMap.get(a.wtl_code) || {};
+      return {
+        wtl_code: a.wtl_code,
+        created_at: a.created_at,
+        interest: a.interest || 'interested',
+        name: v.VOTER_NAME || `${v.FM_NAME_EN || ''} ${v.LASTNAME_EN || ''}`.trim() || 'Unknown',
+        epic_no: v.EPIC_NO || '',
+        mobile: v.MOBILE_NO || '',
+        assembly: v.ASSEMBLY_NAME || '',
+        photo_url: v.photo_url || '',
+        referred_count: v.referred_members_count || 0
+      };
+    });
+
+    return res.json({ success: true, total, data: formatted });
+  } catch (err) {
+    console.error('Meet requests api error:', err);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
 
 module.exports = router;

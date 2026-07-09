@@ -22,7 +22,8 @@ export default function GeneratedVoterDetailPage() {
           setData({
             ...res.voter,
             volunteer_req: res.volunteer_req,
-            booth_agent_req: res.booth_agent_req
+            booth_agent_req: res.booth_agent_req,
+            meet_req: res.meet_req
           })
           setReferred(res.referred || [])
         } else {
@@ -38,9 +39,13 @@ export default function GeneratedVoterDetailPage() {
     try {
       let res
       if (type === 'volunteer') {
-        res = await admin.actionVolunteerRequest(wtlCode, action)
+        res = action === 'confirm'
+          ? await admin.confirmVolunteer(wtlCode)
+          : await admin.rejectVolunteer(wtlCode)
       } else {
-        res = await admin.actionBoothAgentRequest(wtlCode, action)
+        res = action === 'confirm'
+          ? await admin.confirmBoothAgent(wtlCode)
+          : await admin.rejectBoothAgent(wtlCode)
       }
 
       if (res && res.success === true) {
@@ -50,7 +55,8 @@ export default function GeneratedVoterDetailPage() {
           setData({
             ...updated.voter,
             volunteer_req: updated.volunteer_req,
-            booth_agent_req: updated.booth_agent_req
+            booth_agent_req: updated.booth_agent_req,
+            meet_req: updated.meet_req
           })
           setReferred(updated.referred || [])
         }
@@ -211,16 +217,35 @@ export default function GeneratedVoterDetailPage() {
                   { label: 'Registered Booth (Part No)', value: v.part_no || '—', icon: 'bi-building' },
                   { label: 'District', value: v.district || '—', icon: 'bi-map' },
                   { label: 'Generated At', value: v.generated_at ? new Date(v.generated_at).toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }) : '—', icon: 'bi-calendar-event' },
-                ].map((f) => (
-                  <div key={f.label} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                    <span style={{ fontSize: 11, color: 'var(--text-secondary)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                      <i className={`bi ${f.icon} me-1.5`} /> {f.label}
-                    </span>
-                    <span style={{ fontSize: 14, color: 'var(--text-primary)', fontWeight: '500' }}>
-                      {f.value}
-                    </span>
-                  </div>
-                ))}
+                  { label: 'Booth Agent Status', value: baReq ? baReq.status.toUpperCase() : 'NO REQUEST', icon: 'bi-building-fill-check' },
+                  { label: 'Local Body Interest', value: data?.local_body_interest === 'interested' ? 'Interested' : data?.local_body_interest === 'not_interested' ? 'Not Interested' : 'Not Answered', icon: 'bi-building' },
+                  { label: 'President Meeting Status', value: referred.length < 5 ? 'Not Eligible (Requires 5 referrals)' : data?.meet_req?.interest === 'interested' ? 'Interested' : data?.meet_req?.interest === 'not_interested' ? 'Not Interested' : 'Not Answered', icon: 'bi-trophy-fill' },
+                ].map((f) => {
+                  let valColor = 'var(--text-primary)';
+                  let valWeight = '500';
+                  if (f.label === 'Booth Agent Status') {
+                    if (f.value === 'CONFIRMED') valColor = '#2e7d32';
+                    else if (f.value === 'REJECTED') valColor = '#c62828';
+                    else if (f.value === 'PENDING') valColor = '#ef6c00';
+                    valWeight = '700';
+                  } else if (f.label === 'Local Body Interest' || f.label === 'President Meeting Status') {
+                    if (f.value === 'Interested') valColor = '#2e7d32';
+                    else if (f.value === 'Not Interested') valColor = '#c62828';
+                    else if (f.value === 'Not Answered') valColor = '#ef6c00';
+                    else valColor = 'var(--text-secondary)';
+                    valWeight = '700';
+                  }
+                  return (
+                    <div key={f.label} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      <span style={{ fontSize: 11, color: 'var(--text-secondary)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                        <i className={`bi ${f.icon} me-1.5`} /> {f.label}
+                      </span>
+                      <span style={{ fontSize: 14, color: valColor, fontWeight: valWeight }}>
+                        {f.value}
+                      </span>
+                    </div>
+                  )
+                })}
               </div>
             </div>
           </div>
@@ -256,7 +281,7 @@ export default function GeneratedVoterDetailPage() {
                 </div>
                 
                 {/* Application actions inside detail page */}
-                {volReq.status === 'pending' && (
+                {volReq.status !== 'confirmed' && (
                   <div style={{ display: 'flex', gap: 12, borderTop: '1px solid var(--border-dim)', paddingTop: 16 }}>
                     <button
                       className="btn-action btn-confirm"
@@ -270,18 +295,20 @@ export default function GeneratedVoterDetailPage() {
                         <><i className="bi bi-check-circle" /> Approve Request</>
                       )}
                     </button>
-                    <button
-                      className="btn-action btn-reject"
-                      style={{ flex: 1, padding: '10px', fontSize: 13, borderRadius: 'var(--radius-buttons)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
-                      onClick={() => handleAction('volunteer', 'reject')}
-                      disabled={actionLoading.volunteer}
-                    >
-                      {actionLoading.volunteer === 'reject' ? (
-                        <span className="spinner-border spinner-border-sm" />
-                      ) : (
-                        <><i className="bi bi-x-circle" /> Reject Request</>
-                      )}
-                    </button>
+                    {volReq.status === 'pending' && (
+                      <button
+                        className="btn-action btn-reject"
+                        style={{ flex: 1, padding: '10px', fontSize: 13, borderRadius: 'var(--radius-buttons)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+                        onClick={() => handleAction('volunteer', 'reject')}
+                        disabled={actionLoading.volunteer}
+                      >
+                        {actionLoading.volunteer === 'reject' ? (
+                          <span className="spinner-border spinner-border-sm" />
+                        ) : (
+                          <><i className="bi bi-x-circle" /> Reject Request</>
+                        )}
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -293,9 +320,23 @@ export default function GeneratedVoterDetailPage() {
                   <i className="bi bi-hand-thumbs-up me-2" /> Organizer Application
                 </h6>
               </div>
-              <div style={{ padding: '20px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 10 }}>
-                <i className="bi bi-info-circle" style={{ fontSize: 18, color: 'var(--text-secondary)' }} />
-                <span>This member has <strong>not requested</strong> to become an Organizer.</span>
+              <div style={{ padding: '20px', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <i className="bi bi-info-circle" style={{ fontSize: 18, color: 'var(--text-secondary)' }} />
+                  <span>This member has <strong>not requested</strong> to become an Organizer.</span>
+                </div>
+                <button
+                  className="btn-action btn-confirm"
+                  style={{ width: '100%', padding: '10px', fontSize: 13, borderRadius: 'var(--radius-buttons)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, border: 'none', background: '#2e7d32', color: '#fff', cursor: 'pointer', fontWeight: 600 }}
+                  onClick={() => handleAction('volunteer', 'confirm')}
+                  disabled={actionLoading.volunteer}
+                >
+                  {actionLoading.volunteer === 'confirm' ? (
+                    <span className="spinner-border spinner-border-sm" />
+                  ) : (
+                    <><i className="bi bi-check-circle" /> Make Organizer</>
+                  )}
+                </button>
               </div>
             </div>
           )}
@@ -339,7 +380,7 @@ export default function GeneratedVoterDetailPage() {
                 </div>
 
                 {/* Application actions inside detail page */}
-                {baReq.status === 'pending' && (
+                {baReq.status !== 'confirmed' && (
                   <div style={{ display: 'flex', gap: 12, borderTop: '1px solid var(--border-dim)', paddingTop: 16 }}>
                     <button
                       className="btn-action btn-confirm"
@@ -353,18 +394,20 @@ export default function GeneratedVoterDetailPage() {
                         <><i className="bi bi-check-circle" /> Approve Request</>
                       )}
                     </button>
-                    <button
-                      className="btn-action btn-reject"
-                      style={{ flex: 1, padding: '10px', fontSize: 13, borderRadius: 'var(--radius-buttons)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
-                      onClick={() => handleAction('booth_agent', 'reject')}
-                      disabled={actionLoading.booth_agent}
-                    >
-                      {actionLoading.booth_agent === 'reject' ? (
-                        <span className="spinner-border spinner-border-sm" />
-                      ) : (
-                        <><i className="bi bi-x-circle" /> Reject Request</>
-                      )}
-                    </button>
+                    {baReq.status === 'pending' && (
+                      <button
+                        className="btn-action btn-reject"
+                        style={{ flex: 1, padding: '10px', fontSize: 13, borderRadius: 'var(--radius-buttons)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+                        onClick={() => handleAction('booth_agent', 'reject')}
+                        disabled={actionLoading.booth_agent}
+                      >
+                        {actionLoading.booth_agent === 'reject' ? (
+                          <span className="spinner-border spinner-border-sm" />
+                        ) : (
+                          <><i className="bi bi-x-circle" /> Reject Request</>
+                        )}
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -376,9 +419,23 @@ export default function GeneratedVoterDetailPage() {
                   <i className="bi bi-building me-2" /> Booth Agent Application
                 </h6>
               </div>
-              <div style={{ padding: '20px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 10 }}>
-                <i className="bi bi-info-circle" style={{ fontSize: 18, color: 'var(--text-secondary)' }} />
-                <span>This member has <strong>not requested</strong> to become a Booth Agent.</span>
+              <div style={{ padding: '20px', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <i className="bi bi-info-circle" style={{ fontSize: 18, color: 'var(--text-secondary)' }} />
+                  <span>This member has <strong>not requested</strong> to become a Booth Agent.</span>
+                </div>
+                <button
+                  className="btn-action btn-confirm"
+                  style={{ width: '100%', padding: '10px', fontSize: 13, borderRadius: 'var(--radius-buttons)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, border: 'none', background: '#f26522', color: '#fff', cursor: 'pointer', fontWeight: 600 }}
+                  onClick={() => handleAction('booth_agent', 'confirm')}
+                  disabled={actionLoading.booth_agent}
+                >
+                  {actionLoading.booth_agent === 'confirm' ? (
+                    <span className="spinner-border spinner-border-sm" />
+                  ) : (
+                    <><i className="bi bi-check-circle" /> Make Booth Agent</>
+                  )}
+                </button>
               </div>
             </div>
           )}

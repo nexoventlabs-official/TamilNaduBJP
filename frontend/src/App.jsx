@@ -17,6 +17,9 @@ import VolunteerRequestsPage from './pages/admin/VolunteerRequestsPage'
 import ConfirmedVolunteersPage from './pages/admin/ConfirmedVolunteersPage'
 import BoothAgentRequestsPage from './pages/admin/BoothAgentRequestsPage'
 import ConfirmedBoothAgentsPage from './pages/admin/ConfirmedBoothAgentsPage'
+import ReportsPage from './pages/admin/ReportsPage'
+import LocalBodyPage from './pages/admin/LocalBodyPage'
+import MeetRequestsPage from './pages/admin/MeetRequestsPage'
 
 export default function App() {
   return (
@@ -39,6 +42,9 @@ export default function App() {
         <Route path="confirmed-volunteers" element={<ConfirmedVolunteersPage />} />
         <Route path="booth-agent-requests" element={<BoothAgentRequestsPage />} />
         <Route path="confirmed-booth-agents" element={<ConfirmedBoothAgentsPage />} />
+        <Route path="reports" element={<ReportsPage />} />
+        <Route path="local-body" element={<LocalBodyPage />} />
+        <Route path="meet-requests" element={<MeetRequestsPage />} />
       </Route>
       <Route path="*" element={<NotFoundPage />} />
     </Routes>

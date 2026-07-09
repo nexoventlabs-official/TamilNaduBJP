@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
+import QRCode from 'qrcode'
 import { useNavigate } from 'react-router-dom'
 import Cropper from 'cropperjs'
 import 'cropperjs/dist/cropper.css'
 import { chat, publicApi } from '../api'
 import { FlipCard3D } from '../components/FlipCard3D'
+import html2canvas from 'html2canvas'
 import '../styles/chatbot.css'
 
 // ── Read referral params from landing URL (?ref=WTL-XXXX&rid=REF-XXXX)
@@ -169,8 +171,8 @@ function WelcomeBannerMsg({ onStart }) {
         loading="lazy"
         onError={(e) => { e.target.style.display = 'none' }} />
       <div className="banner-content">
-        <h2>Welcome to BJP Tamil Nadu!</h2>
-        <p>Nation First — Your Digital Member ID Card Generator</p>
+        <h2>World's Largest. India's Biggest. Soon to be Tamil Nadu's No. 1.</h2>
+        <p>You are joining the world's leading political organization. Click below to generate your personalized Member Card.</p>
         <button className="btn-start" onClick={onStart}>
           <i className="bi bi-play-circle-fill" /> Start
         </button>
@@ -222,48 +224,181 @@ function VoterCardMsg({ voter, isLatest, chatState, onConfirm, onRetry, disabled
 }
 
 // ── Referral Link Message ────────────────────────────────────
-function ReferralLinkMsg({ link }) {
+function FullReferralPanel({ link, onBack }) {
+  const canvasRef = useRef(null)
   const [copied, setCopied] = useState(false)
-  const waShareUrl = link
-    ? `https://wa.me/?text=${encodeURIComponent('Join BJP Tamil Nadu! Generate your free Digital Member ID Card here:' + link)}`
-    : ''
+  const [qrReady, setQrReady] = useState(false)
+
+  useEffect(() => {
+    if (!link || !canvasRef.current) return
+    const canvas = canvasRef.current
+    const size = 280
+    QRCode.toCanvas(canvas, link, {
+      width: size,
+      margin: 2,
+      color: { dark: '#000000', light: '#ffffff' },
+      errorCorrectionLevel: 'H'
+    }, (err) => {
+      if (err) return
+      // Overlay BJP logo in center
+      const ctx = canvas.getContext('2d')
+      const img = new Image()
+      img.src = '/bjp_logo.svg'
+      img.onload = () => {
+        const logoSize = size * 0.22
+        const logoX = (size - logoSize) / 2
+        const logoY = (size - logoSize) / 2
+        // White background circle
+        ctx.save()
+        ctx.beginPath()
+        ctx.arc(size / 2, size / 2, logoSize * 0.62, 0, Math.PI * 2)
+        ctx.fillStyle = '#ffffff'
+        ctx.fill()
+        ctx.restore()
+        ctx.drawImage(img, logoX, logoY, logoSize, logoSize)
+        setQrReady(true)
+      }
+      img.onerror = () => setQrReady(true)
+    })
+  }, [link])
+
+  const handleCopyLink = () => {
+    navigator.clipboard?.writeText(link).catch(() => {})
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  const handleShareWhatsApp = () => {
+    if (!link || !canvasRef.current) return
+    // WhatsApp bold markdown: *text*
+    const shareText = `*🪷 Join BJP Tamil Nadu!*\n\n*Generate your free Digital Member ID Card here:*\n${link}`
+    // Try Web Share API (mobile) — sends QR image + text as a single share
+    if (navigator.canShare && canvasRef.current) {
+      canvasRef.current.toBlob((blob) => {
+        const file = new File([blob], 'bjp-referral-qr.png', { type: 'image/png' })
+        if (navigator.canShare({ files: [file] })) {
+          navigator.share({
+            title: '🪷 Join BJP Tamil Nadu!',
+            text: shareText,
+            files: [file]
+          }).catch(() => {
+            // Fallback: open WhatsApp text-only
+            window.open(`https://wa.me/?text=${encodeURIComponent(shareText)}`, '_blank')
+          })
+          return
+        }
+        // Device supports share but not file share — text only
+        window.open(`https://wa.me/?text=${encodeURIComponent(shareText)}`, '_blank')
+      }, 'image/png', 1.0)
+    } else {
+      // Desktop fallback — open WhatsApp with text+link
+      window.open(`https://wa.me/?text=${encodeURIComponent(shareText)}`, '_blank')
+    }
+  }
+
+  const handleDownloadQR = () => {
+    if (!canvasRef.current) return
+    const a = document.createElement('a')
+    a.download = 'bjp-referral-qr.png'
+    a.href = canvasRef.current.toDataURL('image/png')
+    a.click()
+  }
 
   return (
-    <div className="referral-card info-card">
-      <div className="info-card-header">
-        <i className="bi bi-link-45deg" /> Your Referral Link
-      </div>
-      {link ? (
-        <>
-          <div className="referral-link-box">{link}</div>
-          <div className="referral-actions">
-            <button
-              className="btn-copy"
-              onClick={() => {
-                navigator.clipboard?.writeText(link).catch(() => {})
-                setCopied(true)
-                setTimeout(() => setCopied(false), 2000)
-              }}
-            >
-              <i className={`bi bi-${copied ? 'check-lg' : 'clipboard'}`} />
-              {copied ? ' Copied!' : ' Copy Link'}
-            </button>
-            <a
-              href={waShareUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn-whatsapp-share"
-            >
-              <i className="bi bi-whatsapp" /> Share on WhatsApp
-            </a>
+    <div className="chatbot-container brochure-panel">
+      <header className="brochure-header">
+        <div className="brochure-title" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <button
+            onClick={onBack}
+            style={{ background: 'none', border: 'none', color: 'var(--color-ash)', cursor: 'pointer', padding: '4px 8px 4px 0', fontSize: '18px', display: 'flex', alignItems: 'center', transition: 'color 0.15s' }}
+            onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-chalk)'}
+            onMouseLeave={(e) => e.currentTarget.style.color = 'var(--color-ash)'}
+            aria-label="Back"
+          >
+            <i className="bi bi-chevron-left" />
+          </button>
+          <i className="bi bi-link-45deg brochure-title-orange" />
+          <span>Referral Link</span>
+        </div>
+      </header>
+
+      <div className="brochure-content" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', padding: '24px 20px', gap: 20 }}>
+        {link ? (
+          <>
+            {/* QR Code Canvas */}
+            <div style={{ position: 'relative', display: 'inline-block' }}>
+              <div style={{
+                background: '#fff',
+                borderRadius: 16,
+                padding: 12,
+                boxShadow: '0 4px 24px rgba(0,0,0,0.13)',
+                display: 'inline-block'
+              }}>
+                <canvas ref={canvasRef} style={{ display: 'block', borderRadius: 8 }} />
+              </div>
+              {!qrReady && (
+                <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div style={{ width: 28, height: 28, border: '3px solid rgba(242,101,34,0.2)', borderTopColor: '#f26522', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+                </div>
+              )}
+            </div>
+
+            {/* Caption */}
+            <p style={{ fontSize: 13, color: 'var(--color-ash)', textAlign: 'center', margin: 0, lineHeight: 1.5 }}>
+              <i className="bi bi-qr-code me-1" style={{ color: '#f26522' }} />
+              Scan this QR to join BJP Tamil Nadu
+            </p>
+
+            {/* Link Box */}
+            <div style={{
+              background: 'rgba(255,255,255,0.07)',
+              border: '1px solid rgba(255,255,255,0.12)',
+              borderRadius: 10,
+              padding: '10px 14px',
+              fontSize: 12,
+              color: 'var(--color-chalk)',
+              wordBreak: 'break-all',
+              width: '100%',
+              maxWidth: 320,
+              textAlign: 'center'
+            }}>
+              {link}
+            </div>
+
+            {/* Action Buttons */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, width: '100%', maxWidth: 320 }}>
+              <button
+                onClick={handleCopyLink}
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.15)', background: copied ? 'rgba(46,204,113,0.15)' : 'rgba(255,255,255,0.07)', color: copied ? '#2ecc71' : 'var(--color-chalk)', fontSize: 14, fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s' }}
+              >
+                <i className={`bi bi-${copied ? 'check-lg' : 'clipboard'}`} />
+                {copied ? 'Copied!' : 'Copy Link'}
+              </button>
+              <button
+                onClick={handleShareWhatsApp}
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px', borderRadius: 10, border: 'none', background: '#25d366', color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}
+              >
+                <i className="bi bi-whatsapp" /> Share on WhatsApp
+              </button>
+              <button
+                onClick={handleDownloadQR}
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px', borderRadius: 10, border: '1px solid rgba(242,101,34,0.4)', background: 'rgba(242,101,34,0.08)', color: '#f26522', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}
+              >
+                <i className="bi bi-download" /> Download QR Code
+              </button>
+            </div>
+
+            <p style={{ fontSize: 12, color: 'var(--color-ash)', textAlign: 'center', margin: 0, lineHeight: 1.6 }}>
+              <i className="bi bi-people-fill" style={{ color: '#f26522', marginRight: 4 }} />
+              Everyone who joins via your link or QR appears in your <strong style={{ color: 'var(--color-chalk)' }}>My Members</strong> list.
+            </p>
+          </>
+        ) : (
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-ash)', fontSize: 13 }}>
+            <i className="bi bi-exclamation-circle me-2" /> No referral link available.
           </div>
-          <p className="referral-hint">
-            <i className="bi bi-people-fill" /> Everyone who joins via your link appears in your <strong>My Members</strong> list.
-          </p>
-        </>
-      ) : (
-        <p style={{ padding: '10px 12px', fontSize: 12, color: '#8696a0' }}>No link available.</p>
-      )}
+        )}
+      </div>
     </div>
   )
 }
@@ -577,78 +712,181 @@ function SelectWingMsg({ wtlCode, epicNo, isLatest }) {
 
   if (checking) {
     return (
-      <div className="info-card volunteer-card" style={{ maxWidth: 300, padding: 16, textAlign: 'center', background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: 12, boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}>
-        <div className="spinner-border spinner-border-sm text-coral" style={{ width: '1.2rem', height: '1.2rem', color: 'var(--color-coral)' }} />
-        <div style={{ fontSize: 12, color: '#64748b', marginTop: 8 }}>Checking request status...</div>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 200 }}>
+        <div style={{ width: 32, height: 32, border: '3px solid rgba(46, 204, 113, 0.15)', borderTopColor: 'var(--color-signal-mint)', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+        <div style={{ fontSize: 13, color: 'var(--color-ash)', marginTop: 12 }}>Checking status...</div>
       </div>
     )
   }
 
   return (
-    <div className="info-card volunteer-card" style={{ maxWidth: 300, background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: 12, overflow: 'hidden', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06)' }}>
-      <div className="info-card-header" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', fontSize: 13, fontWeight: 'bold', color: '#0f172a' }}>
-        <i className="bi bi-hand-thumbs-up-fill" style={{ color: 'var(--color-coral)' }} /> Become an Organizer
+    <div style={{ 
+      width: '100%', 
+      maxWidth: '600px',
+      margin: '0 auto',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: 24
+    }}>
+      {/* Role Header Description */}
+      <div style={{ textAlign: 'center', marginBottom: 12 }}>
+        <div style={{
+          width: 72,
+          height: 72,
+          borderRadius: '50%',
+          background: 'rgba(255, 153, 51, 0.1)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          margin: '0 auto 12px auto'
+        }}>
+          <i className="bi bi-hand-thumbs-up-fill" style={{ fontSize: 36, color: '#FF9933' }} />
+        </div>
+        <h3 style={{ fontSize: 20, fontWeight: 700, color: 'var(--color-chalk)', marginBottom: 8 }}>BJP Organizer Wing</h3>
+        <p style={{ fontSize: 13, color: 'var(--color-ash)', lineHeight: '1.6', margin: '0 auto', maxWidth: '480px' }}>
+          As a BJP Organizer, you play a pivotal role in strengthening the party's foundation. Select your preferred Wing to lead local initiatives, mobilize community support, and drive organizational progress across Tamil Nadu.
+        </p>
       </div>
-      <div style={{ padding: 12 }}>
-        {existingRequest ? (
-          <div style={{ fontSize: 13, color: '#1e293b', textAlign: 'center', padding: '8px 0', lineHeight: '1.5' }}>
-            ℹ️ <strong>Already Requested!</strong><br/>
-            <span style={{ fontSize: 12, display: 'block', marginTop: 6, color: '#475569' }}>
-              Wing: <strong>{existingRequest.wing}</strong>
-            </span>
-            <span style={{ fontSize: 12, display: 'block', marginTop: 4, color: '#64748b' }}>
-              Status: <span style={{ textTransform: 'capitalize', fontWeight: 'bold', color: existingRequest.status === 'confirmed' ? '#16a34a' : existingRequest.status === 'rejected' ? '#dc2626' : '#ea580c' }}>{existingRequest.status}</span>
-            </span>
+
+      {existingRequest ? (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20 }}>
+          {/* Custom SVG Pending / Success Spinner */}
+          <div style={{ position: 'relative', width: 80, height: 80 }}>
+            {existingRequest.status === 'confirmed' ? (
+              <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="var(--color-signal-mint)" strokeWidth="2">
+                <circle cx="12" cy="12" r="10" />
+                <polyline points="22 4 12 14.01 9 11.01" />
+              </svg>
+            ) : (
+              <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="#FF9933" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="pending-svg">
+                <circle cx="12" cy="12" r="10" style={{ strokeDasharray: '60', strokeDashoffset: '20', animation: 'spin-pending 3s linear infinite' }} />
+                <polyline points="12 6 12 12 15 15" />
+              </svg>
+            )}
           </div>
-        ) : !submitted ? (
-          <>
-            <label htmlFor="wing-select" style={{ fontSize: 13, display: 'block', marginBottom: 8, color: '#334155', fontWeight: '500' }}>
-              Select Wing:
-            </label>
-            <select
-              id="wing-select"
-              style={{ width: '100%', marginBottom: 12, padding: 8, borderRadius: 6, background: '#ffffff', color: '#1e293b', border: '1px solid #cbd5e1', fontSize: 13 }}
-              value={selectedWing}
-              onChange={(e) => setSelectedWing(e.target.value)}
-              disabled={loading}
-            >
-              <option value="" style={{ color: '#64748b' }}>-- Choose a Wing --</option>
-              {wings.map(w => <option key={w} value={w} style={{ color: '#1e293b' }}>{w}</option>)}
-            </select>
-            <button
-              style={{
-                width: '100%',
-                padding: '10px 16px',
-                background: '#f47a20',
-                border: 'none',
-                borderRadius: 8,
-                color: '#ffffff',
-                fontWeight: 'bold',
-                fontSize: 13,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 8,
-                opacity: (!selectedWing || loading) ? 0.6 : 1
-              }}
-              onClick={handleSubmit}
-              disabled={!selectedWing || loading}
-            >
-              {loading ? 'Submitting...' : 'Submit Request'}
-            </button>
-          </>
-        ) : (
-          <div style={{ fontSize: 13, color: '#1e293b', textAlign: 'center', padding: '8px 0', lineHeight: '1.4' }}>
-            {statusText}
+
+          <div style={{ textAlign: 'center', fontSize: 15, fontWeight: 600, color: 'var(--color-chalk)' }}>
+            Status: <span style={{ textTransform: 'capitalize', color: existingRequest.status === 'confirmed' ? 'var(--color-signal-mint)' : existingRequest.status === 'rejected' ? '#dc2626' : '#FF9933' }}>{existingRequest.status}</span>
           </div>
-        )}
-        {!existingRequest && submitted === false && statusText && (
-          <div style={{ fontSize: 12, color: '#ff2e2e', marginTop: 8, textAlign: 'center' }}>
-            {statusText}
+
+          {/* Grid fields */}
+          <div style={{ width: '100%', display: 'grid', gridTemplateColumns: '1fr', gap: 12 }}>
+            <div style={{ 
+              background: 'var(--color-carbon)', 
+              border: '1px solid var(--color-graphite)',
+              borderRadius: 12,
+              padding: '12px 16px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 4
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--color-ash)' }}>
+                <i className="bi bi-tag-fill" style={{ color: '#FF9933' }} />
+                <span>Assigned Wing</span>
+              </div>
+              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-chalk)' }}>{existingRequest.wing}</span>
+            </div>
+
+            <div style={{ 
+              background: 'var(--color-carbon)', 
+              border: '1px solid var(--color-graphite)',
+              borderRadius: 12,
+              padding: '12px 16px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 4
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--color-ash)' }}>
+                <i className="bi bi-clock-history" style={{ color: '#FF9933' }} />
+                <span>Application Status</span>
+              </div>
+              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-chalk)' }}>
+                {existingRequest.status === 'confirmed' ? 'Approved & Activated' : 'Pending Admin Verification'}
+              </span>
+            </div>
           </div>
-        )}
-      </div>
+        </div>
+      ) : !submitted ? (
+        <div style={{ 
+          background: 'var(--color-carbon)',
+          border: '1px solid var(--color-graphite)',
+          borderRadius: 16,
+          padding: '24px 20px',
+          width: '100%',
+          maxWidth: '440px',
+          margin: '0 auto'
+        }}>
+          <label htmlFor="wing-select" style={{ fontSize: 13, display: 'block', marginBottom: 8, color: 'var(--color-chalk)', fontWeight: '500' }}>
+            Select Preferred Wing:
+          </label>
+          <select
+            id="wing-select"
+            style={{ 
+              width: '100%', 
+              marginBottom: 16, 
+              padding: 10, 
+              borderRadius: 8, 
+              background: 'var(--color-carbon)', 
+              color: 'var(--color-chalk)', 
+              border: '1px solid var(--color-graphite)', 
+              fontSize: 13 
+            }}
+            value={selectedWing}
+            onChange={(e) => setSelectedWing(e.target.value)}
+            disabled={loading}
+          >
+            <option value="" style={{ color: 'var(--color-ash)' }}>-- Choose a Wing --</option>
+            {wings.map(w => <option key={w} value={w}>{w}</option>)}
+          </select>
+          <button
+            style={{
+              width: '100%',
+              padding: '12px 16px',
+              background: '#f47a20',
+              border: 'none',
+              borderRadius: 8,
+              color: '#ffffff',
+              fontWeight: 'bold',
+              fontSize: 13,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+              opacity: (!selectedWing || loading) ? 0.6 : 1
+            }}
+            onClick={handleSubmit}
+            disabled={!selectedWing || loading}
+          >
+            {loading ? 'Submitting...' : 'Submit Request'}
+          </button>
+        </div>
+      ) : (
+        <div style={{ 
+          background: 'var(--color-carbon)',
+          border: '1px solid var(--color-graphite)',
+          borderRadius: 16,
+          padding: '24px 20px',
+          width: '100%',
+          maxWidth: '440px',
+          margin: '0 auto',
+          textAlign: 'center',
+          color: 'var(--color-chalk)',
+          fontSize: 14,
+          lineHeight: '1.6'
+        }}>
+          {statusText}
+        </div>
+      )}
+      <style>{`
+        @keyframes spin-pending {
+          to { stroke-dashoffset: -60; }
+        }
+        .pending-svg circle {
+          transform-origin: center;
+          animation: spin-pending 2s linear infinite;
+        }
+      `}</style>
     </div>
   )
 }
@@ -725,145 +963,172 @@ function BoothAgentSetupMsg({ wtlCode, epicNo, isLatest }) {
 
   if (checking) {
     return (
-      <div className="info-card booth-card" style={{ maxWidth: 300, padding: 16, textAlign: 'center', background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: 12, boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}>
-        <div className="spinner-border spinner-border-sm text-coral" style={{ width: '1.2rem', height: '1.2rem', color: 'var(--color-coral)' }} />
-        <div style={{ fontSize: 12, color: '#64748b', marginTop: 8 }}>Checking request status...</div>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 200 }}>
+        <div style={{ width: 32, height: 32, border: '3px solid rgba(46, 204, 113, 0.15)', borderTopColor: 'var(--color-signal-mint)', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+        <div style={{ fontSize: 13, color: 'var(--color-ash)', marginTop: 12 }}>Checking status...</div>
       </div>
     )
   }
 
   if (step === 'error') {
     return (
-      <div className="info-card booth-card" style={{ maxWidth: 300, padding: 12, fontSize: 13, color: '#b45309', background: '#fffbeb', border: '1px solid #fef3c7', borderRadius: 12, boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}>
-        <i className="bi bi-exclamation-triangle-fill" /> {errorMsg}
+      <div style={{ textAlign: 'center', padding: '40px 20px', color: '#b45309' }}>
+        <i className="bi bi-exclamation-triangle" style={{ fontSize: 32, marginBottom: 12, display: 'block' }} />
+        {errorMsg}
       </div>
     )
   }
 
   if (step !== 'already_submitted' && !districtsData) {
     return (
-      <div className="info-card booth-card" style={{ maxWidth: 300, padding: 16, textAlign: 'center', background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: 12, boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}>
-        <div className="spinner-border spinner-border-sm text-coral" style={{ width: '1.2rem', height: '1.2rem', color: 'var(--color-coral)' }} />
-        <div style={{ fontSize: 12, color: '#64748b', marginTop: 8 }}>Loading districts data...</div>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 200 }}>
+        <div style={{ width: 32, height: 32, border: '3px solid rgba(46, 204, 113, 0.15)', borderTopColor: 'var(--color-signal-mint)', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+        <div style={{ fontSize: 13, color: 'var(--color-ash)', marginTop: 12 }}>Loading districts...</div>
       </div>
     )
   }
 
   const districts = districtsData ? Object.keys(districtsData) : []
   const assemblies = (district && districtsData) ? districtsData[district] : []
-  
-  // Generate booth array
   const maxBooths = assembly ? assembly.booths : 0
   const booths = Array.from({ length: maxBooths }, (_, i) => i + 1)
 
   return (
-    <div className="info-card booth-card" style={{ maxWidth: 300, background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: 12, overflow: 'hidden', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06)' }}>
-      <div className="info-card-header" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', fontSize: 13, fontWeight: 'bold', color: '#0f172a' }}>
-        <i className="bi bi-building-fill-check" style={{ color: 'var(--color-coral)' }} /> Become a Booth Agent
+    <div style={{ 
+      width: '100%', 
+      maxWidth: '600px',
+      margin: '0 auto',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: 24
+    }}>
+      {/* Role Header Description */}
+      <div style={{ textAlign: 'center', marginBottom: 12 }}>
+        <div style={{
+          width: 72,
+          height: 72,
+          borderRadius: '50%',
+          background: 'rgba(255, 153, 51, 0.1)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          margin: '0 auto 12px auto'
+        }}>
+          <i className="bi bi-building-fill-check" style={{ fontSize: 36, color: '#FF9933' }} />
+        </div>
+        <h3 style={{ fontSize: 20, fontWeight: 700, color: 'var(--color-chalk)', marginBottom: 8 }}>BJP Booth Agent</h3>
+        <p style={{ fontSize: 13, color: 'var(--color-ash)', lineHeight: '1.6', margin: '0 auto', maxWidth: '480px' }}>
+          As a BJP Booth Agent, you are the crucial guardian of our democratic process at the polling booth level. You will be responsible for booth management, voter facilitation, and ensuring fair elections in your local part.
+        </p>
       </div>
-      <div style={{ padding: 12 }}>
-        {step === 'already_submitted' && existingRequest && (
-          <div style={{ fontSize: 13, color: '#1e293b', textAlign: 'center', padding: '8px 0', lineHeight: '1.5' }}>
-            ℹ️ <strong>Already Requested!</strong><br/>
-            <div style={{ fontSize: 12, marginTop: 6, color: '#475569', textAlign: 'left', display: 'inline-block' }}>
-              District: <strong>{existingRequest.district}</strong><br/>
-              Assembly: <strong>{existingRequest.assembly}</strong><br/>
-              Booth Number: <strong>Booth {existingRequest.booth_no}</strong>
-            </div>
-            <span style={{ fontSize: 12, display: 'block', marginTop: 6, color: '#64748b' }}>
-              Status: <span style={{ textTransform: 'capitalize', fontWeight: 'bold', color: existingRequest.status === 'confirmed' ? '#16a34a' : existingRequest.status === 'rejected' ? '#dc2626' : '#ea580c' }}>{existingRequest.status}</span>
-            </span>
+
+      {step === 'already_submitted' && existingRequest && (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20 }}>
+          {/* Custom SVG Pending / Success Spinner */}
+          <div style={{ position: 'relative', width: 80, height: 80 }}>
+            {existingRequest.status === 'confirmed' ? (
+              <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="var(--color-signal-mint)" strokeWidth="2">
+                <circle cx="12" cy="12" r="10" />
+                <polyline points="22 4 12 14.01 9 11.01" />
+              </svg>
+            ) : (
+              <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="#FF9933" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="pending-svg">
+                <circle cx="12" cy="12" r="10" style={{ strokeDasharray: '60', strokeDashoffset: '20', animation: 'spin-pending 3s linear infinite' }} />
+                <polyline points="12 6 12 12 15 15" />
+              </svg>
+            )}
           </div>
-        )}
 
-        {step === 'district' && (
-          <>
-            <label htmlFor="district-select" style={{ fontSize: 13, display: 'block', marginBottom: 8, color: '#334155', fontWeight: '500' }}>
-              Select District:
-            </label>
-            <select
-              id="district-select"
-              style={{ width: '100%', marginBottom: 12, padding: 8, borderRadius: 6, background: '#ffffff', color: '#1e293b', border: '1px solid #cbd5e1', fontSize: 13 }}
-              value={district}
-              onChange={(e) => {
-                setDistrict(e.target.value)
-                setAssembly(null)
-                setBooth('')
-              }}
-            >
-              <option value="" style={{ color: '#64748b' }}>-- Choose a District --</option>
-              {districts.map(d => <option key={d} value={d} style={{ color: '#1e293b' }}>{d}</option>)}
-            </select>
-            <button
-              style={{
-                width: '100%',
-                padding: '10px 16px',
-                background: '#f47a20',
-                border: 'none',
-                borderRadius: 8,
-                color: '#ffffff',
-                fontWeight: 'bold',
-                fontSize: 13,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 8,
-                opacity: !district ? 0.6 : 1
-              }}
-              onClick={handleDistrictSubmit}
-              disabled={!district}
-            >
-              Next <i className="bi bi-chevron-right" />
-            </button>
-          </>
-        )}
+          <div style={{ textAlign: 'center', fontSize: 15, fontWeight: 600, color: 'var(--color-chalk)' }}>
+            Status: <span style={{ textTransform: 'capitalize', color: existingRequest.status === 'confirmed' ? 'var(--color-signal-mint)' : existingRequest.status === 'rejected' ? '#dc2626' : '#FF9933' }}>{existingRequest.status}</span>
+          </div>
 
-        {step === 'assembly' && (
-          <>
-            <div style={{ fontSize: 12, color: '#64748b', marginBottom: 10 }}>
-              District: <strong>{district}</strong>
+          {/* Grid fields */}
+          <div style={{ width: '100%', display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
+            <div style={{ 
+              background: 'var(--color-carbon)', 
+              border: '1px solid var(--color-graphite)',
+              borderRadius: 12,
+              padding: '12px 16px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 4
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--color-ash)' }}>
+                <i className="bi bi-map" style={{ color: '#FF9933' }} />
+                <span>District</span>
+              </div>
+              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-chalk)' }}>{existingRequest.district}</span>
             </div>
-            <label htmlFor="assembly-select" style={{ fontSize: 13, display: 'block', marginBottom: 8, color: '#334155', fontWeight: '500' }}>
-              Choose Assembly:
-            </label>
-            <select
-              id="assembly-select"
-              style={{ width: '100%', marginBottom: 12, padding: 8, borderRadius: 6, background: '#ffffff', color: '#1e293b', border: '1px solid #cbd5e1', fontSize: 13 }}
-              value={assembly ? JSON.stringify(assembly) : ''}
-              onChange={(e) => {
-                setAssembly(e.target.value ? JSON.parse(e.target.value) : null)
-                setBooth('')
-              }}
-            >
-              <option value="" style={{ color: '#64748b' }}>-- Choose an Assembly --</option>
-              {assemblies.map(a => <option key={a.no} value={JSON.stringify(a)} style={{ color: '#1e293b' }}>{a.name} ({a.no})</option>)}
-            </select>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button
-                style={{
-                  flex: 1,
-                  padding: '10px 16px',
-                  background: '#64748b',
-                  border: 'none',
-                  borderRadius: 8,
-                  color: '#ffffff',
-                  fontWeight: 'bold',
-                  fontSize: 13,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 8
+
+            <div style={{ 
+              background: 'var(--color-carbon)', 
+              border: '1px solid var(--color-graphite)',
+              borderRadius: 12,
+              padding: '12px 16px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 4
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--color-ash)' }}>
+                <i className="bi bi-geo-alt" style={{ color: '#FF9933' }} />
+                <span>Assembly</span>
+              </div>
+              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-chalk)' }}>{existingRequest.assembly}</span>
+            </div>
+
+            <div style={{ 
+              background: 'var(--color-carbon)', 
+              border: '1px solid var(--color-graphite)',
+              borderRadius: 12,
+              padding: '12px 16px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 4,
+              gridColumn: 'span 2'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--color-ash)' }}>
+                <i className="bi bi-pin-map" style={{ color: '#FF9933' }} />
+                <span>Polling Booth Location</span>
+              </div>
+              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-chalk)' }}>Booth Number {existingRequest.booth_no}</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {step !== 'already_submitted' && step !== 'submitted' && (
+        <div style={{ 
+          background: 'var(--color-carbon)',
+          border: '1px solid var(--color-graphite)',
+          borderRadius: 16,
+          padding: '24px 20px',
+          width: '100%',
+          maxWidth: '440px',
+          margin: '0 auto'
+        }}>
+          {step === 'district' && (
+            <>
+              <label htmlFor="district-select" style={{ fontSize: 13, display: 'block', marginBottom: 8, color: 'var(--color-chalk)', fontWeight: '500' }}>
+                Select District:
+              </label>
+              <select
+                id="district-select"
+                style={{ width: '100%', marginBottom: 16, padding: 10, borderRadius: 8, background: 'var(--color-carbon)', color: 'var(--color-chalk)', border: '1px solid var(--color-graphite)', fontSize: 13 }}
+                value={district}
+                onChange={(e) => {
+                  setDistrict(e.target.value)
+                  setAssembly(null)
+                  setBooth('')
                 }}
-                onClick={() => setStep('district')}
               >
-                <i className="bi bi-chevron-left" /> Back
-              </button>
+                <option value="" style={{ color: 'var(--color-ash)' }}>-- Choose a District --</option>
+                {districts.map(d => <option key={d} value={d}>{d}</option>)}
+              </select>
               <button
                 style={{
-                  flex: 1,
-                  padding: '10px 16px',
+                  width: '100%',
+                  padding: '12px 16px',
                   background: '#f47a20',
                   border: 'none',
                   borderRadius: 8,
@@ -875,90 +1140,178 @@ function BoothAgentSetupMsg({ wtlCode, epicNo, isLatest }) {
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: 8,
-                  opacity: !assembly ? 0.6 : 1
+                  opacity: !district ? 0.6 : 1
                 }}
-                onClick={handleAssemblySubmit}
-                disabled={!assembly}
+                onClick={handleDistrictSubmit}
+                disabled={!district}
               >
                 Next <i className="bi bi-chevron-right" />
               </button>
-            </div>
-          </>
-        )}
+            </>
+          )}
 
-        {step === 'booth' && (
-          <>
-            <div style={{ fontSize: 12, color: '#64748b', marginBottom: 10, lineHeight: '1.4' }}>
-              District: <strong>{district}</strong><br/>
-              Assembly: <strong>{assembly.name}</strong>
-            </div>
-            <label htmlFor="booth-select" style={{ fontSize: 13, display: 'block', marginBottom: 8, color: '#334155', fontWeight: '500' }}>
-              Select the Booth:
-            </label>
-            <select
-              id="booth-select"
-              style={{ width: '100%', marginBottom: 12, padding: 8, borderRadius: 6, background: '#ffffff', color: '#1e293b', border: '1px solid #cbd5e1', fontSize: 13 }}
-              value={booth}
-              onChange={(e) => setBooth(e.target.value)}
-            >
-              <option value="" style={{ color: '#64748b' }}>-- Choose a Booth Number --</option>
-              {booths.map(b => <option key={b} value={b} style={{ color: '#1e293b' }}>Booth {b}</option>)}
-            </select>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button
-                style={{
-                  flex: 1,
-                  padding: '10px 16px',
-                  background: '#64748b',
-                  border: 'none',
-                  borderRadius: 8,
-                  color: '#ffffff',
-                  fontWeight: 'bold',
-                  fontSize: 13,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 8
+          {step === 'assembly' && (
+            <>
+              <div style={{ fontSize: 12, color: 'var(--color-ash)', marginBottom: 12 }}>
+                District: <strong style={{ color: 'var(--color-chalk)' }}>{district}</strong>
+              </div>
+              <label htmlFor="assembly-select" style={{ fontSize: 13, display: 'block', marginBottom: 8, color: 'var(--color-chalk)', fontWeight: '500' }}>
+                Choose Assembly:
+              </label>
+              <select
+                id="assembly-select"
+                style={{ width: '100%', marginBottom: 16, padding: 10, borderRadius: 8, background: 'var(--color-carbon)', color: 'var(--color-chalk)', border: '1px solid var(--color-graphite)', fontSize: 13 }}
+                value={assembly ? JSON.stringify(assembly) : ''}
+                onChange={(e) => {
+                  setAssembly(e.target.value ? JSON.parse(e.target.value) : null)
+                  setBooth('')
                 }}
-                onClick={() => setStep('assembly')}
-                disabled={loading}
               >
-                <i className="bi bi-chevron-left" /> Back
-              </button>
-              <button
-                style={{
-                  flex: 1,
-                  padding: '10px 16px',
-                  background: '#f47a20',
-                  border: 'none',
-                  borderRadius: 8,
-                  color: '#ffffff',
-                  fontWeight: 'bold',
-                  fontSize: 13,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 8,
-                  opacity: (!booth || loading) ? 0.6 : 1
-                }}
-                onClick={handleBoothSubmit}
-                disabled={!booth || loading}
-              >
-                {loading ? 'Submitting...' : 'Submit Request'}
-              </button>
-            </div>
-          </>
-        )}
+                <option value="" style={{ color: 'var(--color-ash)' }}>-- Choose an Assembly --</option>
+                {assemblies.map(a => <option key={a.no} value={JSON.stringify(a)}>{a.name} ({a.no})</option>)}
+              </select>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  style={{
+                    flex: 1,
+                    padding: '12px 16px',
+                    background: '#64748b',
+                    border: 'none',
+                    borderRadius: 8,
+                    color: '#ffffff',
+                    fontWeight: 'bold',
+                    fontSize: 13,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 8
+                  }}
+                  onClick={() => setStep('district')}
+                >
+                  <i className="bi bi-chevron-left" /> Back
+                </button>
+                <button
+                  style={{
+                    flex: 1,
+                    padding: '12px 16px',
+                    background: '#f47a20',
+                    border: 'none',
+                    borderRadius: 8,
+                    color: '#ffffff',
+                    fontWeight: 'bold',
+                    fontSize: 13,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 8,
+                    opacity: !assembly ? 0.6 : 1
+                  }}
+                  onClick={handleAssemblySubmit}
+                  disabled={!assembly}
+                >
+                  Next <i className="bi bi-chevron-right" />
+                </button>
+              </div>
+            </>
+          )}
 
-        {step === 'submitted' && (
-          <div style={{ fontSize: 13, color: '#1e293b', textAlign: 'center', padding: '8px 0', lineHeight: '1.5' }}>
-            ✅ <strong>Your booth agent request has been submitted successfully!</strong><br/>
-            <span style={{ fontSize: 12, opacity: 0.8 }}>Admin will review your request shortly.</span>
-          </div>
-        )}
-      </div>
+          {step === 'booth' && (
+            <>
+              <div style={{ fontSize: 12, color: 'var(--color-ash)', marginBottom: 12, lineHeight: '1.4' }}>
+                District: <strong style={{ color: 'var(--color-chalk)' }}>{district}</strong><br/>
+                Assembly: <strong style={{ color: 'var(--color-chalk)' }}>{assembly.name}</strong>
+              </div>
+              <label htmlFor="booth-select" style={{ fontSize: 13, display: 'block', marginBottom: 8, color: 'var(--color-chalk)', fontWeight: '500' }}>
+                Select Polling Booth:
+              </label>
+              <select
+                id="booth-select"
+                style={{ width: '100%', marginBottom: 16, padding: 10, borderRadius: 8, background: 'var(--color-carbon)', color: 'var(--color-chalk)', border: '1px solid var(--color-graphite)', fontSize: 13 }}
+                value={booth}
+                onChange={(e) => setBooth(e.target.value)}
+              >
+                <option value="" style={{ color: 'var(--color-ash)' }}>-- Choose a Booth Number --</option>
+                {booths.map(b => <option key={b} value={b}>Booth {b}</option>)}
+              </select>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  style={{
+                    flex: 1,
+                    padding: '12px 16px',
+                    background: '#64748b',
+                    border: 'none',
+                    borderRadius: 8,
+                    color: '#ffffff',
+                    fontWeight: 'bold',
+                    fontSize: 13,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 8
+                  }}
+                  onClick={() => setStep('assembly')}
+                  disabled={loading}
+                >
+                  <i className="bi bi-chevron-left" /> Back
+                </button>
+                <button
+                  style={{
+                    flex: 1,
+                    padding: '12px 16px',
+                    background: '#f47a20',
+                    border: 'none',
+                    borderRadius: 8,
+                    color: '#ffffff',
+                    fontWeight: 'bold',
+                    fontSize: 13,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 8,
+                    opacity: (!booth || loading) ? 0.6 : 1
+                  }}
+                  onClick={handleBoothSubmit}
+                  disabled={!booth || loading}
+                >
+                  {loading ? 'Submitting...' : 'Submit Request'}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {step === 'submitted' && (
+        <div style={{ 
+          background: 'var(--color-carbon)',
+          border: '1px solid var(--color-graphite)',
+          borderRadius: 16,
+          padding: '24px 20px',
+          width: '100%',
+          maxWidth: '440px',
+          margin: '0 auto',
+          textAlign: 'center',
+          color: 'var(--color-chalk)',
+          fontSize: 14,
+          lineHeight: '1.6'
+        }}>
+          ✅ <strong>Your booth agent request has been submitted successfully!</strong><br/>
+          <span style={{ fontSize: 12, opacity: 0.8 }}>Admin will review your request shortly.</span>
+        </div>
+      )}
+      <style>{`
+        @keyframes spin-pending {
+          to { stroke-dashoffset: -60; }
+        }
+        .pending-svg circle {
+          transform-origin: center;
+          animation: spin-pending 2s linear infinite;
+        }
+      `}</style>
     </div>
   )
 }
@@ -1399,13 +1752,29 @@ function BrochurePanel({ onBack }) {
   return (
     <div className="chatbot-container brochure-panel">
       <header className="brochure-header">
-        <div className="brochure-title">
+        <div className="brochure-title" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <button 
+            onClick={onBack}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'var(--color-ash)',
+              cursor: 'pointer',
+              padding: '4px 8px 4px 0',
+              fontSize: '18px',
+              display: 'flex',
+              alignItems: 'center',
+              transition: 'color 0.15s'
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-chalk)'}
+            onMouseLeave={(e) => e.currentTarget.style.color = 'var(--color-ash)'}
+            aria-label="Back"
+          >
+            <i className="bi bi-chevron-left" />
+          </button>
           <i className="bi bi-book-fill brochure-title-orange" />
           <span>BJP Brochure</span>
         </div>
-        <button className="btn-brochure-back" onClick={onBack}>
-          <i className="bi bi-chat-dots-fill" /> Back to Chat
-        </button>
       </header>
 
       <div className="brochure-content">
@@ -1519,11 +1888,31 @@ function BrochurePanel({ onBack }) {
 }
 
 function FullLetterPanel({ type, name, date, onBack }) {
-  const handlePrint = () => {
+  const handleDownloadPNG = async () => {
     const iframe = document.getElementById('full-letter-iframe')
-    if (iframe && iframe.contentWindow) {
-      iframe.contentWindow.focus()
-      iframe.contentWindow.print()
+    if (!iframe || !iframe.contentWindow) return
+    const iframeDoc = iframe.contentDocument || iframe.contentWindow.document
+    
+    const papers = iframeDoc.querySelectorAll('.letter-paper')
+    if (!papers || papers.length === 0) return
+
+    for (let idx = 0; idx < papers.length; idx++) {
+      const paper = papers[idx]
+      try {
+        const canvas = await html2canvas(paper, {
+          scale: 2,
+          useCORS: true,
+          allowTaint: true,
+          backgroundColor: '#FAF8F4',
+        })
+        const link = document.createElement('a')
+        const langSuffix = paper.id && paper.id.includes('ta') ? '_tamil' : '_english'
+        link.download = `${type === 'appreciation' ? 'Appreciation_Letter' : 'Welcome_Letter'}_${name}${langSuffix}.png`
+        link.href = canvas.toDataURL('image/png')
+        link.click()
+      } catch (e) {
+        console.error('Download PNG page error:', e)
+      }
     }
   }
 
@@ -1535,23 +1924,44 @@ function FullLetterPanel({ type, name, date, onBack }) {
   return (
     <div className="chatbot-container brochure-panel">
       <header className="brochure-header">
-        <div className="brochure-title">
+        <div className="brochure-title" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <button 
+            onClick={onBack}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'var(--color-ash)',
+              cursor: 'pointer',
+              padding: '4px 8px 4px 0',
+              fontSize: '18px',
+              display: 'flex',
+              alignItems: 'center',
+              transition: 'color 0.15s'
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-chalk)'}
+            onMouseLeave={(e) => e.currentTarget.style.color = 'var(--color-ash)'}
+            aria-label="Back"
+          >
+            <i className="bi bi-chevron-left" />
+          </button>
           <i className={`bi bi-${isAppreciation ? 'award-fill' : 'envelope-paper-fill'} brochure-title-orange`} />
           <span>{isAppreciation ? 'Letter of Appreciation' : 'Welcome Letter'}</span>
         </div>
         <div style={{ display: 'flex', gap: 12 }}>
           <button 
             className="btn-brochure-back" 
-            onClick={handlePrint}
+            onClick={handleDownloadPNG}
             style={{ 
               borderColor: 'var(--color-signal-mint)', 
-              color: 'var(--color-signal-mint)' 
+              color: 'var(--color-signal-mint)',
+              padding: '8px 12px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
             }}
+            title={isAppreciation ? 'Download Appreciation Letter' : 'Download Welcome Letter'}
           >
-            <i className="bi bi-file-earmark-pdf-fill" /> Download PDF / Print
-          </button>
-          <button className="btn-brochure-back" onClick={onBack}>
-            <i className="bi bi-chat-dots-fill" /> Back to Chat
+            <i className="bi bi-download" style={{ fontSize: 16 }} />
           </button>
         </div>
       </header>
@@ -1605,13 +2015,29 @@ function FullBoothPanel({ epicNo, onBack }) {
   return (
     <div className="chatbot-container brochure-panel">
       <header className="brochure-header">
-        <div className="brochure-title">
+        <div className="brochure-title" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <button 
+            onClick={onBack}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'var(--color-ash)',
+              cursor: 'pointer',
+              padding: '4px 8px 4px 0',
+              fontSize: '18px',
+              display: 'flex',
+              alignItems: 'center',
+              transition: 'color 0.15s'
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-chalk)'}
+            onMouseLeave={(e) => e.currentTarget.style.color = 'var(--color-ash)'}
+            aria-label="Back"
+          >
+            <i className="bi bi-chevron-left" />
+          </button>
           <i className="bi bi-building brochure-title-orange" />
           <span>Booth Information</span>
         </div>
-        <button className="btn-brochure-back" onClick={onBack}>
-          <i className="bi bi-chat-dots-fill" /> Back to Chat
-        </button>
       </header>
 
       <div className="brochure-content">
@@ -1719,13 +2145,29 @@ function FullProfilePanel({ epicNo, mobile, referredCount, onBack }) {
   return (
     <div className="chatbot-container brochure-panel">
       <header className="brochure-header">
-        <div className="brochure-title">
+        <div className="brochure-title" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <button 
+            onClick={onBack}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'var(--color-ash)',
+              cursor: 'pointer',
+              padding: '4px 8px 4px 0',
+              fontSize: '18px',
+              display: 'flex',
+              alignItems: 'center',
+              transition: 'color 0.15s'
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-chalk)'}
+            onMouseLeave={(e) => e.currentTarget.style.color = 'var(--color-ash)'}
+            aria-label="Back"
+          >
+            <i className="bi bi-chevron-left" />
+          </button>
           <i className="bi bi-person-circle brochure-title-orange" />
           <span>My Profile</span>
         </div>
-        <button className="btn-brochure-back" onClick={onBack}>
-          <i className="bi bi-chat-dots-fill" /> Back to Chat
-        </button>
       </header>
 
       <div className="brochure-content">
@@ -1941,6 +2383,15 @@ function FullCardPanel({ card, onBack }) {
   const c = card || {}
   const [fullCardData, setFullCardData] = useState(null)
   const cardRef3D = useRef(null)
+  const [cardWidth, setCardWidth] = useState(Math.min(540, window.innerWidth - 48))
+
+  useEffect(() => {
+    const handleResize = () => {
+      setCardWidth(Math.min(540, window.innerWidth - 48))
+    }
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
 
   useEffect(() => {
     const hasName = c.name || c.voter_name || c.VOTER_NAME;
@@ -1957,7 +2408,26 @@ function FullCardPanel({ card, onBack }) {
   return (
     <div className="chatbot-container brochure-panel">
       <header className="brochure-header">
-        <div className="brochure-title">
+        <div className="brochure-title" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <button 
+            onClick={onBack}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'var(--color-ash)',
+              cursor: 'pointer',
+              padding: '4px 8px 4px 0',
+              fontSize: '18px',
+              display: 'flex',
+              alignItems: 'center',
+              transition: 'color 0.15s'
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-chalk)'}
+            onMouseLeave={(e) => e.currentTarget.style.color = 'var(--color-ash)'}
+            aria-label="Back"
+          >
+            <i className="bi bi-chevron-left" />
+          </button>
           <i className="bi bi-credit-card-2-front brochure-title-orange" />
           <span>My Member Card</span>
         </div>
@@ -1967,13 +2437,15 @@ function FullCardPanel({ card, onBack }) {
             onClick={() => cardRef3D.current?.download()}
             style={{ 
               borderColor: 'var(--color-signal-mint)', 
-              color: 'var(--color-signal-mint)' 
+              color: 'var(--color-signal-mint)',
+              padding: '8px 12px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
             }}
+            title="Download ID Card"
           >
-            <i className="bi bi-download" /> Download ID Card
-          </button>
-          <button className="btn-brochure-back" onClick={onBack}>
-            <i className="bi bi-chat-dots-fill" /> Back to Chat
+            <i className="bi bi-download" style={{ fontSize: 16 }} />
           </button>
         </div>
       </header>
@@ -1985,7 +2457,7 @@ function FullCardPanel({ card, onBack }) {
               ref={cardRef3D}
               cardData={fullCardData}
               backUrl={c.back_url || fullCardData.back_url}
-              width={540}
+              width={cardWidth}
               autoFlip={false}
               showActions={false}
             />
@@ -2006,19 +2478,33 @@ function FullFormPanel({ title, icon, onBack, children }) {
   return (
     <div className="chatbot-container brochure-panel">
       <header className="brochure-header">
-        <div className="brochure-title">
+        <div className="brochure-title" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <button 
+            onClick={onBack}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'var(--color-ash)',
+              cursor: 'pointer',
+              padding: '4px 8px 4px 0',
+              fontSize: '18px',
+              display: 'flex',
+              alignItems: 'center',
+              transition: 'color 0.15s'
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-chalk)'}
+            onMouseLeave={(e) => e.currentTarget.style.color = 'var(--color-ash)'}
+            aria-label="Back"
+          >
+            <i className="bi bi-chevron-left" />
+          </button>
           <i className={`bi bi-${icon} brochure-title-orange`} />
           <span>{title}</span>
         </div>
-        <button className="btn-brochure-back" onClick={onBack}>
-          <i className="bi bi-chat-dots-fill" /> Back to Chat
-        </button>
       </header>
 
-      <div className="brochure-content" style={{ display: 'flex', justifyContent: 'center', alignItems: 'flex-start', paddingTop: 24, overflowY: 'auto' }}>
-        <div style={{ width: '100%', maxWidth: '440px', background: 'var(--color-carbon)', border: '1px solid var(--color-graphite)', borderRadius: 20, padding: 20 }}>
-          {children}
-        </div>
+      <div className="brochure-content" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', padding: '20px', overflowY: 'auto' }}>
+        {children}
       </div>
     </div>
   );
@@ -2046,13 +2532,29 @@ function BestPerformersPanel({ onBack }) {
   return (
     <div className="chatbot-container brochure-panel">
       <header className="brochure-header">
-        <div className="brochure-title">
+        <div className="brochure-title" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <button 
+            onClick={onBack}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'var(--color-ash)',
+              cursor: 'pointer',
+              padding: '4px 8px 4px 0',
+              fontSize: '18px',
+              display: 'flex',
+              alignItems: 'center',
+              transition: 'color 0.15s'
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-chalk)'}
+            onMouseLeave={(e) => e.currentTarget.style.color = 'var(--color-ash)'}
+            aria-label="Back"
+          >
+            <i className="bi bi-chevron-left" />
+          </button>
           <i className="bi bi-trophy-fill brochure-title-orange" />
           <span>Best Performers</span>
         </div>
-        <button className="btn-brochure-back" onClick={onBack}>
-          <i className="bi bi-chat-dots-fill" /> Back to Chat
-        </button>
       </header>
 
       <div className="brochure-content">
@@ -2378,12 +2880,51 @@ export default function ChatbotPage() {
   // Milestones and Appointment state
   const [referredCount, setReferredCount] = useState(0)
   const [hasAppointment, setHasAppointment] = useState(false)
+  const [localBodyInterest, setLocalBodyInterest] = useState(null)
+  const [meetingInterest, setMeetingInterest] = useState(null)
+  const [volunteerStatus, setVolunteerStatus] = useState(null)
+  const [boothAgentStatus, setBoothAgentStatus] = useState(null)
   const [showModal, setShowModal] = useState(false)
-  const [bookingStep, setBookingStep] = useState(1) // 1: Info, 2: Book Form, 3: Success
-  const [selectedDate, setSelectedDate] = useState('')
-  const [selectedTime, setSelectedTime] = useState('')
+  const [bookingStep, setBookingStep] = useState(1) // 1: Congrats/Meeting request, 3: Meeting response thank you, 4: Local Body, 5: Local body thank you
   const [isBooking, setIsBooking] = useState(false)
   const [bookingError, setBookingError] = useState('')
+
+  const soundPlayedRef = useRef({ localBody: false, president: false, volunteer: false, boothAgent: false })
+
+  const playNotificationSound = () => {
+    try {
+      const AudioContext = window.AudioContext || window.webkitAudioContext
+      if (!AudioContext) return
+      const ctx = new AudioContext()
+      const now = ctx.currentTime
+      
+      // Tone 1: C5
+      const osc1 = ctx.createOscillator()
+      const gain1 = ctx.createGain()
+      osc1.type = 'sine'
+      osc1.frequency.setValueAtTime(523.25, now)
+      gain1.gain.setValueAtTime(0.12, now)
+      gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.25)
+      osc1.connect(gain1)
+      gain1.connect(ctx.destination)
+      osc1.start(now)
+      osc1.stop(now + 0.25)
+
+      // Tone 2: E5
+      const osc2 = ctx.createOscillator()
+      const gain2 = ctx.createGain()
+      osc2.type = 'sine'
+      osc2.frequency.setValueAtTime(659.25, now + 0.08)
+      gain2.gain.setValueAtTime(0.12, now + 0.08)
+      gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.35)
+      osc2.connect(gain2)
+      gain2.connect(ctx.destination)
+      osc2.start(now + 0.08)
+      osc2.stop(now + 0.35)
+    } catch (err) {
+      console.warn('Audio Context sound play failed:', err)
+    }
+  }
 
   const fetchMemberStatus = async (code) => {
     if (!code) return
@@ -2392,9 +2933,39 @@ export default function ChatbotPage() {
       if (res.success) {
         setReferredCount(res.referred_count || 0)
         setHasAppointment(res.has_appointment || false)
-        if (res.has_appointment && res.appointment) {
-          setSelectedDate(res.appointment.date || '')
-          setSelectedTime(res.appointment.time || '')
+        setLocalBodyInterest(res.local_body_interest || null)
+        setVolunteerStatus(res.volunteer_status || null)
+        setBoothAgentStatus(res.booth_agent_status || null)
+        
+        let meetInt = null
+        if (res.appointment) {
+          meetInt = res.appointment.interest || null
+        }
+        setMeetingInterest(meetInt)
+
+        // Check if any sound alert should trigger
+        const isLocalBodyPending = res.local_body_interest === null
+        const isPresidentPending = (res.referred_count || 0) >= 5 && (meetInt === null)
+        const isVolunteerStatusAlert = (res.volunteer_status === 'confirmed' || res.volunteer_status === 'rejected') &&
+          localStorage.getItem(`ack_vol_status_${code}`) !== res.volunteer_status
+        const isBoothAgentStatusAlert = (res.booth_agent_status === 'confirmed' || res.booth_agent_status === 'rejected') &&
+          localStorage.getItem(`ack_ba_status_${code}`) !== res.booth_agent_status
+
+        if (isLocalBodyPending && !soundPlayedRef.current.localBody) {
+          soundPlayedRef.current.localBody = true
+          playNotificationSound()
+        }
+        if (isPresidentPending && !soundPlayedRef.current.president) {
+          soundPlayedRef.current.president = true
+          playNotificationSound()
+        }
+        if (isVolunteerStatusAlert && !soundPlayedRef.current.volunteer) {
+          soundPlayedRef.current.volunteer = true
+          playNotificationSound()
+        }
+        if (isBoothAgentStatusAlert && !soundPlayedRef.current.boothAgent) {
+          soundPlayedRef.current.boothAgent = true
+          playNotificationSound()
         }
       }
     } catch (err) {
@@ -2403,41 +2974,85 @@ export default function ChatbotPage() {
   }
 
   const handleBellClick = () => {
-    if (hasAppointment) {
-      setBookingStep(3)
-    } else {
-      setBookingStep(1)
-      setSelectedDate('')
-      setSelectedTime('')
-    }
     setBookingError('')
+    const code = cardRef.current?.wtl_code || cardRef.current?.ptc_code || profileRef.current?.wtl_code || profileRef.current?.ptc_code
+    
+    if ((volunteerStatus === 'confirmed' || volunteerStatus === 'rejected') && localStorage.getItem(`ack_vol_status_${code}`) !== volunteerStatus) {
+      if (volunteerStatus === 'confirmed') {
+        setBookingStep(6)
+      } else {
+        setBookingStep(7)
+      }
+    } else if ((boothAgentStatus === 'confirmed' || boothAgentStatus === 'rejected') && localStorage.getItem(`ack_ba_status_${code}`) !== boothAgentStatus) {
+      if (boothAgentStatus === 'confirmed') {
+        setBookingStep(8)
+      } else {
+        setBookingStep(9)
+      }
+    } else if (localBodyInterest === null) {
+      setBookingStep(4)
+    } else if (referredCount >= 5) {
+      if (meetingInterest === null) {
+        setBookingStep(1)
+      } else {
+        setBookingStep(3)
+      }
+    } else {
+      setBookingStep(5)
+    }
     setShowModal(true)
   }
 
-  const handleBookAppointment = async () => {
-    if (!selectedDate) {
-      setBookingError('Please choose a date.')
-      return
+  const handleAcknowledgeStatus = (type, val) => {
+    const code = cardRef.current?.wtl_code || cardRef.current?.ptc_code || profileRef.current?.wtl_code || profileRef.current?.ptc_code
+    if (code) {
+      if (type === 'volunteer') {
+        localStorage.setItem(`ack_vol_status_${code}`, val)
+      } else if (type === 'booth_agent') {
+        localStorage.setItem(`ack_ba_status_${code}`, val)
+      }
     }
-    if (!selectedTime) {
-      setBookingError('Please choose a time slot.')
-      return
-    }
+    setShowModal(false)
+  }
+
+  const handleLocalBodyInterestSubmit = async (interestValue) => {
+    const wtlCode = cardRef.current?.wtl_code || cardRef.current?.ptc_code || profileRef.current?.wtl_code || profileRef.current?.ptc_code
+    if (!wtlCode) return
     setBookingError('')
     setIsBooking(true)
-    const wtlCode = cardRef.current?.wtl_code || cardRef.current?.ptc_code || profileRef.current?.wtl_code || profileRef.current?.ptc_code
     try {
-      const res = await chat.bookAppointment(wtlCode, selectedDate, selectedTime)
+      const res = await chat.saveLocalBodyInterest(wtlCode, interestValue)
       setIsBooking(false)
       if (res.success) {
-        setHasAppointment(true)
-        setBookingStep(3)
+        setLocalBodyInterest(interestValue)
+        setBookingStep(5)
       } else {
-        setBookingError(res.message || 'Failed to book appointment. Please try again.')
+        setBookingError(res.message || 'Failed to record response.')
       }
     } catch (err) {
       setIsBooking(false)
-      setBookingError(err.message || 'Network error booking appointment.')
+      setBookingError(err.message || 'Network error.')
+    }
+  }
+
+  const handleMeetingInterestSubmit = async (interestValue) => {
+    const wtlCode = cardRef.current?.wtl_code || cardRef.current?.ptc_code || profileRef.current?.wtl_code || profileRef.current?.ptc_code
+    if (!wtlCode) return
+    setBookingError('')
+    setIsBooking(true)
+    try {
+      const res = await chat.saveMeetingInterest(wtlCode, interestValue)
+      setIsBooking(false)
+      if (res.success) {
+        setMeetingInterest(interestValue)
+        setHasAppointment(interestValue === 'interested')
+        setBookingStep(3)
+      } else {
+        setBookingError(res.message || 'Failed to record response.')
+      }
+    } catch (err) {
+      setIsBooking(false)
+      setBookingError(err.message || 'Network error.')
     }
   }
 
@@ -2490,6 +3105,10 @@ export default function ChatbotPage() {
   useEffect(() => {
     if (initializedRef.current) return
     initializedRef.current = true
+
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
 
     const cache = getCache()
     if (cache?.card) {
@@ -2796,7 +3415,7 @@ export default function ChatbotPage() {
         // Use cached link from card if available — avoids a session-auth round-trip
         const cachedLink = cardRef.current?.referral_link
         if (cachedLink) {
-          addMsg('bot', 'referral_link', { link: cachedLink, wtlCode })
+          setActiveView('referral')
           break
         }
         setIsTyping(true)
@@ -2806,7 +3425,7 @@ export default function ChatbotPage() {
           const link = res.referral_link || res.link || res.url || ''
           // Cache it on the card ref for future sidebar clicks
           if (link && cardRef.current) cardRef.current.referral_link = link
-          addMsg('bot', 'referral_link', { link, wtlCode })
+          setActiveView('referral')
         } catch {
           setIsTyping(false)
           await botSay('❌ Unable to load referral link.', 200)
@@ -2829,6 +3448,7 @@ export default function ChatbotPage() {
     cardRef.current    = null
     profileRef.current = null
     voterRef.current   = null
+    soundPlayedRef.current = { localBody: false, president: false }
     setSidebarOpen(false)
     setIsFlipped(false)
     setInputValue('')
@@ -3036,6 +3656,12 @@ export default function ChatbotPage() {
   const isWide   = ['voter_card', 'generated_card', 'booth_info', 'referral_link', 'members_list', 'profile_card'].includes
   const isDone   = chatState === S.DONE
 
+  const code = cardRef.current?.wtl_code || cardRef.current?.ptc_code || profileRef.current?.wtl_code || profileRef.current?.ptc_code
+  const hasPendingNotification = localBodyInterest === null || 
+    (referredCount >= 5 && meetingInterest === null) ||
+    ((volunteerStatus === 'confirmed' || volunteerStatus === 'rejected') && localStorage.getItem(`ack_vol_status_${code}`) !== volunteerStatus) ||
+    ((boothAgentStatus === 'confirmed' || boothAgentStatus === 'rejected') && localStorage.getItem(`ack_ba_status_${code}`) !== boothAgentStatus)
+
   return (
     <div className="chatbot-app wtl-theme">
       {/* ── Main Layout ── */}
@@ -3054,11 +3680,19 @@ export default function ChatbotPage() {
               </div>
             </div>
             <div className="left-menu-header-actions" style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-              {isDone && referredCount >= 5 && (
+              {isDone && (
                 <button
-                  className={`chat-header-btn bell-alert-btn ${hasAppointment ? 'bell-booked-btn' : 'pulsing-vibrate'}`}
+                  className={`chat-header-btn bell-alert-btn ${
+                    hasPendingNotification ? 'pulsing-vibrate' : ''
+                  } ${hasAppointment ? 'bell-booked-btn' : ''}`}
                   onClick={handleBellClick}
-                  title={hasAppointment ? 'Meeting Scheduled! Click to view details' : 'Milestone Achieved! Click to Schedule Meeting with President'}
+                  title={
+                    localBodyInterest === null 
+                      ? 'Local Body Elections interest check' 
+                      : hasAppointment 
+                      ? 'Meeting Scheduled! Click to view details' 
+                      : 'Milestone Achieved! Click to Schedule Meeting with President'
+                  }
                   style={{ 
                     fontSize: 18, 
                     color: hasAppointment ? '#2ecc71' : '#D1B078', 
@@ -3068,7 +3702,7 @@ export default function ChatbotPage() {
                   }}
                 >
                   <i className="bi bi-bell-fill" />
-                  {!hasAppointment && <span className="bell-badge" />}
+                  {hasPendingNotification && <span className="bell-badge" />}
                 </button>
               )}
               {isDone && (
@@ -3181,6 +3815,11 @@ export default function ChatbotPage() {
               date={new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
               onBack={() => setActiveView('chat')} 
             />
+          ) : activeView === 'referral' ? (
+            <FullReferralPanel
+              link={cardRef.current?.referral_link || ''}
+              onBack={() => setActiveView('chat')}
+            />
           ) : activeView === 'best_performers' ? (
             <BestPerformersPanel onBack={() => setActiveView('chat')} />
           ) : activeView === 'volunteer' ? (
@@ -3224,11 +3863,19 @@ export default function ChatbotPage() {
                 </div>
               </div>
               <div className="chat-header-actions" style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-                {isDone && referredCount >= 5 && (
+                {isDone && (
                   <button
-                    className={`chat-header-btn bell-alert-btn ${hasAppointment ? 'bell-booked-btn' : 'pulsing-vibrate'}`}
+                    className={`chat-header-btn bell-alert-btn ${
+                      hasPendingNotification ? 'pulsing-vibrate' : ''
+                    } ${hasAppointment ? 'bell-booked-btn' : ''}`}
                     onClick={handleBellClick}
-                    title={hasAppointment ? 'Meeting Scheduled! Click to view details' : 'Milestone Achieved! Click to Schedule Meeting with President'}
+                    title={
+                      localBodyInterest === null 
+                        ? 'Local Body Elections interest check' 
+                        : hasAppointment 
+                        ? 'Meeting Scheduled! Click to view details' 
+                        : 'Milestone Achieved! Click to Schedule Meeting with President'
+                    }
                     style={{ 
                       fontSize: 18, 
                       color: hasAppointment ? '#2ecc71' : '#D1B078', 
@@ -3238,28 +3885,17 @@ export default function ChatbotPage() {
                     }}
                   >
                     <i className="bi bi-bell-fill" />
-                    {!hasAppointment && <span className="bell-badge" />}
+                    {hasPendingNotification && <span className="bell-badge" />}
                   </button>
                 )}
                 {isDone && (
-                  <>
-                    <button
-                      className="chat-header-btn"
-                      onClick={() => setSidebarOpen(true)}
-                      title="Menu"
-                    >
-                      <i className="bi bi-list" />
-                    </button>
-                    <button
-                      className="chat-header-btn"
-                      onClick={() => {
-                        if (window.confirm('Logout and start over?')) handleLogout()
-                      }}
-                      title="Logout"
-                    >
-                      <i className="bi bi-box-arrow-right" />
-                    </button>
-                  </>
+                  <button
+                    className="chat-header-btn"
+                    onClick={() => setSidebarOpen(true)}
+                    title="Menu"
+                  >
+                    <i className="bi bi-list" />
+                  </button>
                 )}
               </div>
             </header>
@@ -3403,13 +4039,35 @@ export default function ChatbotPage() {
       {sidebarOpen && (
         <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)}>
           <div className="sidebar-panel" onClick={(e) => e.stopPropagation()}>
-            <div className="sidebar-header">
+            <div className="sidebar-header" style={{ position: 'relative' }}>
               <img src="/bjp_logo.svg" alt="BJP" className="sidebar-logo"
                 onError={(e) => { e.target.src = '/bjp_logo.png' }} />
               <div>
                 <div className="sidebar-brand">BJP TAMIL NADU</div>
                 <div className="sidebar-tagline">Nation First. Party Next. Self Last.</div>
               </div>
+              <button 
+                onClick={() => setSidebarOpen(false)}
+                style={{
+                  position: 'absolute',
+                  top: '50%',
+                  right: 16,
+                  transform: 'translateY(-50%)',
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--color-ash)',
+                  fontSize: '24px',
+                  cursor: 'pointer',
+                  padding: 4,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  zIndex: 10
+                }}
+                aria-label="Close sidebar"
+              >
+                <i className="bi bi-x" />
+              </button>
             </div>
             <nav className="sidebar-nav">
               {[
@@ -3484,69 +4142,25 @@ export default function ChatbotPage() {
                 </div>
                 <h2>Congratulations! 🎉</h2>
                 <p className="congrats-text">
-                  You have successfully completed <strong>5 referrals</strong>! As a token of appreciation for your outstanding support, you have earned a special opportunity to meet the State President.
+                  You have successfully completed <strong>5 referrals</strong>! As a token of appreciation for your outstanding support, you have earned a special opportunity to meet the State President. Are you interested in scheduling a meeting?
                 </p>
-                <div className="modal-actions-row">
-                  <button className="btn-modal-action btn-schedule" onClick={() => setBookingStep(2)}>
-                    Schedule
-                  </button>
-                  <button className="btn-modal-action btn-cancel" onClick={() => setShowModal(false)}>
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {bookingStep === 2 && (
-              <div className="modal-step-form">
-                <h2>Schedule President Meeting 📅</h2>
-                <p className="schedule-desc">Select a date and time slot (available from 10:00 AM to 6:00 PM) to confirm your appointment.</p>
-                
-                <div className="form-group" style={{ marginBottom: 16, textAlign: 'left' }}>
-                  <label style={{ display: 'block', fontSize: 12, fontWeight: 'bold', color: 'var(--color-chalk)', marginBottom: 6 }}>Select Date</label>
-                  <input 
-                    type="date" 
-                    className="modal-input" 
-                    value={selectedDate}
-                    min={new Date().toISOString().split('T')[0]}
-                    onChange={(e) => setSelectedDate(e.target.value)}
-                    style={{ width: '100%', padding: '10px 14px', borderRadius: 12, border: '1px solid var(--color-graphite)', background: 'var(--color-bg-light)', color: 'var(--color-chalk)', outline: 'none' }}
-                  />
-                </div>
-
-                <div className="form-group" style={{ marginBottom: 20, textAlign: 'left' }}>
-                  <label style={{ display: 'block', fontSize: 12, fontWeight: 'bold', color: 'var(--color-chalk)', marginBottom: 6 }}>Select Time Slot</label>
-                  <select 
-                    className="modal-input" 
-                    value={selectedTime}
-                    onChange={(e) => setSelectedTime(e.target.value)}
-                    style={{ width: '100%', padding: '10px 14px', borderRadius: 12, border: '1px solid var(--color-graphite)', background: 'var(--color-bg-light)', color: 'var(--color-chalk)', outline: 'none' }}
-                  >
-                    <option value="">-- Choose a time slot --</option>
-                    <option value="10:00 AM">10:00 AM</option>
-                    <option value="11:00 AM">11:00 AM</option>
-                    <option value="12:00 PM">12:00 PM</option>
-                    <option value="01:00 PM">01:00 PM</option>
-                    <option value="02:00 PM">02:00 PM</option>
-                    <option value="03:00 PM">03:00 PM</option>
-                    <option value="04:00 PM">04:00 PM</option>
-                    <option value="05:00 PM">05:00 PM</option>
-                    <option value="06:00 PM">06:00 PM</option>
-                  </select>
-                </div>
-
                 {bookingError && <p className="modal-error-text" style={{ color: '#ff3b30', fontSize: 12, marginBottom: 16 }}>⚠️ {bookingError}</p>}
-
-                <div className="modal-actions-row">
+                <div className="modal-actions-row" style={{ display: 'flex', gap: 12, marginTop: 20 }}>
                   <button 
                     className="btn-modal-action btn-schedule" 
-                    onClick={handleBookAppointment}
+                    style={{ flex: 1 }}
+                    onClick={() => handleMeetingInterestSubmit('interested')}
                     disabled={isBooking}
                   >
-                    {isBooking ? 'Booking...' : 'Book Appointment'}
+                    {isBooking ? 'Saving...' : 'Interested'}
                   </button>
-                  <button className="btn-modal-action btn-cancel" onClick={() => setBookingStep(1)}>
-                    Back
+                  <button 
+                    className="btn-modal-action btn-cancel" 
+                    style={{ flex: 1, border: '1px solid var(--border-dim)' }}
+                    onClick={() => handleMeetingInterestSubmit('not_interested')}
+                    disabled={isBooking}
+                  >
+                    {isBooking ? 'Saving...' : 'Not Interested'}
                   </button>
                 </div>
               </div>
@@ -3557,12 +4171,140 @@ export default function ChatbotPage() {
                 <div className="modal-icon-wrapper success">
                   <i className="bi bi-check-circle-fill success-icon" />
                 </div>
-                <h2>Appointment Booked! 🗓️</h2>
+                <h2>Preference Saved! 🗓️</h2>
                 <p className="success-text">
-                  Your appointment has been successfully scheduled for <strong>{selectedDate}</strong> at <strong>{selectedTime}</strong>. We look forward to meeting you!
+                  {meetingInterest === 'interested'
+                    ? 'Thanks for your interest! Your request to meet the State President has been recorded. Our team will contact you soon.'
+                    : 'Thank you for your response. Your preference has been successfully recorded.'
+                  }
                 </p>
                 <div className="modal-actions-row">
                   <button className="btn-modal-action btn-schedule" onClick={() => setShowModal(false)}>
+                    Done
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {bookingStep === 4 && (
+              <div className="modal-step-local-body">
+                <div className="modal-icon-wrapper congrats" style={{ background: 'rgba(209, 176, 120, 0.12)' }}>
+                  <i className="bi bi-building congrats-icon" style={{ color: '#D1B078' }} />
+                </div>
+                <h2>Local Body Elections 🗳️</h2>
+                <p className="congrats-text" style={{ fontSize: 13, lineHeight: '1.5' }}>
+                  Are you interested in participating or contesting in the upcoming Local Body Elections? BJP Tamil Nadu is planning candidate profiles and coordinators for each ward/panchayat. Let us know your interest below:
+                </p>
+                {bookingError && <p className="modal-error-text" style={{ color: '#ff3b30', fontSize: 12, marginBottom: 16 }}>⚠️ {bookingError}</p>}
+                <div className="modal-actions-row" style={{ display: 'flex', gap: 12, marginTop: 20 }}>
+                  <button 
+                    className="btn-modal-action btn-schedule" 
+                    style={{ flex: 1 }}
+                    onClick={() => handleLocalBodyInterestSubmit('interested')}
+                    disabled={isBooking}
+                  >
+                    {isBooking ? 'Saving...' : 'Interested'}
+                  </button>
+                  <button 
+                    className="btn-modal-action btn-cancel" 
+                    style={{ flex: 1, border: '1px solid var(--border-dim)' }}
+                    onClick={() => handleLocalBodyInterestSubmit('not_interested')}
+                    disabled={isBooking}
+                  >
+                    {isBooking ? 'Saving...' : 'Not Interested'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {bookingStep === 5 && (
+              <div className="modal-step-success">
+                <div className="modal-icon-wrapper success">
+                  <i className="bi bi-check-circle-fill success-icon" />
+                </div>
+                <h2>Thank You! 🙏</h2>
+                <p className="success-text" style={{ fontSize: 13, lineHeight: '1.5' }}>
+                  {localBodyInterest === 'interested' 
+                    ? 'Thanks for your interest! Your preference has been recorded. Our team will reach out to you with further updates.'
+                    : 'Thank you for your response. Your preference has been successfully recorded.'
+                  }
+                </p>
+                <div className="modal-actions-row" style={{ marginTop: 20 }}>
+                  <button className="btn-modal-action btn-schedule" onClick={() => {
+                    setShowModal(false);
+                    // If they have met milestones (referredCount >= 5) and don't have an appointment yet, route them back to step 1
+                    if (referredCount >= 5 && !hasAppointment) {
+                      setBookingStep(1);
+                    }
+                  }}>
+                    Close
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {bookingStep === 6 && (
+              <div className="modal-step-success">
+                <div className="modal-icon-wrapper success" style={{ backgroundColor: 'rgba(46, 125, 50, 0.12)' }}>
+                  <i className="bi bi-patch-check-fill success-icon" style={{ color: '#2e7d32' }} />
+                </div>
+                <h2>Congratulations Organizer! 🎉</h2>
+                <p className="success-text" style={{ fontSize: 13, lineHeight: '1.5' }}>
+                  Your application to become a BJP Organizer has been accepted by the State Administrator. Thank you for your leadership and dedication to the party!
+                </p>
+                <div className="modal-actions-row" style={{ marginTop: 20 }}>
+                  <button className="btn-modal-action btn-schedule" style={{ backgroundColor: '#2e7d32' }} onClick={() => handleAcknowledgeStatus('volunteer', 'confirmed')}>
+                    Done
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {bookingStep === 7 && (
+              <div className="modal-step-success">
+                <div className="modal-icon-wrapper success" style={{ backgroundColor: 'rgba(198, 40, 40, 0.12)' }}>
+                  <i className="bi bi-x-circle-fill success-icon" style={{ color: '#c62828' }} />
+                </div>
+                <h2>Organizer Application ℹ️</h2>
+                <p className="success-text" style={{ fontSize: 13, lineHeight: '1.5' }}>
+                  Your application to become a BJP Organizer has been reviewed and rejected by the State Administrator at this time. Thank you for your interest; you can continue to participate and refer new members.
+                </p>
+                <div className="modal-actions-row" style={{ marginTop: 20 }}>
+                  <button className="btn-modal-action btn-schedule" style={{ backgroundColor: '#c62828' }} onClick={() => handleAcknowledgeStatus('volunteer', 'rejected')}>
+                    Done
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {bookingStep === 8 && (
+              <div className="modal-step-success">
+                <div className="modal-icon-wrapper success" style={{ backgroundColor: 'rgba(21, 101, 192, 0.12)' }}>
+                  <i className="bi bi-shield-fill-check success-icon" style={{ color: '#1565c0' }} />
+                </div>
+                <h2>Congratulations Booth Agent! 🗳️</h2>
+                <p className="success-text" style={{ fontSize: 13, lineHeight: '1.5' }}>
+                  Your application to become a BJP Booth Agent has been confirmed by the State Administrator. You are now officially assigned to your booth! Thank you for your valuable support.
+                </p>
+                <div className="modal-actions-row" style={{ marginTop: 20 }}>
+                  <button className="btn-modal-action btn-schedule" style={{ backgroundColor: '#1565c0' }} onClick={() => handleAcknowledgeStatus('booth_agent', 'confirmed')}>
+                    Done
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {bookingStep === 9 && (
+              <div className="modal-step-success">
+                <div className="modal-icon-wrapper success" style={{ backgroundColor: 'rgba(198, 40, 40, 0.12)' }}>
+                  <i className="bi bi-x-circle-fill success-icon" style={{ color: '#c62828' }} />
+                </div>
+                <h2>Booth Agent Application ℹ️</h2>
+                <p className="success-text" style={{ fontSize: 13, lineHeight: '1.5' }}>
+                  Your application to become a BJP Booth Agent has been reviewed and rejected by the State Administrator at this time. Thank you for your interest.
+                </p>
+                <div className="modal-actions-row" style={{ marginTop: 20 }}>
+                  <button className="btn-modal-action btn-schedule" style={{ backgroundColor: '#c62828' }} onClick={() => handleAcknowledgeStatus('booth_agent', 'rejected')}>
                     Done
                   </button>
                 </div>

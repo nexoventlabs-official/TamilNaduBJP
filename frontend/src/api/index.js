@@ -94,6 +94,12 @@ export const chat = {
 
   bookAppointment: (wtlCode, date, time) =>
     api.post('/api/book-appointment', { wtl_code: wtlCode, date, time }),
+
+  saveLocalBodyInterest: (wtlCode, interest) =>
+    api.post('/api/local-body-interest', { wtl_code: wtlCode, interest }),
+
+  saveMeetingInterest: (wtlCode, interest) =>
+    api.post('/api/save-meeting-interest', { wtl_code: wtlCode, interest }),
 }
 
 export const admin = {
@@ -148,6 +154,15 @@ export const admin = {
 
   getConfirmedBoothAgents: (params) =>
     api.get('/admin/api/confirmed-booth-agents', { params }),
+
+  getReports: (params) =>
+    api.get('/admin/api/reports', { params }),
+
+  getLocalBody: (params) =>
+    api.get('/admin/api/local-body', { params }),
+
+  getMeetRequests: (params) =>
+    api.get('/admin/api/meet-requests', { params }),
 }
 
 export const publicApi = {

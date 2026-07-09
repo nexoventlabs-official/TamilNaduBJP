@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { admin } from '../../api'
 
 function StatCard({ icon, label, value, color, bg }) {
@@ -29,6 +30,7 @@ function StatusRow({ label, status, detail }) {
 }
 
 export default function DashboardPage() {
+  const navigate = useNavigate()
   const [stats, setStats]       = useState(null)
   const [extStats, setExtStats] = useState(null)
   const [loading, setLoading]   = useState(true)
@@ -78,30 +80,61 @@ export default function DashboardPage() {
         <StatCard icon="shield-fill-check"     label="Confirmed Booth Agents" value={s.confirmed_booth_agents} color="#1565c0" bg="rgba(21,101,192,0.1)" />
       </div>
 
-      {/* System status */}
-      <div className="admin-card">
-        <div className="admin-card-header">
-          <h6 className="admin-card-title"><i className="bi bi-activity" /> System Status</h6>
-          <span style={{ fontSize: 11, color: '#8696a0' }}>Live indicators</span>
+      {/* Leaderboard */}
+      <div style={{ marginTop: 24 }}>
+        {/* Top 5 Referrals Leaderboard */}
+        <div className="admin-card" style={{ margin: 0 }}>
+          <div className="admin-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h6 className="admin-card-title"><i className="bi bi-trophy-fill text-coral" /> Top 5 Referrers</h6>
+            <span style={{ fontSize: 11, color: '#8696a0' }}>Referral Champions</span>
+          </div>
+          <div className="admin-table-wrap" style={{ border: 'none', margin: 0 }}>
+            <table className="admin-table" style={{ fontSize: 12 }}>
+              <thead>
+                <tr>
+                  <th style={{ padding: '8px 12px' }}>#</th>
+                  <th style={{ padding: '8px 12px' }}>Photo</th>
+                  <th style={{ padding: '8px 12px' }}>Name</th>
+                  <th style={{ padding: '8px 12px' }}>Code</th>
+                  <th style={{ padding: '8px 12px' }}>Assembly</th>
+                  <th style={{ padding: '8px 12px' }}>Count</th>
+                </tr>
+              </thead>
+              <tbody>
+                {s.top_referrals && s.top_referrals.length > 0 ? (
+                  s.top_referrals.map((r, idx) => (
+                    <tr key={idx} onClick={() => navigate(`/admin/generated-voters/${r.code}`)} style={{ cursor: 'pointer' }} className="admin-clickable-row">
+                      <td style={{ padding: '8px 12px', color: 'var(--admin-ink-dim)', verticalAlign: 'middle' }}>{idx + 1}</td>
+                      <td style={{ padding: '8px 12px', verticalAlign: 'middle' }}>
+                        {r.photo_url ? (
+                          <img src={r.photo_url} alt="Profile" style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', border: '1px solid rgba(0,0,0,0.08)' }} />
+                        ) : (
+                          <div style={{ width: 36, height: 36, borderRadius: '50%', backgroundColor: 'rgba(0,0,0,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <i className="bi bi-person-fill" style={{ color: '#8696a0', fontSize: 16 }} />
+                          </div>
+                        )}
+                      </td>
+                      <td style={{ padding: '8px 12px', fontWeight: '500', verticalAlign: 'middle' }}>{r.name}</td>
+                      <td style={{ padding: '8px 12px', fontFamily: 'monospace', verticalAlign: 'middle' }}>{r.code}</td>
+                      <td style={{ padding: '8px 12px', verticalAlign: 'middle' }}>{r.assembly || r.district}</td>
+                      <td style={{ padding: '8px 12px', verticalAlign: 'middle' }}>
+                        <span className="badge-status badge-generated" style={{ fontWeight: '600', padding: '2px 6px', fontSize: 11 }}>
+                          {r.referrals}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={6} style={{ textAlign: 'center', padding: 20, color: 'var(--admin-ink-dim)' }}>
+                      No referrals data yet.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
-        <StatusRow
-          label="Database Connection"
-          status={e.db_status === 'connected' ? 'ok' : 'error'}
-          detail={e.db_status || (s.total_voters !== undefined ? 'connected' : 'unknown')}
-        />
-        <StatusRow
-          label="Cloudinary Storage"
-          status={e.cloudinary_status === 'ok' ? 'ok' : e.cloudinary_status ? 'warning' : 'ok'}
-          detail={e.cloudinary_credits !== undefined ? `${e.cloudinary_credits} credits remaining` : (e.cloudinary_status || 'N/A')}
-        />
-        <StatusRow
-          label="SMS Service"
-          status={e.sms_balance !== undefined ? (e.sms_balance > 10 ? 'ok' : 'warning') : 'ok'}
-          detail={e.sms_balance !== undefined ? `Balance: ${e.sms_balance}` : (e.sms_status || 'N/A')}
-        />
-        {e.last_generation && (
-          <StatusRow label="Last Card Generation" status="ok" detail={new Date(e.last_generation).toLocaleString()} />
-        )}
       </div>
 
       {/* Raw stats (if API returns extra data) */}

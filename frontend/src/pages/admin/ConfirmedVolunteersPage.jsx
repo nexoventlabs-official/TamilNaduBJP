@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { admin } from '../../api'
 
 function Pagination({ page, total, perPage = 20, onChange }) {
@@ -19,6 +19,7 @@ function Pagination({ page, total, perPage = 20, onChange }) {
 }
 
 export default function ConfirmedVolunteersPage() {
+  const navigate = useNavigate()
   const [data, setData]       = useState({ volunteers: [], total: 0 })
   const [loading, setLoading] = useState(true)
   const [page, setPage]       = useState(1)
@@ -88,6 +89,7 @@ export default function ConfirmedVolunteersPage() {
                 <thead>
                   <tr>
                     <th>#</th>
+                    <th>Photo</th>
                     <th>Name</th>
                     <th>EPIC No</th>
                     <th>BJP Code</th>
@@ -100,8 +102,21 @@ export default function ConfirmedVolunteersPage() {
                   {volunteers.map((v, i) => {
                     const codeVal = v.wtl_code || v.ptc_code
                     return (
-                      <tr key={codeVal || v.epic_no || i}>
+                      <tr 
+                        key={codeVal || v.epic_no || i}
+                        style={{ cursor: 'pointer' }}
+                        onClick={() => codeVal && navigate(`/admin/generated-voters/${codeVal}`)}
+                      >
                         <td style={{ color: '#8696a0' }}>{(page - 1) * 20 + i + 1}</td>
+                        <td>
+                          {v.photo_url ? (
+                            <img src={v.photo_url} alt="Profile" style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover' }} />
+                          ) : (
+                            <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#eee', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              <i className="bi bi-person-fill" style={{ fontSize: 18, color: '#bbb' }} />
+                            </div>
+                          )}
+                        </td>
                         <td>{v.name || v.Name}</td>
                         <td>
                           <Link to={`/admin/voters/${v.epic_no}`} style={{ color: '#64b5f6', fontSize: 12 }}>{v.epic_no}</Link>

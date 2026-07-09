@@ -11,6 +11,9 @@ const NAV_ITEMS = [
   { path: '/admin/confirmed-volunteers', icon: 'check-circle-fill',  label: 'Confirmed Organizers' },
   { path: '/admin/booth-agent-requests', icon: 'building-fill',      label: 'Booth Agent Requests' },
   { path: '/admin/confirmed-booth-agents', icon: 'shield-fill-check', label: 'Confirmed Booth Agents' },
+  { path: '/admin/reports',            icon: 'file-earmark-bar-graph-fill', label: 'Reports' },
+  { path: '/admin/local-body',         icon: 'building',                    label: 'Local Body Requests' },
+  { path: '/admin/meet-requests',       icon: 'person-video',                label: 'Meet Requests' },
 ]
 
 export default function AdminLayout() {

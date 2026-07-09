@@ -1306,11 +1306,17 @@ router.get('/member-status/:wtlCode', async (req, res) => {
       return res.status(404).json({ success: false, message: 'Member not found' });
     }
     const appointment = await db.collection('appointments').findOne({ wtl_code: wtlCode });
+    const volReq = await db.collection('volunteer_requests').findOne({ wtl_code: wtlCode });
+    const baReq = await db.collection('booth_agent_requests').findOne({ wtl_code: wtlCode });
+
     return res.json({
       success: true,
       referred_count: voter.referred_members_count || 0,
-      has_appointment: !!appointment,
-      appointment: appointment ? { date: appointment.date, time: appointment.time } : null
+      has_appointment: !!appointment && appointment.interest === 'interested',
+      appointment: appointment ? { interest: appointment.interest } : null,
+      local_body_interest: voter.local_body_interest || null,
+      volunteer_status: volReq ? volReq.status : null,
+      booth_agent_status: baReq ? baReq.status : null
     });
   } catch (err) {
     console.error('member-status error:', err.message);
@@ -1319,29 +1325,53 @@ router.get('/member-status/:wtlCode', async (req, res) => {
 });
 
 // ────────────────────────────────────────────────────────────────
-//  POST /book-appointment
+//  POST /local-body-interest
 // ────────────────────────────────────────────────────────────────
-router.post('/book-appointment', async (req, res) => {
+router.post('/local-body-interest', async (req, res) => {
   try {
-    const { wtl_code, date, time } = req.body;
-    if (!wtl_code || !date || !time) {
+    const { wtl_code, interest } = req.body;
+    if (!wtl_code || !interest) {
       return res.status(400).json({ success: false, message: 'Missing required parameters' });
     }
-    const db = getDb();
-    // Check if appointment already exists
-    const existing = await db.collection('appointments').findOne({ wtl_code });
-    if (existing) {
-      return res.json({ success: true, message: 'Appointment already booked' });
+    if (interest !== 'interested' && interest !== 'not_interested') {
+      return res.status(400).json({ success: false, message: 'Invalid interest value' });
     }
-    await db.collection('appointments').insertOne({
-      wtl_code,
-      date,
-      time,
-      created_at: new Date()
-    });
-    return res.json({ success: true, message: 'Appointment booked successfully' });
+    const db = getDb();
+    const result = await db.collection('generated_voters').updateOne(
+      { wtl_code },
+      { $set: { local_body_interest: interest } }
+    );
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ success: false, message: 'Member not found' });
+    }
+    return res.json({ success: true, message: 'Interest updated successfully' });
   } catch (err) {
-    console.error('book-appointment error:', err.message);
+    console.error('local-body-interest error:', err.message);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// ────────────────────────────────────────────────────────────────
+//  POST /save-meeting-interest
+// ────────────────────────────────────────────────────────────────
+router.post('/save-meeting-interest', async (req, res) => {
+  try {
+    const { wtl_code, interest } = req.body;
+    if (!wtl_code || !interest) {
+      return res.status(400).json({ success: false, message: 'Missing required parameters' });
+    }
+    if (interest !== 'interested' && interest !== 'not_interested') {
+      return res.status(400).json({ success: false, message: 'Invalid interest value' });
+    }
+    const db = getDb();
+    await db.collection('appointments').updateOne(
+      { wtl_code },
+      { $set: { interest, created_at: new Date() } },
+      { upsert: true }
+    );
+    return res.json({ success: true, message: 'Meeting interest saved successfully' });
+  } catch (err) {
+    console.error('save-meeting-interest error:', err.message);
     return res.status(500).json({ success: false, message: 'Server error' });
   }
 });

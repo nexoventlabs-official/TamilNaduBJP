@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { admin } from '../../api'
 
 function Pagination({ page, total, perPage = 20, onChange }) {
@@ -19,6 +19,7 @@ function Pagination({ page, total, perPage = 20, onChange }) {
 }
 
 export default function ConfirmedBoothAgentsPage() {
+  const navigate = useNavigate()
   const [data, setData]       = useState({ agents: [], total: 0 })
   const [loading, setLoading] = useState(true)
   const [page, setPage]       = useState(1)
@@ -88,6 +89,7 @@ export default function ConfirmedBoothAgentsPage() {
                 <thead>
                   <tr>
                     <th>#</th>
+                    <th>Photo</th>
                     <th>Name</th>
                     <th>EPIC No</th>
                     <th>BJP Code</th>
@@ -101,8 +103,21 @@ export default function ConfirmedBoothAgentsPage() {
                   {agents.map((a, i) => {
                     const codeVal = a.wtl_code || a.ptc_code
                     return (
-                      <tr key={codeVal || a.epic_no || i}>
+                      <tr 
+                        key={codeVal || a.epic_no || i}
+                        style={{ cursor: 'pointer' }}
+                        onClick={() => codeVal && navigate(`/admin/generated-voters/${codeVal}`)}
+                      >
                         <td style={{ color: 'var(--admin-ink-dim)' }}>{(page - 1) * 20 + i + 1}</td>
+                        <td>
+                          {a.photo_url ? (
+                            <img src={a.photo_url} alt="Profile" style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover' }} />
+                          ) : (
+                            <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#eee', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              <i className="bi bi-person-fill" style={{ fontSize: 18, color: '#bbb' }} />
+                            </div>
+                          )}
+                        </td>
                         <td>{a.name || a.Name}</td>
                         <td>
                           <Link to={`/admin/voters/${a.epic_no}`} style={{ color: 'var(--admin-badge-blue)', fontSize: 12 }}>{a.epic_no}</Link>
