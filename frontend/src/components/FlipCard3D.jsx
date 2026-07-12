@@ -141,7 +141,7 @@ export const FlipCard3D = forwardRef(function FlipCard3D(
       const frontCanvas = await h2c(cardEl, {
         scale: 3,
         useCORS: true,
-        allowTaint: true,
+        allowTaint: false,
         backgroundColor: '#F9F8F6',
         width:  ORIG_W,
         height: ORIG_H,

@@ -651,7 +651,7 @@ function downloadPNG() {
   html2canvas(g('card'), {
     scale: 3,
     useCORS: true,
-    allowTaint: true,
+    allowTaint: false,
     backgroundColor: '#FFFFFF',
     width: 1576, height: 998,
   }).then(canvas => {

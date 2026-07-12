@@ -184,6 +184,9 @@ app.use((err, req, res, _next) => {
   } else {
     console.error(`[${correlationId}]`, err);
   }
+  if (res.headersSent) {
+    return _next(err);
+  }
   res.status(500).json({ success: false, message: 'Internal server error', ref: correlationId });
 });
 
