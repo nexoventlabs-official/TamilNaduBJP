@@ -765,10 +765,6 @@
             var cards = [page1];
             if (currentLang !== 'en' && page2) cards.push(page2);
 
-            document.body.classList.add('pdf-generating');
-            var wrapper = document.querySelector('.letter-wrapper');
-            if (wrapper) wrapper.classList.add('pdf-generating');
-
             var pdfDoc = new jsPDFCtor({ unit: 'mm', format: 'a4', orientation: 'portrait' });
             var w = pdfDoc.internal.pageSize.getWidth();
             var h = pdfDoc.internal.pageSize.getHeight();
@@ -788,6 +784,10 @@
                     windowHeight: 1123,
                     backgroundColor: '#ffffff',
                     onclone: function(doc) {
+                        doc.body.classList.add('pdf-generating');
+                        var clonedWrapper = doc.querySelector('.letter-wrapper');
+                        if (clonedWrapper) clonedWrapper.classList.add('pdf-generating');
+
                         doc.documentElement.style.margin = '0';
                         doc.documentElement.style.padding = '0';
                         doc.documentElement.style.width = '794px';
