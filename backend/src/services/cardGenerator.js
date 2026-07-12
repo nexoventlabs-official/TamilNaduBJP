@@ -125,14 +125,21 @@ async function generateCard(voter, photoBuffer = null) {
   const wtlCode  = clean(voter.wtl_code || voter.ptc_code || '');
   const memberId = wtlCode || `BJP-${epicNo.slice(-6)}`;
 
-  // Generate QR code pointing to the verification URL for this EPIC
-  const baseUrl  = process.env.BASE_URL || 'https://we-the-leader.onrender.com';
-  const verifyUrl = `${baseUrl}/verify/${epicNo}`;
-  const qrDataUrl = await QRCode.toDataURL(verifyUrl, {
-    errorCorrectionLevel: 'M',
+  // Generate QR code pointing to the referral URL for this member
+  let qrData = voter.referral_link || '';
+  if (!qrData && wtlCode && voter.referral_id) {
+    const baseUrl  = process.env.BASE_URL || 'https://we-the-leader.onrender.com';
+    qrData = `${baseUrl}/refer/${wtlCode}/${voter.referral_id}`;
+  }
+  if (!qrData) {
+    const baseUrl  = process.env.BASE_URL || 'https://we-the-leader.onrender.com';
+    qrData = `${baseUrl}/verify/${wtlCode || epicNo}`;
+  }
+  const qrDataUrl = await QRCode.toDataURL(qrData, {
+    errorCorrectionLevel: 'H',
     width: 200,
     margin: 1,
-    color: { dark: '#1a1a1a', light: '#f9f8f6' },
+    color: { dark: '#000000', light: '#ffffff' },
   });
 
   const browser = await getBrowser();
@@ -144,6 +151,7 @@ async function generateCard(voter, photoBuffer = null) {
     const publicDir = path.dirname(templatePath);
     const modiPath    = path.join(publicDir, 'modi_transparent.png');
     const nayanarPath = path.join(publicDir, 'nayanar_transparent.png');
+    const sigPath     = path.join(publicDir, 'signature.png');
     let html = fs.readFileSync(templatePath, 'utf8');
     if (fs.existsSync(modiPath)) {
       const b64 = fs.readFileSync(modiPath).toString('base64');
@@ -152,6 +160,10 @@ async function generateCard(voter, photoBuffer = null) {
     if (fs.existsSync(nayanarPath)) {
       const b64 = fs.readFileSync(nayanarPath).toString('base64');
       html = html.replace(/url\('nayanar_transparent\.png'\)/g, `url('data:image/png;base64,${b64}')`);
+    }
+    if (fs.existsSync(sigPath)) {
+      const b64 = fs.readFileSync(sigPath).toString('base64');
+      html = html.replace(/src="signature\.png"/g, `src="data:image/png;base64,${b64}"`);
     }
     await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: 15000 });
 

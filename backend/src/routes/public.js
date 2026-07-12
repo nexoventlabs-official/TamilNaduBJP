@@ -6,6 +6,7 @@ const router  = express.Router();
 const config  = require('../config');
 const { getDb, getVoterDb, findVoterByEpic } = require('../db');
 const { publicVerifyLimiter } = require('../middleware/rateLimiter');
+const { getPhotoPresignedUrl } = require('../services/backblazeService');
 
 // ── Health check — for uptime monitors and Render/Cloudways ────────
 router.get('/health', async (req, res) => {
@@ -98,25 +99,33 @@ router.get('/cronjob', (req, res) => res.send('OK'));
 //  Also aliased at /api/verify/:epicNo
 async function verifyVoterHandler(req, res) {
   try {
-    const epicNo  = req.params.epicNo.trim().toUpperCase();
-    const db      = getDb();
+    const id = req.params.epicNo.trim().toUpperCase();
+    const db = getDb();
 
-    const voterDoc = await findVoterByEpic(epicNo);
-    let voter = voterDoc || null;
-    if (!voter) {
-      const genFallback = await db.collection('generated_voters').findOne({ EPIC_NO: epicNo });
-      if (genFallback) voter = genFallback;
+    let genDoc = {};
+    let epicNo = id;
+
+    if (id.startsWith('BJP-')) {
+      genDoc = await db.collection('generated_voters').findOne({ wtl_code: id }) || {};
+      epicNo = genDoc.EPIC_NO || '';
+    } else {
+      genDoc = await db.collection('generated_voters').findOne({ EPIC_NO: id }, { sort: { generated_at: -1 } }) || {};
     }
 
-    const genDoc = await db.collection('generated_voters').findOne({ EPIC_NO: epicNo }) || {};
-    const stat   = await db.collection('generation_stats').findOne({ epic_no: epicNo }) || {};
+    const voterDoc = epicNo ? await findVoterByEpic(epicNo) : null;
+    let voter = voterDoc || null;
+    if (!voter && genDoc.EPIC_NO) {
+      voter = genDoc;
+    }
+
+    const stat = epicNo ? (await db.collection('generation_stats').findOne({ epic_no: epicNo }) || {}) : {};
 
     const name     = voter ? (voter.VOTER_NAME || `${voter.FM_NAME_EN || ''} ${voter.LASTNAME_EN || ''}`.trim() || '') : '';
     const assembly = voter?.ASSEMBLY_NAME || genDoc.ASSEMBLY_NAME || '';
     const district = voter?.DISTRICT || voter?.DISTRICT_NAME || genDoc.DISTRICT_NAME || '';
     const partNo   = String(voter?.PART_NO || genDoc.PART_NO || '');
-    const cardUrl  = stat.card_url  || genDoc.card_url  || '';
-    const photoUrl = stat.photo_url || genDoc.photo_url || '';
+    const cardUrl  = genDoc.card_url  || stat.card_url  || '';
+    const photoUrl = await getPhotoPresignedUrl(genDoc.photo_url || stat.photo_url || '');
     const wtlCode  = genDoc.wtl_code || '';
     const isMember = Boolean(wtlCode);
 
@@ -177,7 +186,7 @@ ${cardUrl ? `.view-card{display:block;margin-top:20px;padding:14px;background:#f
     // ── API JSON response ─────────────────────────────────────────
     const volReq = await db.collection('volunteer_requests').findOne({ epic_no: epicNo }, { sort: { requested_at: -1 } }) || {};
     const baReq  = await db.collection('booth_agent_requests').findOne({ epic_no: epicNo }, { sort: { requested_at: -1 } }) || {};
-    const authMob = stat.auth_mobile || '';
+    const authMob = genDoc.MOBILE_NO || stat.auth_mobile || '';
 
     const out = {
       success: true, verified: Boolean(voter), epic_no: epicNo, name, assembly, district,
@@ -204,11 +213,20 @@ router.get('/api/verify/:epicNo', publicVerifyLimiter, verifyVoterHandler);
 // ── Get card data ─────────────────────────────────────────────────
 router.get('/api/card/:epicNo', async (req, res) => {
   try {
-    const epicNo = req.params.epicNo.trim().toUpperCase();
-    const db     = getDb();
+    const id = req.params.epicNo.trim().toUpperCase();
+    const db = getDb();
 
-    const stat   = await db.collection('generation_stats').findOne({ epic_no: epicNo })  || {};
-    const genDoc = await db.collection('generated_voters').findOne({ EPIC_NO: epicNo })   || {};
+    let genDoc = {};
+    let epicNo = id;
+
+    if (id.startsWith('BJP-')) {
+      genDoc = await db.collection('generated_voters').findOne({ wtl_code: id }) || {};
+      epicNo = genDoc.EPIC_NO || '';
+    } else {
+      genDoc = await db.collection('generated_voters').findOne({ EPIC_NO: id }, { sort: { generated_at: -1 } }) || {};
+    }
+
+    const stat = epicNo ? (await db.collection('generation_stats').findOne({ epic_no: epicNo }) || {}) : {};
 
     if (!genDoc.EPIC_NO && !stat.epic_no) {
       return res.status(404).json({ success: false, message: 'Card not found.' });
@@ -223,10 +241,10 @@ router.get('/api/card/:epicNo', async (req, res) => {
 
     return res.json({
       success:      true,
-      card_url:     stat.card_url     || genDoc.card_url     || '',
-      back_url:     stat.back_url     || genDoc.back_url     || '',
-      combined_url: stat.combined_url || genDoc.combined_url || '',
-      photo_url:    stat.photo_url    || genDoc.photo_url    || '',
+      card_url:     genDoc.card_url     || stat.card_url     || '',
+      back_url:     genDoc.back_url     || stat.back_url     || '',
+      combined_url: genDoc.combined_url || stat.combined_url || '',
+      photo_url:    await getPhotoPresignedUrl(genDoc.photo_url || stat.photo_url || ''),
       wtl_code:     genDoc.wtl_code   || '',
       gen_count:    stat.count        || 0,
       name,
@@ -234,6 +252,8 @@ router.get('/api/card/:epicNo', async (req, res) => {
       assembly_name: voter?.ASSEMBLY_NAME || voter?.assembly_name || '',
       district:      voter?.DISTRICT      || voter?.DISTRICT_NAME || voter?.district || '',
       part_no:       String(voter?.PART_NO || voter?.part_no || ''),
+      referral_link: genDoc.referral_link || '',
+      referral_id:   genDoc.referral_id   || '',
     });
   } catch (err) {
     console.error('card error:', err);

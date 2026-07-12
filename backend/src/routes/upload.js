@@ -10,7 +10,7 @@ const router  = express.Router();
 const crypto  = require('crypto');
 const config  = require('../config');
 const { getDb } = require('../db');
-const { uploadPhoto, uploadCard, uploadBackCard } = require('../services/cloudinaryService');
+const { uploadPhoto, uploadCard, uploadBackCard } = require('../services/backblazeService');
 const { generateCard, generateBackCard }          = require('../services/cardGenerator');
 const { sendTextMessage, sendImageMessage }       = require('../services/whatsappService');
 
@@ -593,18 +593,32 @@ router.post('/:token', upload.single('photo'), async (req, res) => {
       };
 
       const frontBuffer = await generateCard(voterData, photoBuffer);
-      const backBuffer  = await generateBackCard(voterData);
       const photoUrl    = await uploadPhoto(photoBuffer, epicNo, mobile);
-      const frontUrl    = await uploadCard(frontBuffer,  epicNo, mobile);
-      const backUrl     = await uploadBackCard(backBuffer, epicNo, mobile);
-      const now         = new Date();
+
+      const fs = require('fs');
+      const path = require('path');
+      const isProd = config.nodeEnv === 'production';
+      const tempCardsDir = isProd
+        ? '/var/www/bjptn/dist/cards'
+        : path.join(__dirname, '../../../frontend/dist/cards');
+
+      if (!fs.existsSync(tempCardsDir)) {
+        fs.mkdirSync(tempCardsDir, { recursive: true });
+      }
+
+      const fileName = `${wtlCode}-${epicNo}.png`;
+      const filePath = path.join(tempCardsDir, fileName);
+      fs.writeFileSync(filePath, frontBuffer);
+
+      const frontUrl = `${config.baseUrl}/cards/${fileName}`;
+      const now      = new Date();
 
       await db.collection('generated_voters').updateOne(
-        { EPIC_NO: epicNo },
+        { MOBILE_NO: mobile },
         {
           $set: {
             EPIC_NO: epicNo, wtl_code: wtlCode,
-            photo_url: photoUrl, card_url: frontUrl, back_url: backUrl, combined_url: frontUrl,
+            photo_url: photoUrl, card_url: frontUrl, back_url: '', combined_url: frontUrl,
             generated_at: now,
             VOTER_NAME:    pending.voter_name    || '',
             ASSEMBLY_NAME: pending.assembly_name || '',
@@ -631,14 +645,29 @@ router.post('/:token', upload.single('photo'), async (req, res) => {
       ].join('\n');
 
       await sendImageMessage(waTo, frontUrl, frontCaption);
-      await new Promise(r => setTimeout(r, 1000));
-      await sendImageMessage(waTo, backUrl, '🪪 *Your Digital Member ID Card — BACK*\n\nBJP Tamil Nadu — Nation First');
+
+      // Clean up the temp card file after 60 seconds (gives WhatsApp's CDN time to fetch/cache it)
+      setTimeout(() => {
+        fs.unlink(filePath, (err) => {
+          if (err && err.code !== 'ENOENT') {
+            console.error(`[Upload] Failed to delete temp card: ${filePath}`, err.message);
+          } else {
+            console.log(`[Upload] Temporary card deleted: ${filePath}`);
+          }
+        });
+      }, 60000);
+
+      await new Promise(r => setTimeout(r, 800));
       await sendTextMessage(waTo,
         `🎉 *Registration Complete!*\n\nWelcome to BJP Tamil Nadu, *${pending.voter_name || 'Member'}*!\n\nYour BJP Code: *${wtlCode}*\n\nShare and invite others to join!`);
 
       console.log(`[Upload] Card generated & sent for ${mobile} / ${epicNo}`);
     } catch (err) {
       console.error(`[Upload] Error for ${mobile}:`, err.message, err.stack);
+      const Sentry = require('@sentry/node');
+      Sentry.captureException(err, {
+        extra: { mobile, epicNo }
+      });
       try {
         await db.collection('pending_registrations').updateOne(
           { mobile }, { $set: { status: 'awaiting_photo' } },

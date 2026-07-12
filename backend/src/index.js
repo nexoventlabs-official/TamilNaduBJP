@@ -6,6 +6,14 @@
  */
 require('dotenv').config();
 
+const Sentry = require('@sentry/node');
+
+// Initialize Sentry before requiring other route modules to ensure auto-instrumentation works
+Sentry.init({
+  dsn: "https://9beaab4828c82c718969bbcb7d4db92b@o4511709522886656.ingest.us.sentry.io/4511709628989441",
+  tracesSampleRate: 1.0,
+});
+
 const express    = require('express');
 const session    = require('express-session');
 const MongoStore = require('connect-mongo');
@@ -164,6 +172,9 @@ app.use('/',       publicRoutes);
 app.use((req, res) => {
   res.status(404).json({ success: false, message: 'Route not found' });
 });
+
+// The Sentry error handler must be registered before any other error middleware
+Sentry.setupExpressErrorHandler(app);
 
 // ── Global error handler — never leak stack traces ────────────────
 app.use((err, req, res, _next) => {

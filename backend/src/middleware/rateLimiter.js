@@ -1,4 +1,5 @@
 const rateLimit = require('express-rate-limit');
+const Sentry = require('@sentry/node');
 
 /**
  * Factory for creating rate limiters.
@@ -15,6 +16,11 @@ function createRateLimiter(maxRequests, windowSeconds) {
     standardHeaders: true,
     legacyHeaders: false,
     handler: (req, res) => {
+      const route = req.originalUrl || req.url;
+      Sentry.captureMessage(`Rate limit exceeded: ${req.ip} on ${route}`, {
+        level: 'warning',
+        extra: { ip: req.ip, route }
+      });
       res.status(429).json({
         success: false,
         message: `Rate limit exceeded. Try again in ${Math.ceil(windowSeconds / 60)} minute(s).`,
@@ -46,6 +52,12 @@ const chatGenerateCardLimiter = process.env.DISABLE_RATE_LIMITER === 'true'
       // Key by session mobile if available, fall back to IP
       keyGenerator: (req) => req.session?.verified_mobile || req.ip,
       handler: (req, res) => {
+        const key = req.session?.verified_mobile || req.ip;
+        const route = req.originalUrl || req.url;
+        Sentry.captureMessage(`Card generation rate limit exceeded for: ${key}`, {
+          level: 'warning',
+          extra: { key, route }
+        });
         res.status(429).json({
           success: false,
           message: 'Too many card generation attempts. Please wait a few minutes and try again.',

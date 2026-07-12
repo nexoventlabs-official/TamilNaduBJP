@@ -70,6 +70,7 @@ export const CardPreviewIframe = React.forwardRef(({ cardData, width = 340 }, re
       if (midInput) midInput.value = midVal.toUpperCase()
 
       if (photoImg && photoUrl) {
+        photoImg.crossOrigin = 'anonymous';
         photoImg.src = photoUrl
         photoImg.style.display = 'block'
         const photoBox = doc.getElementById('photo-box')
@@ -91,8 +92,14 @@ export const CardPreviewIframe = React.forwardRef(({ cardData, width = 340 }, re
       }
 
       if (qrImg && epic) {
-        const verifyUrl = `${window.location.origin}/verify/${epic}`
-        qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(verifyUrl)}`
+        let qrData = cardData.referral_link || '';
+        if (!qrData && wtlCode && cardData.referral_id) {
+          qrData = `${window.location.origin}/refer/${wtlCode}/${cardData.referral_id}`;
+        }
+        if (!qrData) {
+          qrData = `${window.location.origin}/verify/${wtlCode || epic}`;
+        }
+        qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&ecc=H&data=${encodeURIComponent(qrData)}`;
       }
 
       // Trigger generate card preview inside template

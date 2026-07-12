@@ -119,7 +119,7 @@ export default function VolunteerRequestsPage() {
                                 <i className="bi bi-person" style={{ color: 'var(--color-coral)' }} />
                               </div>
                             )}
-                            <Link to={`/admin/generated-voters/${codeVal}`} style={{ color: '#ffffff', textDecoration: 'none', fontWeight: 500 }}>
+                            <Link to={`/admin/generated-voters/${codeVal}`} style={{ color: '#1e293b', textDecoration: 'none', fontWeight: 600 }}>
                                {r.name || r.Name || '—'}
                             </Link>
                           </div>

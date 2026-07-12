@@ -17,9 +17,10 @@ cloudinary.config({
  * @param {Buffer} buffer
  * @param {string} publicId - filename (no folder prefix)
  * @param {string} folder   - Cloudinary folder
+ * @param {object} options  - extra upload options
  * @returns {Promise<string>} secure_url
  */
-function uploadBuffer(buffer, publicId, folder) {
+function uploadBuffer(buffer, publicId, folder, options = {}) {
   return new Promise((resolve, reject) => {
     const stream = cloudinary.uploader.upload_stream(
       {
@@ -28,6 +29,7 @@ function uploadBuffer(buffer, publicId, folder) {
         overwrite:     true,
         invalidate:    true,
         resource_type: 'image',
+        ...options
       },
       (err, result) => {
         if (err) return reject(err);
@@ -45,7 +47,19 @@ async function uploadPhoto(buffer, epicNo, mobile) {
   }
   const suffix = mobile ? `_${mobile}` : '';
   const id = `${epicNo.toUpperCase()}${suffix}`.replace(/[/\\]/g, '_');
-  return uploadBuffer(buffer, id, config.cloudinary.photoFolder);
+  
+  // Compress and resize image in the Cloudinary cloud on upload:
+  // - limit dimensions to max 500x600
+  // - auto-convert to web-friendly JPG format
+  // - auto-compress quality to keep file size tiny (~30 KB to 50 KB)
+  const uploadOptions = {
+    transformation: [
+      { width: 500, height: 600, crop: 'limit' },
+      { quality: 'auto' },
+      { fetch_format: 'jpg' }
+    ]
+  };
+  return uploadBuffer(buffer, id, config.cloudinary.photoFolder, uploadOptions);
 }
 
 /** Upload generated front card. */

@@ -16,6 +16,7 @@ export const FlipCard3D = forwardRef(function FlipCard3D(
 ) {
   const [flipped, setFlipped]     = useState(false)
   const [downloading, setDownloading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const iframeRef = useRef(null)
 
   // Card original dimensions
@@ -72,6 +73,7 @@ export const FlipCard3D = forwardRef(function FlipCard3D(
       const photoImg = doc.getElementById('member-photo-img')
       const photoBox = doc.getElementById('photo-box')
       if (photoImg && photoUrl) {
+        photoImg.crossOrigin = 'anonymous';
         photoImg.src = photoUrl
         photoImg.style.display = 'block'
         if (photoBox) {
@@ -84,7 +86,14 @@ export const FlipCard3D = forwardRef(function FlipCard3D(
 
       const qrImg = doc.getElementById('qr-img')
       if (qrImg && epic) {
-        qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(`${window.location.origin}/verify/${epic}`)}`
+        let qrData = cardData.referral_link || '';
+        if (!qrData && wtlCode && cardData.referral_id) {
+          qrData = `${window.location.origin}/refer/${wtlCode}/${cardData.referral_id}`;
+        }
+        if (!qrData) {
+          qrData = `${window.location.origin}/verify/${wtlCode || epic}`;
+        }
+        qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&ecc=H&data=${encodeURIComponent(qrData)}`;
       }
 
       if (typeof iframe.contentWindow.generate === 'function') {
@@ -101,7 +110,11 @@ export const FlipCard3D = forwardRef(function FlipCard3D(
         const val = firstRow.querySelector('.field-value')
         if (val) val.style.maxWidth = '600px'
       }
-    } catch (e) { console.error('FlipCard3D iframe error:', e) }
+      setLoading(false)
+    } catch (e) {
+      console.error('FlipCard3D iframe error:', e)
+      setLoading(false)
+    }
   }
 
   // ── Download: front (html2canvas) + back (image) side-by-side ──
@@ -154,6 +167,103 @@ export const FlipCard3D = forwardRef(function FlipCard3D(
 
   return (
     <div className="flip-card-wrapper" style={{ width: `${width}px` }}>
+      <style>{`
+        .card-skeleton {
+          position: absolute;
+          inset: 0;
+          background: #f9f8f6;
+          border-radius: 12px;
+          padding: 16px;
+          box-sizing: border-box;
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+          z-index: 10;
+          border: 1px solid rgba(0, 0, 0, 0.08);
+          overflow: hidden;
+          transition: opacity 0.3s ease;
+        }
+
+        @keyframes pulse {
+          0%, 100% { opacity: 0.8; }
+          50% { opacity: 0.4; }
+        }
+
+        .skeleton-logo,
+        .skeleton-line,
+        .skeleton-photo,
+        .skeleton-qr {
+          background: rgba(0, 0, 0, 0.08);
+          border-radius: 4px;
+          animation: pulse 1.5s infinite ease-in-out;
+        }
+
+        .skeleton-header {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          height: 32px;
+        }
+
+        .skeleton-logo {
+          width: 28px;
+          height: 28px;
+          border-radius: 50%;
+        }
+
+        .skeleton-title-lines {
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+          flex: 1;
+        }
+
+        .title-l1 {
+          width: 60%;
+          height: 8px;
+        }
+
+        .title-l2 {
+          width: 40%;
+          height: 6px;
+        }
+
+        .skeleton-body {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          flex: 1;
+          margin-top: 14px;
+        }
+
+        .skeleton-photo {
+          width: 64px;
+          height: 78px;
+          border-radius: 6px;
+        }
+
+        .skeleton-details {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          flex: 1;
+        }
+
+        .detail-line {
+          width: 90%;
+          height: 6px;
+        }
+        .detail-line:nth-child(2) { width: 75%; }
+        .detail-line:nth-child(3) { width: 85%; }
+        .detail-line:nth-child(4) { width: 50%; }
+
+        .skeleton-qr {
+          width: 48px;
+          height: 48px;
+          border-radius: 6px;
+          align-self: flex-end;
+        }
+      `}</style>
 
       {/* Card Display Container */}
       <div
@@ -161,6 +271,27 @@ export const FlipCard3D = forwardRef(function FlipCard3D(
       >
         {/* FRONT ONLY */}
         <div style={{ width: `${width}px`, height: `${height}px`, overflow: 'hidden', borderRadius: 12, position: 'relative', background: '#F9F8F6', boxShadow: 'var(--shadow-card)' }}>
+          {loading && (
+            <div className="card-skeleton">
+              <div className="skeleton-header">
+                <div className="skeleton-logo"></div>
+                <div className="skeleton-title-lines">
+                  <div className="skeleton-line title-l1"></div>
+                  <div className="skeleton-line title-l2"></div>
+                </div>
+              </div>
+              <div className="skeleton-body">
+                <div className="skeleton-photo"></div>
+                <div className="skeleton-details">
+                  <div className="skeleton-line detail-line"></div>
+                  <div className="skeleton-line detail-line"></div>
+                  <div className="skeleton-line detail-line"></div>
+                  <div className="skeleton-line detail-line"></div>
+                </div>
+                <div className="skeleton-qr"></div>
+              </div>
+            </div>
+          )}
           <iframe
             ref={iframeRef}
             src="/bjp_card_design.html?v=2"
@@ -173,6 +304,8 @@ export const FlipCard3D = forwardRef(function FlipCard3D(
               transformOrigin: 'top left',
               pointerEvents: 'none',
               maxWidth: 'none',
+              opacity: loading ? 0 : 1,
+              transition: 'opacity 0.3s ease'
             }}
             onLoad={handleIframeLoad}
           />

@@ -117,7 +117,7 @@
   display: inline-block;
   width: 6px;
   height: 6px;
-  background-color: var(--color-signal-mint);
+  background-color: #2ecc71;
   border-radius: 50%;
 }
 

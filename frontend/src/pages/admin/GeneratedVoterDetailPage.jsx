@@ -118,7 +118,7 @@ export default function GeneratedVoterDetailPage() {
         
         {/* Photo Avatar */}
         {v.photo_url ? (
-          <img src={v.photo_url} alt="Profile" style={{
+          <img src={v.photo_url} crossOrigin="anonymous" alt="Profile" style={{
             width: 100,
             height: 120,
             borderRadius: 12,
@@ -178,7 +178,7 @@ export default function GeneratedVoterDetailPage() {
         {/* Action verify button */}
         <div style={{ zIndex: 2 }}>
           {v.epic_no && (
-            <a href={`https://tamilnadubjp.live/verify/${v.epic_no}`} target="_blank" rel="noreferrer" className="btn-action btn-view" style={{
+            <a href={`https://tamilnadubjp.live/verify/${v.wtl_code || v.epic_no}`} target="_blank" rel="noreferrer" className="btn-action btn-view" style={{
               padding: '10px 20px',
               borderRadius: 'var(--radius-buttons)',
               fontWeight: '600',
@@ -325,18 +325,6 @@ export default function GeneratedVoterDetailPage() {
                   <i className="bi bi-info-circle" style={{ fontSize: 18, color: 'var(--text-secondary)' }} />
                   <span>This member has <strong>not requested</strong> to become an Organizer.</span>
                 </div>
-                <button
-                  className="btn-action btn-confirm"
-                  style={{ width: '100%', padding: '10px', fontSize: 13, borderRadius: 'var(--radius-buttons)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, border: 'none', background: '#2e7d32', color: '#fff', cursor: 'pointer', fontWeight: 600 }}
-                  onClick={() => handleAction('volunteer', 'confirm')}
-                  disabled={actionLoading.volunteer}
-                >
-                  {actionLoading.volunteer === 'confirm' ? (
-                    <span className="spinner-border spinner-border-sm" />
-                  ) : (
-                    <><i className="bi bi-check-circle" /> Make Organizer</>
-                  )}
-                </button>
               </div>
             </div>
           )}
@@ -424,18 +412,6 @@ export default function GeneratedVoterDetailPage() {
                   <i className="bi bi-info-circle" style={{ fontSize: 18, color: 'var(--text-secondary)' }} />
                   <span>This member has <strong>not requested</strong> to become a Booth Agent.</span>
                 </div>
-                <button
-                  className="btn-action btn-confirm"
-                  style={{ width: '100%', padding: '10px', fontSize: 13, borderRadius: 'var(--radius-buttons)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, border: 'none', background: '#f26522', color: '#fff', cursor: 'pointer', fontWeight: 600 }}
-                  onClick={() => handleAction('booth_agent', 'confirm')}
-                  disabled={actionLoading.booth_agent}
-                >
-                  {actionLoading.booth_agent === 'confirm' ? (
-                    <span className="spinner-border spinner-border-sm" />
-                  ) : (
-                    <><i className="bi bi-check-circle" /> Make Booth Agent</>
-                  )}
-                </button>
               </div>
             </div>
           )}

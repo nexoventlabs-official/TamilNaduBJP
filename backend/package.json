@@ -14,10 +14,12 @@
     "send:card": "node scripts/send-card-to-whatsapp.js"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1084.0",
+    "@aws-sdk/s3-request-presigner": "^3.1084.0",
+    "@sentry/node": "^8.18.0",
     "@sparticuz/chromium": "^149.0.0",
     "axios": "^1.6.2",
     "bcryptjs": "^2.4.3",
-    "cloudinary": "^2.0.1",
     "connect-mongo": "^5.1.0",
     "cors": "^2.8.5",
     "crypto": "^1.0.1",

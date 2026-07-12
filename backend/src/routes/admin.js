@@ -10,7 +10,7 @@ const { requireAdminAuth } = require('../middleware/auth');
 const { adminLoginLimiter } = require('../middleware/rateLimiter');
 const { LoginAttemptTracker } = require('../utils/security');
 const { sanitizeSearch } = require('../utils/validators');
-const { getUsageStats } = require('../services/cloudinaryService');
+const { getPhotoPresignedUrl } = require('../services/backblazeService');
 const config = require('../config');
 const { getDb, getVoterDb, getVoterTotalCount, findVoterByEpic } = require('../db');
 
@@ -74,6 +74,11 @@ router.post('/api/login', adminLoginLimiter, async (req, res) => {
   }
 
   loginTracker.recordAttempt(ip, username, false);
+  const Sentry = require('@sentry/node');
+  Sentry.captureMessage(`Failed admin login attempt: '${username}' from IP ${ip}`, {
+    level: 'warning',
+    extra: { ip, username }
+  });
   return res.status(401).json({ success: false, message: 'Invalid credentials.' });
 });
 
@@ -243,7 +248,7 @@ router.get('/api/voters', async (req, res) => {
         const stat = await db.collection('generation_stats').findOne({ epic_no: voter.epic_no }) || {};
         voter.gen_count      = stat.count || 0;
         voter.last_generated = stat.last_generated ? String(stat.last_generated).slice(0, 19).replace('T', ' ') : '';
-        voter.photo_url      = stat.photo_url  || '';
+        voter.photo_url      = await getPhotoPresignedUrl(stat.photo_url  || '');
         voter.card_url       = stat.card_url   || '';
         voter.auth_mobile    = stat.auth_mobile || '';
         
@@ -341,7 +346,7 @@ router.get('/api/voters', async (req, res) => {
       const s = statsMap[v.epic_no] || {};
       v.gen_count      = s.count || 0;
       v.last_generated = s.last_generated ? String(s.last_generated).slice(0, 19).replace('T', ' ') : '';
-      v.photo_url      = s.photo_url  || '';
+      v.photo_url      = await getPhotoPresignedUrl(s.photo_url  || '');
       v.card_url       = s.card_url   || '';
       v.auth_mobile    = s.auth_mobile || '';
     }
@@ -378,7 +383,7 @@ router.get('/api/voters/:epicNo', async (req, res) => {
 
     voter.gen_count      = stat.count || 0;
     voter.last_generated = stat.last_generated ? String(stat.last_generated).slice(0, 19).replace('T', ' ') : '';
-    voter.photo_url      = stat.photo_url  || genDoc.photo_url  || '';
+    voter.photo_url      = await getPhotoPresignedUrl(stat.photo_url  || genDoc.photo_url  || '');
     voter.card_url       = stat.card_url   || genDoc.card_url   || '';
     voter.wtl_code       = genDoc.wtl_code || '';
     const mob            = stat.auth_mobile || '';
@@ -432,6 +437,8 @@ router.get('/api/generated-voters', async (req, res) => {
     const assemblies = await getDistinctCached(db, 'generated_voters', 'ASSEMBLY_NAME');
     const districts  = await getDistinctCached(db, 'generated_voters', 'DISTRICT_NAME');
 
+    await presignPhotoUrls(voters);
+
     return res.json({
       voters, total, page: saferPage, per_page: perPage,
       total_pages: totalPages, assemblies, districts, cursor_mode: false,
@@ -453,8 +460,11 @@ router.get('/api/generated-voters/:wtlCode', async (req, res) => {
     if (!doc) return res.status(404).json({ success: false, message: 'Not found.' });
 
     const voter    = genDocToDict(doc);
+    voter.photo_url = await getPhotoPresignedUrl(voter.photo_url || '');
     const referred = await db.collection('generated_voters')
       .find({ referred_by_wtl: req.params.wtlCode }).sort({ generated_at: -1 }).toArray();
+    const referredFormatted = referred.map(genDocToDict);
+    await presignPhotoUrls(referredFormatted);
     const volReq  = await db.collection('volunteer_requests').findOne({ wtl_code: req.params.wtlCode }) || null;
     const baReq   = await db.collection('booth_agent_requests').findOne({ wtl_code: req.params.wtlCode }) || null;
     const meetReq = await db.collection('appointments').findOne({ wtl_code: req.params.wtlCode }) || null;
@@ -462,7 +472,7 @@ router.get('/api/generated-voters/:wtlCode', async (req, res) => {
     return res.json({
       success: true,
       voter,
-      referred: referred.map(genDocToDict),
+      referred: referredFormatted,
       volunteer_req:   serialiseDoc(volReq),
       booth_agent_req: serialiseDoc(baReq),
       meet_req:        serialiseDoc(meetReq),
@@ -506,6 +516,7 @@ router.get('/api/volunteer-requests', async (req, res) => {
       };
     });
 
+    await presignPhotoUrls(enrichedItems);
     return res.json({ items: enrichedItems, requests: enrichedItems, total, page, per_page: perPage, total_pages: totalPages });
   } catch (err) {
     console.error('volunteer-requests error:', err);
@@ -608,6 +619,7 @@ router.get('/api/confirmed-volunteers', async (req, res) => {
       };
     });
 
+    await presignPhotoUrls(enrichedItems);
     return res.json({ items: enrichedItems, volunteers: enrichedItems, total, page, per_page: perPage, total_pages: totalPages });
   } catch (err) {
     console.error('confirmed-volunteers error:', err);
@@ -648,6 +660,7 @@ router.get('/api/booth-agent-requests', async (req, res) => {
       };
     });
 
+    await presignPhotoUrls(enrichedItems);
     return res.json({ items: enrichedItems, requests: enrichedItems, total, page, per_page: perPage, total_pages: totalPages });
   } catch (err) {
     console.error('booth-agent-requests error:', err);
@@ -752,6 +765,7 @@ router.get('/api/confirmed-booth-agents', async (req, res) => {
       };
     });
 
+    await presignPhotoUrls(enrichedItems);
     return res.json({ items: enrichedItems, agents: enrichedItems, total, page, per_page: perPage, total_pages: totalPages });
   } catch (err) {
     console.error('confirmed-booth-agents error:', err);
@@ -826,6 +840,16 @@ function genDocToDict(doc) {
   base.MOBILE_NO              = doc.MOBILE_NO || '';
   base.local_body_interest    = doc.local_body_interest || null;
   return base;
+}
+
+/** Batch-presign photo_url fields in an array of objects */
+async function presignPhotoUrls(items) {
+  await Promise.all(items.map(async (item) => {
+    if (item && item.photo_url) {
+      item.photo_url = await getPhotoPresignedUrl(item.photo_url);
+    }
+  }));
+  return items;
 }
 
 function serialiseDoc(doc) {
@@ -1194,6 +1218,7 @@ router.get('/api/local-body', async (req, res) => {
       local_body_interest: v.local_body_interest || 'not_answered'
     }));
 
+    await presignPhotoUrls(formatted);
     return res.json({ success: true, total, data: formatted });
   } catch (err) {
     console.error('Local-body api error:', err);
@@ -1264,6 +1289,7 @@ router.get('/api/meet-requests', async (req, res) => {
       };
     });
 
+    await presignPhotoUrls(formatted);
     return res.json({ success: true, total, data: formatted });
   } catch (err) {
     console.error('Meet requests api error:', err);

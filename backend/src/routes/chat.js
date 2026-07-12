@@ -23,7 +23,7 @@ const crypto   = require('crypto');
 const { validateMobile, validateEpic, validatePin, validateOtp } = require('../utils/validators');
 const { hashPin, verifyPin } = require('../utils/security');
 const { sendOtp } = require('../services/smsService');
-const { uploadPhoto, uploadCard, uploadBackCard, uploadCombinedCard } = require('../services/cloudinaryService');
+const { uploadPhoto, uploadCard, uploadBackCard, uploadCombinedCard, getPhotoPresignedUrl } = require('../services/backblazeService');
 const { generateCard, generateBackCard, generateCombinedCard } = require('../services/cardGenerator');
 const {
   chatOtpLimiter,
@@ -226,7 +226,15 @@ router.post('/verify-otp', chatVerifyOtpLimiter, async (req, res) => {
     // Check if user already has a card
     const stat   = await db.collection('generation_stats').findOne({ auth_mobile: mobile });
     const genDoc = await db.collection('generated_voters').findOne(
-      { MOBILE_NO: mobile }, { sort: { generated_at: -1 } }
+      {
+        $or: [
+          { MOBILE_NO: mobile },
+          { mobile: mobile },
+          { MOBILE_NO: Number(mobile) },
+          { MOBILE_NO: "91" + mobile }
+        ]
+      },
+      { sort: { generated_at: -1 } }
     );
 
     if ((stat && stat.card_url) || (genDoc && genDoc.card_url)) {
@@ -240,7 +248,7 @@ router.post('/verify-otp', chatVerifyOtpLimiter, async (req, res) => {
         card_url:   s.card_url || g.card_url  || '',
         back_url:   s.back_url || g.back_url  || '',
         voter_name: name,
-        photo_url:  g.photo_url || '',
+        photo_url:  await getPhotoPresignedUrl(g.photo_url || ''),
         wtl_code:   g.wtl_code  || '',
       });
     }
@@ -265,29 +273,16 @@ router.post('/check-mobile', async (req, res) => {
 
     // Primary lookup: by MOBILE_NO (web registrations)
     let genDoc = await db.collection('generated_voters').findOne(
-      { MOBILE_NO: mobile }, { sort: { generated_at: -1 } }
+      {
+        $or: [
+          { MOBILE_NO: mobile },
+          { mobile: mobile },
+          { MOBILE_NO: Number(mobile) },
+          { MOBILE_NO: "91" + mobile }
+        ]
+      },
+      { sort: { generated_at: -1 } }
     );
-
-    // Fallback: WhatsApp registrations may have card but MOBILE_NO not indexed by web
-    // Check pending_registrations for the EPIC, then look up generated_voters by EPIC
-    if (!genDoc) {
-      const pending = await db.collection('pending_registrations').findOne(
-        { mobile }, { projection: { epic_no: 1, status: 1 } }
-      );
-      if (pending?.epic_no) {
-        const byEpic = await db.collection('generated_voters').findOne(
-          { EPIC_NO: pending.epic_no }
-        );
-        if (byEpic) {
-          genDoc = byEpic;
-          // Backfill MOBILE_NO so future lookups are instant
-          db.collection('generated_voters').updateOne(
-            { EPIC_NO: pending.epic_no },
-            { $set: { MOBILE_NO: mobile } }
-          ).catch(() => {});
-        }
-      }
-    }
 
     const hasCard = Boolean(genDoc || (stat && stat.epic_no));
 
@@ -307,7 +302,7 @@ router.post('/check-mobile', async (req, res) => {
         card_url:      g.card_url || '',
         back_url:      g.back_url || '',
         combined_url:  g.combined_url || g.card_url || '',
-        photo_url:     g.photo_url || '',
+        photo_url:     await getPhotoPresignedUrl(g.photo_url || ''),
         wtl_code:      g.wtl_code || '',
         referral_link: g.referral_link || '',
         referred_count: g.referred_members_count || 0,
@@ -393,7 +388,14 @@ router.post('/verify-pin', chatVerifyPinLimiter, async (req, res) => {
       return res.status(400).json({ success: false, message: 'Invalid PIN. Please try again.' });
     }
 
-    const genDoc = await db.collection('generated_voters').findOne({ MOBILE_NO: mobile });
+    const genDoc = await db.collection('generated_voters').findOne({
+      $or: [
+        { MOBILE_NO: mobile },
+        { mobile: mobile },
+        { MOBILE_NO: Number(mobile) },
+        { MOBILE_NO: "91" + mobile }
+      ]
+    });
     const name   = genDoc ? `${genDoc.FM_NAME_EN || ''} ${genDoc.LASTNAME_EN || ''}`.trim() : '';
 
     // Set verified session upon PIN verification
@@ -406,7 +408,7 @@ router.post('/verify-pin', chatVerifyPinLimiter, async (req, res) => {
       epic_no:    stat.epic_no || '',
       card_url:   stat.card_url || '',
       voter_name: name,
-      photo_url:  genDoc?.photo_url || '',
+      photo_url:  await getPhotoPresignedUrl(genDoc?.photo_url || ''),
       referral_link: genDoc?.referral_link || '',
     });
   } catch (err) {
@@ -425,7 +427,14 @@ router.post('/forgot-pin', chatOtpLimiter, async (req, res) => {
 
     const db      = getDb();
     const hasAcct = (await db.collection('generation_stats').findOne({ auth_mobile: mobile })) ||
-                    (await db.collection('generated_voters').findOne({ MOBILE_NO: mobile }));
+                    (await db.collection('generated_voters').findOne({
+                      $or: [
+                        { MOBILE_NO: mobile },
+                        { mobile: mobile },
+                        { MOBILE_NO: Number(mobile) },
+                        { MOBILE_NO: "91" + mobile }
+                      ]
+                    }));
 
     if (!hasAcct) {
       return res.status(404).json({ success: false, message: 'No account found for this mobile.' });
@@ -533,12 +542,26 @@ router.post('/reset-pin', chatVerifyOtpLimiter, async (req, res) => {
 
     const hashed = hashPin(newPin);
     await db.collection('generation_stats').updateOne({ auth_mobile: mobile }, { $set: { secret_pin: hashed } });
-    await db.collection('generated_voters').updateMany({ MOBILE_NO: mobile },  { $set: { secret_pin: hashed } });
+    await db.collection('generated_voters').updateMany({
+      $or: [
+        { MOBILE_NO: mobile },
+        { mobile: mobile },
+        { MOBILE_NO: Number(mobile) },
+        { MOBILE_NO: "91" + mobile }
+      ]
+    },  { $set: { secret_pin: hashed } });
     // Delete OTP session after successful pin reset
     await db.collection('otp_sessions').deleteOne({ mobile });
 
     const stat   = await db.collection('generation_stats').findOne({ auth_mobile: mobile });
-    const genDoc = await db.collection('generated_voters').findOne({ MOBILE_NO: mobile });
+    const genDoc = await db.collection('generated_voters').findOne({
+      $or: [
+        { MOBILE_NO: mobile },
+        { mobile: mobile },
+        { MOBILE_NO: Number(mobile) },
+        { MOBILE_NO: "91" + mobile }
+      ]
+    });
     const name   = genDoc ? `${genDoc.FM_NAME_EN || ''} ${genDoc.LASTNAME_EN || ''}`.trim() : '';
 
     return res.json({
@@ -547,7 +570,7 @@ router.post('/reset-pin', chatVerifyOtpLimiter, async (req, res) => {
       epic_no:    (stat || {}).epic_no  || '',
       card_url:   (stat || {}).card_url || '',
       voter_name: name,
-      photo_url:  genDoc?.photo_url || '',
+      photo_url:  await getPhotoPresignedUrl(genDoc?.photo_url || ''),
     });
   } catch (err) {
     console.error('reset-pin error:', err.message);
@@ -581,7 +604,14 @@ router.post('/set-pin', async (req, res) => {
     } else {
       await db.collection('generation_stats').updateOne({ auth_mobile: mobile }, { $set: { secret_pin: hashed } });
     }
-    await db.collection('generated_voters').updateMany({ MOBILE_NO: mobile }, { $set: { secret_pin: hashed } });
+    await db.collection('generated_voters').updateMany({
+      $or: [
+        { MOBILE_NO: mobile },
+        { mobile: mobile },
+        { MOBILE_NO: Number(mobile) },
+        { MOBILE_NO: "91" + mobile }
+      ]
+    }, { $set: { secret_pin: hashed } });
 
     return res.json({ success: true });
   } catch (err) {
@@ -606,10 +636,20 @@ router.post('/validate-epic', chatValidateEpicLimiter, async (req, res) => {
 
     if (mobile) {
       const otherEpic = await db.collection('generated_voters').findOne({
-        MOBILE_NO: mobile,
+        $or: [
+          { MOBILE_NO: mobile },
+          { mobile: mobile },
+          { MOBILE_NO: Number(mobile) },
+          { MOBILE_NO: "91" + mobile }
+        ],
         EPIC_NO: { $ne: epicNo }
       });
       if (otherEpic) {
+        const Sentry = require('@sentry/node');
+        Sentry.captureMessage(`Registration duplicate check warning: Mobile ${mobile} tried to register EPIC ${epicNo} but is already bound to EPIC ${otherEpic.EPIC_NO}`, {
+          level: 'warning',
+          extra: { mobile, attemptedEpic: epicNo, registeredEpic: otherEpic.EPIC_NO }
+        });
         return res.status(400).json({
           success: false,
           message: 'This mobile number is already registered under a different EPIC number.'
@@ -618,10 +658,23 @@ router.post('/validate-epic', chatValidateEpicLimiter, async (req, res) => {
     }
 
     const existing = await db.collection('generated_voters').findOne(
-      { EPIC_NO: epicNo, MOBILE_NO: mobile },
+      {
+        EPIC_NO: epicNo,
+        $or: [
+          { MOBILE_NO: mobile },
+          { mobile: mobile },
+          { MOBILE_NO: Number(mobile) },
+          { MOBILE_NO: "91" + mobile }
+        ]
+      },
       { projection: { card_url: 1, back_url: 1, combined_url: 1, photo_url: 1, wtl_code: 1, VOTER_NAME: 1, ASSEMBLY_NAME: 1, DISTRICT_NAME: 1, PART_NO: 1, referral_link: 1 } },
     );
     if (existing?.photo_url) {
+      const Sentry = require('@sentry/node');
+      Sentry.captureMessage(`Already registered voter requested card again: EPIC ${epicNo}`, {
+        level: 'info',
+        extra: { epicNo, wtlCode: existing.wtl_code, mobile }
+      });
       return res.status(409).json({
         success:     false,
         already_registered: true,
@@ -629,7 +682,7 @@ router.post('/validate-epic', chatValidateEpicLimiter, async (req, res) => {
         card_url:    existing.card_url,
         back_url:    existing.back_url    || '',
         combined_url: existing.combined_url || '',
-        photo_url:   existing.photo_url   || '',
+        photo_url:   await getPhotoPresignedUrl(existing.photo_url   || ''),
         wtl_code:    existing.wtl_code    || '',
         voter_name:  existing.VOTER_NAME  || '',
         epic_no:     epicNo,
@@ -642,6 +695,11 @@ router.post('/validate-epic', chatValidateEpicLimiter, async (req, res) => {
 
     const doc = await findVoterByEpic(epicNo);
     if (!doc) {
+      const Sentry = require('@sentry/node');
+      Sentry.captureMessage(`EPIC validation lookup failed: ${epicNo} not found in database`, {
+        level: 'warning',
+        extra: { epicNo, mobile }
+      });
       return res.status(404).json({ success: false, message: 'EPIC Number not found. Please check and try again.' });
     }
 
@@ -679,10 +737,15 @@ router.post('/generate-card', chatGenerateCardLimiter, upload.single('photo'), a
     const mobile      = req.session.verified_mobile || String(req.body.mobile || '').trim() || '';
 
     // ── Hard block: one card per mobile number ───────────────────────────────────
-    const existingCard = await db.collection('generated_voters').findOne(
-      { MOBILE_NO: mobile, photo_url: { $exists: true, $ne: '' } },
-      { projection: { card_url: 1, back_url: 1, combined_url: 1, photo_url: 1, wtl_code: 1, referral_link: 1, VOTER_NAME: 1, EPIC_NO: 1, ASSEMBLY_NAME: 1, DISTRICT_NAME: 1, PART_NO: 1 } },
-    );
+    const existingCard = await db.collection('generated_voters').findOne({
+      $or: [
+        { MOBILE_NO: mobile },
+        { mobile: mobile },
+        { MOBILE_NO: Number(mobile) },
+        { MOBILE_NO: "91" + mobile }
+      ],
+      photo_url: { $exists: true, $ne: '' }
+    }, { projection: { card_url: 1, back_url: 1, combined_url: 1, photo_url: 1, wtl_code: 1, referral_link: 1, VOTER_NAME: 1, EPIC_NO: 1, ASSEMBLY_NAME: 1, DISTRICT_NAME: 1, PART_NO: 1 } });
     if (existingCard?.photo_url) {
       if (existingCard.EPIC_NO !== epicNo) {
         return res.status(400).json({
@@ -697,7 +760,7 @@ router.post('/generate-card', chatGenerateCardLimiter, upload.single('photo'), a
         card_url:           existingCard.card_url,
         back_url:           existingCard.back_url      || '',
         combined_url:       existingCard.combined_url  || '',
-        photo_url:          existingCard.photo_url     || '',
+        photo_url:          await getPhotoPresignedUrl(existingCard.photo_url     || ''),
         wtl_code:           existingCard.wtl_code      || '',
         referral_link:      existingCard.referral_link || '',
         voter_name:         existingCard.VOTER_NAME    || '',
@@ -741,9 +804,15 @@ router.post('/generate-card', chatGenerateCardLimiter, upload.single('photo'), a
 
     try {
       // Preserve existing wtl_code to protect referral links
-      const existingGen = await db.collection('generated_voters').findOne(
-        { EPIC_NO: epicNo, MOBILE_NO: mobile }, { projection: { wtl_code: 1, referral_id: 1, referral_link: 1 } }
-      );
+      const existingGen = await db.collection('generated_voters').findOne({
+        EPIC_NO: epicNo,
+        $or: [
+          { MOBILE_NO: mobile },
+          { mobile: mobile },
+          { MOBILE_NO: Number(mobile) },
+          { MOBILE_NO: "91" + mobile }
+        ]
+      }, { projection: { wtl_code: 1, referral_id: 1, referral_link: 1 } });
       const wtlCode   = existingGen?.wtl_code || generateWtlCode();
       const config    = require('../config');
 
@@ -777,7 +846,7 @@ router.post('/generate-card', chatGenerateCardLimiter, upload.single('photo'), a
       const referralId   = existingGen?.referral_id   || ('REF-' + crypto.randomBytes(4).toString('hex').toUpperCase());
       const referralBase = config.baseUrl;
       const referralLink = `${referralBase}/refer/${wtlCode}/${referralId}`;
-      const verifyUrl = `${config.baseUrl}/verify/${epicNo}`;
+      const verifyUrl = `${config.baseUrl}/verify/${wtlCode || epicNo}`;
 
 
       const voterData = {
@@ -870,7 +939,7 @@ router.post('/generate-card', chatGenerateCardLimiter, upload.single('photo'), a
         card_url:      cardUrl,
         back_url:      backUrl,
         combined_url:  combinedUrl,
-        photo_url:     photoUrl,
+        photo_url:     await getPhotoPresignedUrl(photoUrl),
         epic_no:       epicNo,
         voter_name:    voter.name,
         assembly_name: voter.assembly_name,
@@ -879,6 +948,7 @@ router.post('/generate-card', chatGenerateCardLimiter, upload.single('photo'), a
         wtl_code:      wtlCode,
         referral_id:   referralId,
         referral_link: referralLink,
+        created_at:    now,
         message:       'Card generated successfully',
       });
     } finally {
@@ -903,18 +973,31 @@ router.get('/profile/:epicNo', async (req, res) => {
     if (!valid) return res.status(400).json({ success: false, message: 'Invalid EPIC format' });
 
     const db     = getDb();
-    const mobile = req.session.verified_mobile;
+    const sessionMobile = req.session.verified_mobile;
+    const queryMobile = req.query.mobile;
+    const mobile = sessionMobile || queryMobile;
 
     // Try voter DB first; fall back to app DB if voter not indexed in DB1
     const rawVoter = await findVoterByEpic(epicNo);
     const voter    = rawVoter ? normaliseVoter(rawVoter) : null;
 
-    // App DB lookups — by session mobile or by EPIC
-    const genByMobile = mobile
-      ? await db.collection('generated_voters').findOne({ MOBILE_NO: mobile }) || {}
-      : {};
-    const genByEpic   = await db.collection('generated_voters').findOne({ EPIC_NO: epicNo }) || {};
-    const genDoc      = (genByMobile.EPIC_NO === epicNo ? genByMobile : genByEpic) || {};
+    // App DB lookups — by session/query mobile or fallback to EPIC
+    let genDoc = {};
+    if (mobile) {
+      genDoc = await db.collection('generated_voters').findOne({
+        EPIC_NO: epicNo,
+        $or: [
+          { MOBILE_NO: mobile },
+          { mobile: mobile },
+          { MOBILE_NO: Number(mobile) },
+          { MOBILE_NO: "91" + mobile }
+        ]
+      }) || {};
+    }
+
+    if (!genDoc.EPIC_NO) {
+      genDoc = await db.collection('generated_voters').findOne({ EPIC_NO: epicNo }, { sort: { generated_at: -1 } }) || {};
+    }
 
     const stat = mobile
       ? await db.collection('generation_stats').findOne({ auth_mobile: mobile }) || {}
@@ -925,8 +1008,26 @@ router.get('/profile/:epicNo', async (req, res) => {
     const assembly = voter?.assembly_name || genDoc.ASSEMBLY_NAME || '';
     const district = voter?.district      || genDoc.DISTRICT_NAME || genDoc.DISTRICT || '';
 
-    if (!name && !assembly) {
-      return res.status(404).json({ success: false, message: 'Profile not found' });
+    const rawMob = String(genDoc.MOBILE_NO || genDoc.mobile || mob || '').trim();
+    const maskedMobile = rawMob.length >= 4 
+      ? `${'*'.repeat(rawMob.length - 4)}${rawMob.slice(-4)}` 
+      : rawMob;
+
+    let appreciation_earned_at = genDoc.appreciation_earned_at || null;
+    if ((genDoc.referred_members_count || 0) >= 5 && !appreciation_earned_at && genDoc.wtl_code) {
+      const referrals = await db.collection('generated_voters')
+        .find({ referred_by_wtl: genDoc.wtl_code })
+        .sort({ created_at: 1 })
+        .skip(4)
+        .limit(1)
+        .toArray();
+      if (referrals.length > 0) {
+        appreciation_earned_at = referrals[0].created_at;
+        await db.collection('generated_voters').updateOne(
+          { _id: genDoc._id },
+          { $set: { appreciation_earned_at } }
+        );
+      }
     }
 
     return res.json({
@@ -939,8 +1040,13 @@ router.get('/profile/:epicNo', async (req, res) => {
       card_url:           stat.card_url     || genDoc.card_url     || '',
       back_url:           stat.back_url     || genDoc.back_url     || '',
       combined_url:       stat.combined_url || genDoc.combined_url || '',
-      photo_url:          stat.photo_url    || genDoc.photo_url    || '',
+      photo_url:          await getPhotoPresignedUrl(genDoc.photo_url    || stat.photo_url    || ''),
       auth_mobile_masked: mob.length >= 4 ? `****${mob.slice(-4)}` : '',
+      referral_link:      genDoc.referral_link || '',
+      referral_id:        genDoc.referral_id   || '',
+      mobile:             maskedMobile,
+      created_at:         genDoc.created_at || genDoc.generated_at || null,
+      appreciation_earned_at: appreciation_earned_at
     });
   } catch (err) {
     console.error('profile error:', err.message);
@@ -1077,7 +1183,7 @@ router.get('/my-members/:wtlCode', async (req, res) => {
       name:          rootDoc.VOTER_NAME || `${rootDoc.FM_NAME_EN || ''} ${rootDoc.LASTNAME_EN || ''}`.trim() || 'A Member',
       epic_no:       rootDoc.EPIC_NO || '',
       wtl_code:      rootDoc.wtl_code || '',
-      photo_url:     rootDoc.photo_url || '',
+      photo_url:     await getPhotoPresignedUrl(rootDoc.photo_url || ''),
       assembly_name: rootDoc.ASSEMBLY_NAME || '',
       district:      rootDoc.DISTRICT_NAME || '',
       part_no:       rootDoc.PART_NO || '',
@@ -1105,40 +1211,38 @@ router.get('/my-members/:wtlCode', async (req, res) => {
         .toArray();
     }
 
-    // Map Layer 3 members by their referrer's WTL code
+    // Map Layer 3 members by their referrer's WTL code (with presigned photos)
     const layer3Map = {};
-    for (const m3 of layer3Docs) {
+    await Promise.all(layer3Docs.map(async (m3) => {
       const parentWtl = m3.referred_by_wtl;
-      if (!layer3Map[parentWtl]) {
-        layer3Map[parentWtl] = [];
-      }
+      if (!layer3Map[parentWtl]) layer3Map[parentWtl] = [];
       layer3Map[parentWtl].push({
         name:          m3.VOTER_NAME || `${m3.FM_NAME_EN || ''} ${m3.LASTNAME_EN || ''}`.trim() || 'A Member',
         epic_no:       m3.EPIC_NO || '',
         wtl_code:      m3.wtl_code || '',
-        photo_url:     m3.photo_url || '',
+        photo_url:     await getPhotoPresignedUrl(m3.photo_url || ''),
         assembly_name: m3.ASSEMBLY_NAME || '',
         district:      m3.DISTRICT_NAME || '',
         part_no:       m3.PART_NO || '',
         generated_at:  m3.generated_at || null,
       });
-    }
+    }));
 
-    // Build the tree
-    const tree = layer2Docs.map(m2 => {
+    // Build the tree (with presigned photos for layer 2)
+    const tree = await Promise.all(layer2Docs.map(async (m2) => {
       const w2 = m2.wtl_code;
       return {
         name:          m2.VOTER_NAME || `${m2.FM_NAME_EN || ''} ${m2.LASTNAME_EN || ''}`.trim() || 'A Member',
         epic_no:       m2.EPIC_NO || '',
         wtl_code:      w2 || '',
-        photo_url:     m2.photo_url || '',
+        photo_url:     await getPhotoPresignedUrl(m2.photo_url || ''),
         assembly_name: m2.ASSEMBLY_NAME || '',
         district:      m2.DISTRICT_NAME || '',
         part_no:       m2.PART_NO || '',
         generated_at:  m2.generated_at || null,
         referrals:     layer3Map[w2] || [],
       };
-    });
+    }));
 
     return res.json({ success: true, root, tree });
   } catch (err) {
@@ -1285,18 +1389,18 @@ router.get('/best-performers', async (req, res) => {
       .limit(5)
       .toArray();
 
-    const result = performers.map((p, index) => ({
+    const result = await Promise.all(performers.map(async (p, index) => ({
       rank:                 index + 1,
       name:                 p.VOTER_NAME || `${p.FM_NAME_EN || ''} ${p.LASTNAME_EN || ''}`.trim() || 'BJP Member',
       referred_count:       p.referred_members_count || 0,
       referrals:            p.referred_members_count || 0,
       wtl_code:             p.wtl_code || '',
-      photo_url:            p.photo_url || '',
+      photo_url:            await getPhotoPresignedUrl(p.photo_url || ''),
       epic_no:              p.EPIC_NO || '',
       assembly_name:        p.ASSEMBLY_NAME || '',
       district:             p.DISTRICT_NAME || '',
       part_no:              p.PART_NO || ''
-    }));
+    })));
 
     return res.json({ success: true, performers: result });
   } catch (err) {
@@ -1327,6 +1431,23 @@ router.get('/member-status/:wtlCode', async (req, res) => {
     const volReq = await db.collection('volunteer_requests').findOne({ wtl_code: wtlCode });
     const baReq = await db.collection('booth_agent_requests').findOne({ wtl_code: wtlCode });
 
+    let appreciation_earned_at = voter.appreciation_earned_at || null;
+    if ((voter.referred_members_count || 0) >= 5 && !appreciation_earned_at) {
+      const referrals = await db.collection('generated_voters')
+        .find({ referred_by_wtl: wtlCode })
+        .sort({ created_at: 1 })
+        .skip(4)
+        .limit(1)
+        .toArray();
+      if (referrals.length > 0) {
+        appreciation_earned_at = referrals[0].created_at;
+        await db.collection('generated_voters').updateOne(
+          { _id: voter._id },
+          { $set: { appreciation_earned_at } }
+        );
+      }
+    }
+
     return res.json({
       success: true,
       referred_count: voter.referred_members_count || 0,
@@ -1334,7 +1455,9 @@ router.get('/member-status/:wtlCode', async (req, res) => {
       appointment: appointment ? { interest: appointment.interest } : null,
       local_body_interest: voter.local_body_interest || null,
       volunteer_status: volReq ? volReq.status : null,
-      booth_agent_status: baReq ? baReq.status : null
+      booth_agent_status: baReq ? baReq.status : null,
+      created_at: voter.created_at || voter.generated_at || null,
+      appreciation_earned_at: appreciation_earned_at
     });
   } catch (err) {
     console.error('member-status error:', err.message);

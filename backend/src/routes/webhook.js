@@ -26,7 +26,7 @@ const {
   sendCtaUrlMessage,
 } = require('../services/whatsappService');
 const { generateCard, generateBackCard } = require('../services/cardGenerator');
-const { uploadPhoto, uploadCard, uploadBackCard } = require('../services/cloudinaryService');
+const { uploadPhoto, uploadCard, uploadBackCard } = require('../services/backblazeService');
 
 const BTN_MY_CARD = 'btn_my_card';
 
@@ -340,12 +340,24 @@ async function handleImageMessage(from, mobile, imageInfo, db) {
     };
 
     const frontBuffer = await generateCard(voterData, photoBuffer);
-    const backBuffer  = await generateBackCard(voterData);
-
     const photoUrl = await uploadPhoto(photoBuffer,  epicNo, mobile);
-    const frontUrl = await uploadCard(frontBuffer,   epicNo, mobile);
-    const backUrl  = await uploadBackCard(backBuffer, epicNo, mobile);
 
+    const fs = require('fs');
+    const path = require('path');
+    const isProd = config.nodeEnv === 'production';
+    const tempCardsDir = isProd
+      ? '/var/www/bjptn/dist/cards'
+      : path.join(__dirname, '../../../frontend/dist/cards');
+
+    if (!fs.existsSync(tempCardsDir)) {
+      fs.mkdirSync(tempCardsDir, { recursive: true });
+    }
+
+    const fileName = `${wtlCode}-${epicNo}.png`;
+    const filePath = path.join(tempCardsDir, fileName);
+    fs.writeFileSync(filePath, frontBuffer);
+
+    const frontUrl = `${config.baseUrl}/cards/${fileName}`;
     const now = new Date();
 
     // Generate referral link for this new member
@@ -357,14 +369,14 @@ async function handleImageMessage(from, mobile, imageInfo, db) {
     const referredByRid = pending.referred_by_referral_id || '';
 
     await db.collection('generated_voters').updateOne(
-      { EPIC_NO: epicNo },
+      { MOBILE_NO: mobile },
       {
         $set: {
           EPIC_NO:                 epicNo,
           wtl_code:                wtlCode,
           photo_url:               photoUrl,
           card_url:                frontUrl,
-          back_url:                backUrl,
+          back_url:                '',
           combined_url:            frontUrl,
           generated_at:            now,
           VOTER_NAME:              pending.voter_name    || '',
@@ -408,8 +420,17 @@ async function handleImageMessage(from, mobile, imageInfo, db) {
     ].join('\n');
 
     await sendImageMessage(from, frontUrl, frontCaption);
-    await new Promise(function(r) { setTimeout(r, 1000); });
-    await sendImageMessage(from, backUrl, 'Your Digital Member ID Card -- BACK\n\nWe The Leaders -- Lead the Change');
+
+    // Clean up local temp card file after 60 seconds
+    setTimeout(() => {
+      fs.unlink(filePath, (err) => {
+        if (err && err.code !== 'ENOENT') {
+          console.error(`[Webhook] Failed to delete temp card: ${filePath}`, err.message);
+        } else {
+          console.log(`[Webhook] Temporary card deleted: ${filePath}`);
+        }
+      });
+    }, 60000);
 
     const welcomeName = pending.voter_name || 'Member';
     await new Promise(function(r) { setTimeout(r, 800); });

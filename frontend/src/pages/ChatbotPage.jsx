@@ -412,7 +412,7 @@ function GeneratedCardMsg({ card, isNew = false }) {  const c = card || {}
     if (hasName && hasAssembly) {
       setFullCardData(c)
     } else if (c.epic_no) {
-      publicApi.getCardData(c.epic_no)
+      publicApi.getCardData(c.wtl_code || c.epic_no)
         .then((data) => setFullCardData(data))
         .catch(() => setFullCardData(c))
     }
@@ -429,31 +429,154 @@ function GeneratedCardMsg({ card, isNew = false }) {  const c = card || {}
           showActions={true}
         />
       ) : (
-        <div style={{
-          background: '#1f2c34', width: 300, height: 190,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          color: '#8696a0', fontSize: 12, borderRadius: 12,
-          border: '1px solid var(--color-graphite)'
-        }}>
-          Loading preview…
+        <div className="card-skeleton">
+          <style>{`
+            .card-skeleton {
+              background: #f9f8f6;
+              width: 300px;
+              height: 190px;
+              border-radius: 12px;
+              padding: 16px;
+              box-sizing: border-box;
+              display: flex;
+              flex-direction: column;
+              justify-content: space-between;
+              border: 1px solid rgba(0, 0, 0, 0.08);
+              overflow: hidden;
+            }
+
+            @keyframes pulse {
+              0%, 100% { opacity: 0.8; }
+              50% { opacity: 0.4; }
+            }
+
+            .skeleton-logo,
+            .skeleton-line,
+            .skeleton-photo,
+            .skeleton-qr {
+              background: rgba(0, 0, 0, 0.08);
+              border-radius: 4px;
+              animation: pulse 1.5s infinite ease-in-out;
+            }
+
+            .skeleton-header {
+              display: flex;
+              align-items: center;
+              gap: 12px;
+              height: 32px;
+            }
+
+            .skeleton-logo {
+              width: 28px;
+              height: 28px;
+              border-radius: 50%;
+            }
+
+            .skeleton-title-lines {
+              display: flex;
+              flex-direction: column;
+              gap: 6px;
+              flex: 1;
+            }
+
+            .title-l1 {
+              width: 60%;
+              height: 8px;
+            }
+
+            .title-l2 {
+              width: 40%;
+              height: 6px;
+            }
+
+            .skeleton-body {
+              display: flex;
+              align-items: center;
+              gap: 12px;
+              flex: 1;
+              margin-top: 14px;
+            }
+
+            .skeleton-photo {
+              width: 64px;
+              height: 78px;
+              border-radius: 6px;
+            }
+
+            .skeleton-details {
+              display: flex;
+              flex-direction: column;
+              gap: 8px;
+              flex: 1;
+            }
+
+            .detail-line {
+              width: 90%;
+              height: 6px;
+            }
+            .detail-line:nth-child(2) { width: 75%; }
+            .detail-line:nth-child(3) { width: 85%; }
+            .detail-line:nth-child(4) { width: 50%; }
+
+            .skeleton-qr {
+              width: 48px;
+              height: 48px;
+              border-radius: 6px;
+              align-self: flex-end;
+            }
+          `}</style>
+          <div className="skeleton-header">
+            <div className="skeleton-logo"></div>
+            <div className="skeleton-title-lines">
+              <div className="skeleton-line title-l1"></div>
+              <div className="skeleton-line title-l2"></div>
+            </div>
+          </div>
+          <div className="skeleton-body">
+            <div className="skeleton-photo"></div>
+            <div className="skeleton-details">
+              <div className="skeleton-line detail-line"></div>
+              <div className="skeleton-line detail-line"></div>
+              <div className="skeleton-line detail-line"></div>
+              <div className="skeleton-line detail-line"></div>
+            </div>
+            <div className="skeleton-qr"></div>
+          </div>
         </div>
       )}
     </div>
   )
 }
 
-function WelcomeLetterMsg({ name, date }) {
+function WelcomeLetterMsg({ name, date, autoDownload }) {
   const safeId = name.replace(/[^a-zA-Z0-9]/g, '-')
   
   const handlePrint = () => {
     const iframe = document.getElementById(`welcome-iframe-${safeId}`)
-    if (iframe && iframe.contentWindow) {
+    if (iframe && iframe.contentWindow && typeof iframe.contentWindow.downloadPDF === 'function') {
+      iframe.contentWindow.downloadPDF(`Welcome_Letter_${name}`)
+    } else if (iframe && iframe.contentWindow) {
       iframe.contentWindow.focus()
       iframe.contentWindow.print()
     }
   }
 
-  const letterUrl = `/Welcome_letter.html?name=${encodeURIComponent(name)}&date=${encodeURIComponent(date)}&hideControls=true`
+  const hasDownloaded = useRef(false)
+
+  useEffect(() => {
+    if (autoDownload && !hasDownloaded.current) {
+      const timer = setTimeout(() => {
+        const iframe = document.getElementById(`welcome-iframe-${safeId}`)
+        if (iframe && iframe.contentWindow && typeof iframe.contentWindow.downloadPDF === 'function') {
+          hasDownloaded.current = true
+          iframe.contentWindow.downloadPDF(`Welcome_Letter_${name}`)
+        }
+      }, 3500)
+      return () => clearTimeout(timer)
+    }
+  }, [autoDownload, name, safeId])
+
+  const letterUrl = `/Welcome_letter.html?name=${encodeURIComponent(name)}&date=${encodeURIComponent(date)}&lang=ta&hideControls=true&v=1.0.4`
 
   return (
     <div style={{
@@ -510,6 +633,14 @@ function WelcomeLetterMsg({ name, date }) {
             transformOrigin: 'top left'
           }} 
           title="Welcome Letter Preview"
+          onLoad={(e) => {
+            try {
+              const iframe = e.target;
+              const doc = iframe.contentDocument || iframe.contentWindow.document;
+              const controls = doc.querySelector('.controls-container');
+              if (controls) controls.style.display = 'none';
+            } catch(err) {}
+          }}
         />
       </div>
 
@@ -536,25 +667,196 @@ function WelcomeLetterMsg({ name, date }) {
           onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-1px)' }}
           onMouseLeave={(e) => { e.currentTarget.style.transform = 'none' }}
         >
-          <i className="bi bi-file-earmark-pdf-fill" /> Save as PDF / Print
+          <i className="bi bi-file-earmark-pdf-fill" /> Download PDF
         </button>
       </div>
     </div>
   )
 }
 
-function AppreciationLetterMsg({ name, date }) {
+function ReferralLinkMsg({ link }) {
+  const canvasRef = useRef(null)
+  const [copied, setCopied] = useState(false)
+  const [qrReady, setQrReady] = useState(false)
+
+  useEffect(() => {
+    if (!link || !canvasRef.current) return
+    const canvas = canvasRef.current
+    const size = 180
+    QRCode.toCanvas(canvas, link, {
+      width: size,
+      margin: 1,
+      color: { dark: '#000000', light: '#ffffff' },
+      errorCorrectionLevel: 'H'
+    }, (err) => {
+      if (err) return
+      const ctx = canvas.getContext('2d')
+      const img = new Image()
+      img.src = '/bjp_logo.svg'
+      img.onload = () => {
+        const logoSize = size * 0.22
+        const logoX = (size - logoSize) / 2
+        const logoY = (size - logoSize) / 2
+        ctx.save()
+        ctx.beginPath()
+        ctx.arc(size / 2, size / 2, logoSize * 0.62, 0, Math.PI * 2)
+        ctx.fillStyle = '#ffffff'
+        ctx.fill()
+        ctx.restore()
+        ctx.drawImage(img, logoX, logoY, logoSize, logoSize)
+        setQrReady(true)
+      }
+      img.onerror = () => setQrReady(true)
+    })
+  }, [link])
+
+  const handleCopyLink = () => {
+    navigator.clipboard?.writeText(link).catch(() => {})
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  const handleShareWhatsApp = () => {
+    if (!link) return
+    const shareText = `*🪷 Join BJP Tamil Nadu!*\n\n*Generate your free Digital Member ID Card here:*\n${link}`
+    if (navigator.canShare && canvasRef.current) {
+      canvasRef.current.toBlob((blob) => {
+        const file = new File([blob], 'bjp-referral-qr.png', { type: 'image/png' })
+        if (navigator.canShare({ files: [file] })) {
+          navigator.share({
+            title: '🪷 Join BJP Tamil Nadu!',
+            text: shareText,
+            files: [file]
+          }).catch(() => {
+            window.open(`https://wa.me/?text=${encodeURIComponent(shareText)}`, '_blank')
+          })
+          return
+        }
+        window.open(`https://wa.me/?text=${encodeURIComponent(shareText)}`, '_blank')
+      }, 'image/png', 1.0)
+    } else {
+      window.open(`https://wa.me/?text=${encodeURIComponent(shareText)}`, '_blank')
+    }
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, padding: '8px 4px' }}>
+      <div style={{ color: 'var(--color-ash)', fontSize: 13, textAlign: 'center', fontWeight: 500, lineHeight: 1.5 }}>
+        🪷 Here is your referral link and QR code! Share this to invite others and build your team:
+      </div>
+      
+      {/* QR Code */}
+      <div style={{ position: 'relative', display: 'inline-block' }}>
+        <div style={{
+          background: '#fff',
+          borderRadius: 12,
+          padding: 8,
+          boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
+          display: 'inline-block'
+        }}>
+          <canvas ref={canvasRef} style={{ display: 'block', borderRadius: 6, width: 180, height: 180 }} />
+        </div>
+        {!qrReady && (
+          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div className="spinner-border spinner-border-sm text-warning" />
+          </div>
+        )}
+      </div>
+
+      {/* Referral Link Box */}
+      <div style={{
+        background: 'rgba(255,255,255,0.06)',
+        border: '1px solid rgba(255,255,255,0.12)',
+        borderRadius: 8,
+        padding: '8px 12px',
+        fontSize: 12,
+        color: 'var(--color-chalk)',
+        wordBreak: 'break-all',
+        width: '100%',
+        textAlign: 'center',
+        fontFamily: 'monospace'
+      }}>
+        {link}
+      </div>
+
+      {/* Share / Copy Buttons */}
+      <div style={{ display: 'flex', gap: 8, width: '100%' }}>
+        <button
+          onClick={handleCopyLink}
+          style={{
+            flex: 1,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 6,
+            padding: '10px 14px',
+            borderRadius: 8,
+            border: '1px solid rgba(255,255,255,0.15)',
+            background: copied ? 'rgba(46,204,113,0.15)' : 'rgba(255,255,255,0.07)',
+            color: copied ? '#2ecc71' : 'var(--color-chalk)',
+            fontSize: 12,
+            fontWeight: 600,
+            cursor: 'pointer',
+            transition: 'all 0.2s'
+          }}
+        >
+          <i className={`bi bi-${copied ? 'check-lg' : 'clipboard'}`} />
+          {copied ? 'Copied!' : 'Copy Link'}
+        </button>
+        <button
+          onClick={handleShareWhatsApp}
+          style={{
+            flex: 1,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 6,
+            padding: '10px 14px',
+            borderRadius: 8,
+            border: 'none',
+            background: '#25d366',
+            color: '#fff',
+            fontSize: 12,
+            fontWeight: 600,
+            cursor: 'pointer'
+          }}
+        >
+          <i className="bi bi-whatsapp" /> Share WhatsApp
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function AppreciationLetterMsg({ name, date, autoDownload }) {
   const safeId = name.replace(/[^a-zA-Z0-9]/g, '-')
   
   const handlePrint = () => {
     const iframe = document.getElementById(`appreciation-iframe-${safeId}`)
-    if (iframe && iframe.contentWindow) {
+    if (iframe && iframe.contentWindow && typeof iframe.contentWindow.downloadPDF === 'function') {
+      iframe.contentWindow.downloadPDF(`Appreciation_Letter_${name}`)
+    } else if (iframe && iframe.contentWindow) {
       iframe.contentWindow.focus()
       iframe.contentWindow.print()
     }
   }
 
-  const letterUrl = `/Appreciation_letter.html?name=${encodeURIComponent(name)}&date=${encodeURIComponent(date)}&hideControls=true`
+  const hasDownloaded = useRef(false)
+
+  useEffect(() => {
+    if (autoDownload && !hasDownloaded.current) {
+      const timer = setTimeout(() => {
+        const iframe = document.getElementById(`appreciation-iframe-${safeId}`)
+        if (iframe && iframe.contentWindow && typeof iframe.contentWindow.downloadPDF === 'function') {
+          hasDownloaded.current = true
+          iframe.contentWindow.downloadPDF(`Appreciation_Letter_${name}`)
+        }
+      }, 3500)
+      return () => clearTimeout(timer)
+    }
+  }, [autoDownload, name, safeId])
+
+  const letterUrl = `/Appreciation_letter.html?name=${encodeURIComponent(name)}&date=${encodeURIComponent(date)}&lang=ta&hideControls=true&v=1.0.4`
 
   return (
     <div style={{
@@ -611,6 +913,14 @@ function AppreciationLetterMsg({ name, date }) {
             transformOrigin: 'top left'
           }} 
           title="Appreciation Letter Preview"
+          onLoad={(e) => {
+            try {
+              const iframe = e.target;
+              const doc = iframe.contentDocument || iframe.contentWindow.document;
+              const controls = doc.querySelector('.controls-container');
+              if (controls) controls.style.display = 'none';
+            } catch(err) {}
+          }}
         />
       </div>
 
@@ -637,7 +947,7 @@ function AppreciationLetterMsg({ name, date }) {
           onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-1px)' }}
           onMouseLeave={(e) => { e.currentTarget.style.transform = 'none' }}
         >
-          <i className="bi bi-file-earmark-pdf-fill" /> Save as PDF / Print
+          <i className="bi bi-file-earmark-pdf-fill" /> Download PDF
         </button>
       </div>
     </div>
@@ -753,7 +1063,7 @@ function SelectWingMsg({ wtlCode, epicNo, isLatest }) {
           {/* Custom SVG Pending / Success Spinner */}
           <div style={{ position: 'relative', width: 80, height: 80 }}>
             {existingRequest.status === 'confirmed' ? (
-              <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="var(--color-signal-mint)" strokeWidth="2">
+              <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="#2ecc71" strokeWidth="2">
                 <circle cx="12" cy="12" r="10" />
                 <polyline points="22 4 12 14.01 9 11.01" />
               </svg>
@@ -766,7 +1076,7 @@ function SelectWingMsg({ wtlCode, epicNo, isLatest }) {
           </div>
 
           <div style={{ textAlign: 'center', fontSize: 15, fontWeight: 600, color: 'var(--color-chalk)' }}>
-            Status: <span style={{ textTransform: 'capitalize', color: existingRequest.status === 'confirmed' ? 'var(--color-signal-mint)' : existingRequest.status === 'rejected' ? '#dc2626' : '#FF9933' }}>{existingRequest.status}</span>
+            Status: <span style={{ textTransform: 'capitalize', color: existingRequest.status === 'confirmed' ? '#2ecc71' : existingRequest.status === 'rejected' ? '#dc2626' : '#FF9933' }}>{existingRequest.status}</span>
           </div>
 
           {/* Grid fields */}
@@ -1027,7 +1337,7 @@ function BoothAgentSetupMsg({ wtlCode, epicNo, isLatest }) {
           {/* Custom SVG Pending / Success Spinner */}
           <div style={{ position: 'relative', width: 80, height: 80 }}>
             {existingRequest.status === 'confirmed' ? (
-              <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="var(--color-signal-mint)" strokeWidth="2">
+              <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="#2ecc71" strokeWidth="2">
                 <circle cx="12" cy="12" r="10" />
                 <polyline points="22 4 12 14.01 9 11.01" />
               </svg>
@@ -1040,7 +1350,7 @@ function BoothAgentSetupMsg({ wtlCode, epicNo, isLatest }) {
           </div>
 
           <div style={{ textAlign: 'center', fontSize: 15, fontWeight: 600, color: 'var(--color-chalk)' }}>
-            Status: <span style={{ textTransform: 'capitalize', color: existingRequest.status === 'confirmed' ? 'var(--color-signal-mint)' : existingRequest.status === 'rejected' ? '#dc2626' : '#FF9933' }}>{existingRequest.status}</span>
+            Status: <span style={{ textTransform: 'capitalize', color: existingRequest.status === 'confirmed' ? '#2ecc71' : existingRequest.status === 'rejected' ? '#dc2626' : '#FF9933' }}>{existingRequest.status}</span>
           </div>
 
           {/* Grid fields */}
@@ -1457,6 +1767,7 @@ const SCHEMES = [
     category: 'Women & Child Welfare',
     title: 'Sukanya Samriddhi Yojana (SSY)',
     highlight: '8.2% INTEREST',
+    link: 'https://www.nsiindia.gov.in/(S(wcm5mt55jsxbps55egzi1o45))/InternalPage.aspx?Id_Pk=89',
     overview: "This is a savings scheme by the Government of India designed to build a dedicated corpus for a girl child's higher education and marriage expenses.",
     tags: ['Girl Child Welfare', 'Tax-Free Savings', '8.2% Annually'],
     eligibility: 'Available for parents with girls under 10 years old. It features an attractive 8.2% tax-free interest rate and deduction benefits under Section 80C.',
@@ -1478,6 +1789,7 @@ const SCHEMES = [
     category: 'Women & Child Welfare',
     title: 'Lakhpati Didi Scheme',
     highlight: '₹1 LAKH INCOME GOAL',
+    link: 'https://lakhpatididi.gov.in/digital-ajeevika-register/',
     overview: 'A national livelihood program providing skill development, drone training, and enterprise credit support to rural women entrepreneurs.',
     tags: ['Women SHGs', '🛠️ Skill & Drone Training', 'Entrepreneurship Loan'],
     eligibility: 'Aims to enable rural Self-Help Group (SHG) women members to earn a sustainable household income of at least ₹1 Lakh per annum through entrepreneurship.',
@@ -1499,6 +1811,7 @@ const SCHEMES = [
     category: 'Women & Child Welfare',
     title: 'PM Matru Vandana Yojana (PMMVY)',
     highlight: '₹5,000 DIRECT CASH',
+    link: 'https://wcd.delhi.gov.in/wcd/pradhan-mantri-matru-vandana-yojana-pmmvy',
     overview: 'A maternity benefit program that provides direct cash assistance to pregnant women to promote immunization and healthcare support.',
     tags: ['Maternal Nutrition', '👶 Child Immunization', '₹5,000 DBT Cash'],
     eligibility: 'Pregnant and lactating mothers receive a direct benefit transfer (DBT) of ₹5,00,000 in their bank account to compensate for wages and cover food.',
@@ -1520,6 +1833,7 @@ const SCHEMES = [
     category: 'Education & Research',
     title: 'PM Vidyalaxmi Higher Education Loan',
     highlight: 'COLLATERAL-FREE',
+    link: 'https://pmvidyalaxmi.co.in/',
     overview: 'A national portal offering meritorious students collateral-free and guarantor-free higher education loans for admission to designated Quality Higher Educational Institutions.',
     tags: ['Quality Education', 'Collateral-Free Loans', 'Interest Subvention'],
     eligibility: 'Enables access to education loans with zero assets required as collateral. Offers interest subvention of 3% for family incomes up to ₹8 Lakhs.',
@@ -1541,6 +1855,7 @@ const SCHEMES = [
     category: 'Education & Research',
     title: 'PM-YASASVI Scholarship Scheme',
     highlight: 'SCHOOL FEE GRANTS',
+    link: 'https://www.dosje.gov.in/schemes-and-services/pm-yasasvi/',
     overview: 'A scholarship scheme under the Ministry of Social Justice and Empowerment for OBC, EBC, and DNT students studying in Top Class Schools.',
     tags: ['OBC/EBC Welfare', 'Merit Scholarships', 'Full Fee Support'],
     eligibility: 'Full fee coverage. Eligible students receive up to ₹75,000/year (Class 9-10) and up to ₹1,25,000/year (Class 11-12) via direct benefit transfer.',
@@ -1562,6 +1877,7 @@ const SCHEMES = [
     category: 'Education & Research',
     title: 'PM Research Fellowship (PMRF)',
     highlight: '₹80,000 / MONTH STIPEND',
+    link: 'https://pmrf.in/',
     overview: 'A prestigious fellowship designed to support top scientific and technological PhD research talent at premium institutes.',
     tags: ['PhD Researchers', 'IIT/IISc/NIT Host', 'Contigency Fund'],
     eligibility: 'Stipends of ₹70,000 to ₹80,000/month, along with a research contingency grant of ₹2 Lakhs per year for 5 consecutive years.',
@@ -1583,6 +1899,7 @@ const SCHEMES = [
     category: 'Artisans & Small Business',
     title: 'PM Vishwakarma Scheme',
     highlight: '₹15,000 TOOLKIT GRANT',
+    link: 'https://pmvishwakarma.gov.in/',
     overview: 'A scheme supporting traditional artisans and craftspeople who work with hand tools, aiming to preserve heritage and modernize their skills.',
     tags: ['🛠️ 18 Craft Trades', 'Toolkit Grants', 'Low Interest Loans'],
     eligibility: 'Covers 18 trades (carpenters, potters, blacksmiths, etc.). Provides ₹15,000 toolkit grants, training stipends, and collateral-free enterprise credit starting at 5% interest.',
@@ -1604,6 +1921,7 @@ const SCHEMES = [
     category: 'Artisans & Small Business',
     title: 'Pradhan Mantri Mudra Yojana (PMMY)',
     highlight: '₹50,000 TO ₹20 LAKHS',
+    link: 'https://www.mudra.org.in/Home/PMMYBankersKit',
     overview: 'A flagship loan scheme supporting non-farm, non-corporate micro and small enterprises to access collateral-free business capital.',
     tags: ['Micro Enterprises', 'Startups & Shops', 'No Asset Security'],
     eligibility: 'Provides business loans up to ₹20 Lakhs categorized into Shishu (up to ₹50k), Kishor (up to ₹5 Lakhs), and Tarun (up to ₹20 Lakhs) with no collateral needed.',
@@ -1625,6 +1943,7 @@ const SCHEMES = [
     category: 'Artisans & Small Business',
     title: 'PM SVANidhi Scheme',
     highlight: 'STREET VENDOR CREDIT',
+    link: 'https://uatapi.udyamimitra.in/PMSVANidhi',
     overview: 'A special micro-credit scheme providing working capital loans to urban and semi-urban street vendors to resume livelihoods.',
     tags: ['Street Hawkers', 'Regular Repay Subsidy', 'Cash Back Rewards'],
     eligibility: 'First-time collateral-free working capital loan of ₹10,000. Successful repayment unlocks secondary loans of ₹20,000 and tertiary loans of ₹50,000.',
@@ -1646,6 +1965,7 @@ const SCHEMES = [
     category: 'Healthcare & Energy',
     title: 'Ayushman Bharat (PM-JAY) & CMCHIS',
     highlight: '₹5 LAKHS CASHLESS COVER',
+    link: 'https://beneficiary.nha.gov.in/',
     overview: "A flagship health insurance program integrated with Tamil Nadu's Chief Minister's Comprehensive Health Insurance Scheme (CMCHIS), offering up to ₹5 Lakhs per family per year cashless treatment and extended to all senior citizens aged 70+.",
     tags: ['Cashless Hospitalization', '₹5 Lakhs Floater / Family', '👴 Senior Citizens 70+ Priority'],
     eligibility: 'Provides cashless hospital coverage of ₹5,00,000 per family per year on a floater basis for secondary and tertiary care at empanelled hospitals, with special priority cards issued to senior citizens aged 70+.',
@@ -1667,6 +1987,7 @@ const SCHEMES = [
     category: 'Healthcare & Energy',
     title: 'PM Surya Ghar: Muft Bijli Yojana',
     highlight: '300 UNITS FREE POWER',
+    link: 'https://pmsuryaghar.gov.in/#/',
     overview: 'A national subsidy program to help households install rooftop solar systems, reducing electricity bills and supplying clean energy.',
     tags: ['☀️ Rooftop Solar Subsidy', '300 Free Power Units', '₹78,000 DBT Grant'],
     eligibility: 'Gives up to ₹78,000 cash subsidy directly into bank accounts for installations (up to 3kW). Excess power generated can be sold back to the grid.',
@@ -1688,6 +2009,7 @@ const SCHEMES = [
     category: 'Agriculture & Farmers',
     title: 'PM Kisan Samman Nidhi (PM-KISAN)',
     highlight: '₹6,000 ANNUAL CASH SUPPORT',
+    link: 'https://pmkisan.gov.in/',
     overview: 'An income support scheme providing direct financial assistance to all landholding farmer families across India to buy agricultural inputs.',
     tags: ['Landholding Farmers', 'Input Purchase Support', '₹6,000 DBT Income'],
     eligibility: 'Farmers receive an annual income support of ₹6,000 paid directly in 3 equal installments of ₹2,000 via Aadhaar-linked DBT transfers.',
@@ -1709,6 +2031,7 @@ const SCHEMES = [
     category: 'Agriculture & Farmers',
     title: 'PM Fasal Bima Yojana (PMFBY)',
     highlight: 'SUBSIDIZED PREMIUM COVER',
+    link: 'https://pmfby.gov.in/',
     overview: 'A crop insurance scheme that protects farmers from financial losses due to natural disasters, crop diseases, pests, or localized bad weather.',
     tags: ['Agriculture Security', '🌧️ Natural Calamity Cover', '1.5% - 2% Premium Cap'],
     eligibility: 'Subsidized premium rates capped at 1.5% to 2% for food crops, oilseeds, and pulses. Provides comprehensive financial protection from sowing to post-harvest.',
@@ -1875,6 +2198,41 @@ function BrochurePanel({ onBack }) {
                           ))}
                         </div>
                       </div>
+                      {scheme.link && (
+                        <div style={{ marginTop: 20 }}>
+                          <a 
+                            href={scheme.link}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 8,
+                              backgroundColor: '#FF9933',
+                              color: '#FFFFFF',
+                              padding: '10px 20px',
+                              borderRadius: 12,
+                              fontWeight: 600,
+                              textDecoration: 'none',
+                              fontSize: 13,
+                              transition: 'all 0.15s',
+                              boxShadow: '0 4px 12px rgba(255, 153, 51, 0.2)'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.backgroundColor = '#fa5d00';
+                              e.currentTarget.style.transform = 'translateY(-1px)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.backgroundColor = '#FF9933';
+                              e.currentTarget.style.transform = 'none';
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <i className="bi bi-box-arrow-up-right" />
+                            Apply Online (Click Here)
+                          </a>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -1888,38 +2246,23 @@ function BrochurePanel({ onBack }) {
 }
 
 function FullLetterPanel({ type, name, date, onBack }) {
-  const handleDownloadPNG = async () => {
-    const iframe = document.getElementById('full-letter-iframe')
-    if (!iframe || !iframe.contentWindow) return
-    const iframeDoc = iframe.contentDocument || iframe.contentWindow.document
-    
-    const papers = iframeDoc.querySelectorAll('.letter-paper')
-    if (!papers || papers.length === 0) return
+  const [selectedLang, setSelectedLang] = useState('ta')
 
-    for (let idx = 0; idx < papers.length; idx++) {
-      const paper = papers[idx]
-      try {
-        const canvas = await html2canvas(paper, {
-          scale: 2,
-          useCORS: true,
-          allowTaint: true,
-          backgroundColor: '#FAF8F4',
-        })
-        const link = document.createElement('a')
-        const langSuffix = paper.id && paper.id.includes('ta') ? '_tamil' : '_english'
-        link.download = `${type === 'appreciation' ? 'Appreciation_Letter' : 'Welcome_Letter'}_${name}${langSuffix}.png`
-        link.href = canvas.toDataURL('image/png')
-        link.click()
-      } catch (e) {
-        console.error('Download PNG page error:', e)
-      }
+  const handleDownloadPDF = () => {
+    const iframe = document.getElementById('full-letter-iframe')
+    if (iframe && iframe.contentWindow && typeof iframe.contentWindow.downloadPDF === 'function') {
+      const fileName = `${type === 'appreciation' ? 'Appreciation_Letter' : 'Welcome_Letter'}_${name}`
+      iframe.contentWindow.downloadPDF(fileName)
+    } else if (iframe && iframe.contentWindow) {
+      iframe.contentWindow.focus()
+      iframe.contentWindow.print()
     }
   }
 
   const isAppreciation = type === 'appreciation';
   const letterUrl = isAppreciation
-    ? `/Appreciation_letter.html?name=${encodeURIComponent(name)}&date=${encodeURIComponent(date)}&hideControls=true`
-    : `/Welcome_letter.html?name=${encodeURIComponent(name)}&date=${encodeURIComponent(date)}&hideControls=true`;
+    ? `/Appreciation_letter.html?name=${encodeURIComponent(name)}&date=${encodeURIComponent(date)}&lang=${selectedLang}&hideControls=true&v=1.0.4`
+    : `/Welcome_letter.html?name=${encodeURIComponent(name)}&date=${encodeURIComponent(date)}&lang=${selectedLang}&hideControls=true&v=1.0.4`;
 
   return (
     <div className="chatbot-container brochure-panel">
@@ -1947,10 +2290,53 @@ function FullLetterPanel({ type, name, date, onBack }) {
           <i className={`bi bi-${isAppreciation ? 'award-fill' : 'envelope-paper-fill'} brochure-title-orange`} />
           <span>{isAppreciation ? 'Letter of Appreciation' : 'Welcome Letter'}</span>
         </div>
-        <div style={{ display: 'flex', gap: 12 }}>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+          {/* Tamil / Eng Toggle */}
+          <div style={{ 
+            display: 'flex', 
+            background: 'var(--color-carbon)', 
+            border: '1px solid var(--color-graphite)', 
+            borderRadius: '20px', 
+            padding: '2px',
+            alignItems: 'center'
+          }}>
+            <button
+              onClick={() => setSelectedLang('ta')}
+              style={{
+                background: selectedLang === 'ta' ? 'var(--color-signal-mint)' : 'transparent',
+                color: selectedLang === 'ta' ? '#fff' : 'var(--color-ash)',
+                border: 'none',
+                borderRadius: '18px',
+                padding: '6px 14px',
+                fontSize: '12px',
+                fontWeight: '600',
+                cursor: 'pointer',
+                transition: 'all 0.2s'
+              }}
+            >
+              தமிழ்
+            </button>
+            <button
+              onClick={() => setSelectedLang('en')}
+              style={{
+                background: selectedLang === 'en' ? 'var(--color-signal-mint)' : 'transparent',
+                color: selectedLang === 'en' ? '#fff' : 'var(--color-ash)',
+                border: 'none',
+                borderRadius: '18px',
+                padding: '6px 14px',
+                fontSize: '12px',
+                fontWeight: '600',
+                cursor: 'pointer',
+                transition: 'all 0.2s'
+              }}
+            >
+              English
+            </button>
+          </div>
+
           <button 
             className="btn-brochure-back" 
-            onClick={handleDownloadPNG}
+            onClick={handleDownloadPDF}
             style={{ 
               borderColor: 'var(--color-signal-mint)', 
               color: 'var(--color-signal-mint)',
@@ -1965,12 +2351,34 @@ function FullLetterPanel({ type, name, date, onBack }) {
           </button>
         </div>
       </header>
-      <div style={{ flex: 1, background: '#f5f5f5', overflow: 'hidden', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+      <div style={{ flex: 1, background: '#f5f5f5', overflow: 'auto', display: 'flex', justifyContent: 'center', alignItems: 'flex-start' }}>
         <iframe
           id="full-letter-iframe"
+          key={selectedLang}
           src={letterUrl}
-          style={{ width: '100%', height: '100%', border: 'none' }}
+          style={{ width: '100%', height: selectedLang === 'ta' ? '2400px' : '100%', border: 'none', minHeight: '100%' }}
           title={isAppreciation ? 'Appreciation Letter' : 'Welcome Letter'}
+          onLoad={(e) => {
+            try {
+              const iframe = e.target;
+              const doc = iframe.contentDocument || iframe.contentWindow.document;
+              const controls = doc.querySelector('.controls-container');
+              if (controls) controls.style.display = 'none';
+
+              const setH = () => {
+                const scrollH = Math.max(
+                  doc.documentElement.scrollHeight,
+                  doc.body ? doc.body.scrollHeight : 0
+                );
+                if (scrollH > 200) {
+                  iframe.style.height = scrollH + 'px';
+                }
+              };
+              setH();
+              setTimeout(setH, 800);  // retry after fonts load
+              setTimeout(setH, 2000); // final retry
+            } catch(err) {}
+          }}
         />
       </div>
     </div>
@@ -2379,6 +2787,552 @@ function FullProfilePanel({ epicNo, mobile, referredCount, onBack }) {
   );
 }
 
+function FullMyMembersPanel({ wtlCode, onBack }) {
+  const [root, setRoot] = useState(null)
+  const [tree, setTree] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [selectedMember, setSelectedMember] = useState(null)
+
+  useEffect(() => {
+    if (!wtlCode) {
+      setError('No referral code available.')
+      setLoading(false)
+      return
+    }
+    chat.getMyMembers(wtlCode)
+      .then((data) => {
+        setRoot(data.root || null)
+        setTree(data.tree || [])
+      })
+      .catch((err) => {
+        setError(err.message || 'Unable to load referred members.')
+      })
+      .finally(() => {
+        setLoading(false)
+      })
+  }, [wtlCode])
+
+  const directCount = tree.length
+  const indirectCount = tree.reduce((acc, curr) => acc + (curr.referrals?.length || 0), 0)
+  const totalCount = directCount + indirectCount
+
+  const renderNode = (member, level) => {
+    const isRoot = level === 1
+    const nodeWidth = isRoot ? '200px' : '170px'
+    
+    return (
+      <div key={member.wtl_code} className={`tree-node level-${level}`} style={{
+        display: 'flex',
+        alignItems: 'center',
+        position: 'relative',
+        zIndex: 2,
+        flexShrink: 0
+      }}>
+        {/* Node card inner */}
+        <div 
+          onClick={() => setSelectedMember(member)}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            padding: '8px 12px',
+            background: 'var(--color-carbon)',
+            border: isRoot ? '2px solid #FF9933' : '1px solid var(--color-graphite)',
+            borderRadius: '12px',
+            cursor: 'pointer',
+            width: nodeWidth,
+            boxShadow: '0 4px 15px rgba(0,0,0,0.1)',
+            transition: 'all 0.15s ease',
+            zIndex: 3
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.borderColor = isRoot ? '#FF9933' : 'var(--color-signal-mint)';
+            e.currentTarget.style.transform = 'translateY(-1px)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.borderColor = isRoot ? '#FF9933' : 'var(--color-graphite)';
+            e.currentTarget.style.transform = 'none';
+          }}
+        >
+          {/* Photo */}
+          <div style={{ position: 'relative', flexShrink: 0 }}>
+            {member.photo_url ? (
+              <img src={member.photo_url} crossOrigin="anonymous" alt={member.name} style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover', border: '1px solid var(--color-graphite)' }} />
+            ) : (
+              <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#252d27', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--color-graphite)' }}>
+                <i className="bi bi-person-fill" style={{ color: 'var(--color-ash)', fontSize: 14 }} />
+              </div>
+            )}
+            <span style={{
+              position: 'absolute',
+              bottom: -3,
+              right: -3,
+              width: 14,
+              height: 14,
+              borderRadius: '50%',
+              background: level === 1 ? '#FF9933' : level === 2 ? 'var(--color-signal-mint)' : '#17a2b8',
+              color: '#000',
+              fontSize: 8,
+              fontWeight: 'bold',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>L{level}</span>
+          </div>
+
+          {/* Details */}
+          <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, textAlign: 'left' }}>
+            <span style={{ fontSize: 11, fontWeight: 'bold', color: 'var(--color-chalk)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{member.name}</span>
+            <span style={{ fontSize: 9, color: 'var(--color-signal-mint)', fontFamily: 'monospace', fontWeight: 600 }}>{member.wtl_code}</span>
+          </div>
+
+          <i className="bi bi-chevron-right" style={{ color: 'var(--color-ash)', fontSize: 10, flexShrink: 0 }} />
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="chatbot-container brochure-panel">
+      <header className="brochure-header">
+        <div className="brochure-title" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <button 
+            onClick={onBack}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'var(--color-ash)',
+              cursor: 'pointer',
+              padding: '4px 8px 4px 0',
+              fontSize: '18px',
+              display: 'flex',
+              alignItems: 'center',
+              transition: 'color 0.15s'
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-chalk)'}
+            onMouseLeave={(e) => e.currentTarget.style.color = 'var(--color-ash)'}
+            aria-label="Back"
+          >
+            <i className="bi bi-chevron-left" />
+          </button>
+          <i className="bi bi-people-fill brochure-title-orange" />
+          <span>My Members</span>
+        </div>
+      </header>
+
+      <div className="brochure-content" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        {loading ? (
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 200 }}>
+            <div style={{ width: 32, height: 32, border: '3px solid rgba(46, 204, 113, 0.15)', borderTopColor: 'var(--color-signal-mint)', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+          </div>
+        ) : error ? (
+          <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--color-ash)' }}>
+            <i className="bi bi-exclamation-triangle" style={{ fontSize: 32, color: '#ff3b30', marginBottom: 12, display: 'block' }} />
+            {error}
+          </div>
+        ) : (
+          <div style={{ width: '100%', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {/* Stats bar */}
+            <div style={{ fontSize: 12, color: 'var(--color-signal-mint)', fontWeight: 600, borderBottom: '1px solid var(--color-graphite)', paddingBottom: 12 }}>
+              Referral Tree Network — {directCount} Direct | {indirectCount} Indirect ({totalCount} Total)
+            </div>
+
+            {/* Tree Container (Left-to-Right layout) */}
+            <div style={{ 
+              background: 'var(--color-carbon)', 
+              border: '1px solid var(--color-graphite)', 
+              borderRadius: 20, 
+              padding: '24px 16px', 
+              display: 'flex', 
+              alignItems: 'center',
+              minHeight: '350px',
+              overflowX: 'auto',
+              overflowY: 'auto',
+              gap: '32px',
+              position: 'relative'
+            }}>
+              {/* LAYER 1: ROOT */}
+              <div style={{ display: 'flex', alignItems: 'center', position: 'relative' }}>
+                {root && renderNode(root, 1)}
+                {/* Horizontal connection line to L2 column */}
+                {tree.length > 0 && (
+                  <div style={{
+                    width: '32px',
+                    height: '2px',
+                    background: 'var(--color-graphite)',
+                    flexShrink: 0
+                  }} />
+                )}
+              </div>
+
+              {/* LAYERS 2 & 3 */}
+              {tree.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--color-ash)', maxWidth: 400 }}>
+                  <i className="bi bi-diagram-3" style={{ fontSize: 48, color: 'var(--color-graphite)', marginBottom: 16, display: 'block' }} />
+                  <h3 style={{ fontSize: 16, fontWeight: 600, color: 'var(--color-chalk)', marginBottom: 8 }}>Tree structure empty</h3>
+                  <p style={{ fontSize: 13, margin: '0 auto', color: 'var(--color-ash)' }}>
+                    You haven't referred anyone yet. Share your custom BJP code to build your 3-layer support network!
+                  </p>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', position: 'relative' }}>
+                  
+                  {/* Vertical connecting line spanning from first to last L2 node */}
+                  {tree.length > 1 && (
+                    <div style={{
+                      position: 'absolute',
+                      left: '-16px',
+                      top: '25px', // Center of first L2 row
+                      bottom: '25px', // Center of last L2 row
+                      width: '2px',
+                      background: 'var(--color-graphite)',
+                      zIndex: 1
+                    }} />
+                  )}
+
+                  {/* Stack of Rows */}
+                  {tree.map(parent => {
+                    const hasChildren = parent.referrals && parent.referrals.length > 0
+                    return (
+                      <div key={parent.wtl_code} style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        position: 'relative',
+                        gap: '24px'
+                      }}>
+                        {/* Horizontal link from L2 vertical line to L2 Node */}
+                        <div style={{
+                          position: 'absolute',
+                          left: '-16px',
+                          top: '50%',
+                          width: '16px',
+                          height: '2px',
+                          background: 'var(--color-graphite)',
+                          transform: 'translateY(-50%)',
+                          zIndex: 1
+                        }} />
+
+                        {renderNode(parent, 2)}
+
+                        {hasChildren && (
+                          <div style={{
+                            width: '24px',
+                            height: '2px',
+                            background: 'var(--color-graphite)',
+                            flexShrink: 0
+                          }} />
+                        )}
+
+                        {hasChildren && (
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '16px',
+                            position: 'relative'
+                          }}>
+                            {parent.referrals.length > 1 && (
+                              <div style={{
+                                position: 'absolute',
+                                left: '0px',
+                                right: '85px', // Stops at center of last node
+                                height: '2px',
+                                background: 'var(--color-graphite)',
+                                top: '50%',
+                                transform: 'translateY(-50%)',
+                                zIndex: 1
+                              }} />
+                            )}
+
+                            {parent.referrals.map(child => (
+                              <div key={child.wtl_code} style={{ display: 'flex', alignItems: 'center', gap: '16px', position: 'relative' }}>
+                                {renderNode(child, 3)}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* MEMBER DETAILS MODAL */}
+      {selectedMember && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0,0,0,0.85)',
+          backdropFilter: 'blur(8px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 999,
+          padding: 16
+        }} onClick={() => setSelectedMember(null)}>
+          <div style={{
+            background: 'var(--color-carbon)',
+            border: '1.5px solid var(--color-graphite)',
+            borderRadius: 24,
+            width: '100%',
+            maxWidth: '460px',
+            maxHeight: '90vh',
+            overflowY: 'auto',
+            padding: '24px',
+            position: 'relative'
+          }} onClick={(e) => e.stopPropagation()}>
+            <button 
+              onClick={() => setSelectedMember(null)}
+              style={{
+                position: 'absolute',
+                top: 16,
+                right: 16,
+                background: 'transparent',
+                border: 'none',
+                color: 'var(--color-ash)',
+                fontSize: 22,
+                cursor: 'pointer'
+              }}
+            >
+              <i className="bi bi-x-lg" />
+            </button>
+
+            <h3 style={{ fontSize: 16, fontWeight: 'bold', color: 'var(--color-chalk)', marginBottom: 20 }}>Member Details</h3>
+
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 20 }}>
+              <FlipCard3D
+                cardData={{
+                  name: selectedMember.name,
+                  epic_no: selectedMember.epic_no,
+                  assembly_name: selectedMember.assembly_name,
+                  district: selectedMember.district,
+                  part_no: selectedMember.part_no,
+                  wtl_code: selectedMember.wtl_code,
+                  photo_url: selectedMember.photo_url
+                }}
+                width={300}
+                autoFlip={false}
+                showActions={false}
+              />
+            </div>
+
+            <div style={{
+              background: '#f9f8f6',
+              border: '1px solid #E2E8F0',
+              borderRadius: 16,
+              padding: 16,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 12
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+                <span style={{ color: '#555555' }}>Member Name</span>
+                <span style={{ color: '#111111', fontWeight: 600 }}>{selectedMember.name}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+                <span style={{ color: '#555555' }}>EPIC Number</span>
+                <span style={{ color: '#111111', fontFamily: 'monospace', fontWeight: 600 }}>{selectedMember.epic_no || '—'}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+                <span style={{ color: '#555555' }}>BJP Code</span>
+                <span style={{ color: '#FF9933', fontFamily: 'monospace', fontWeight: 700 }}>{selectedMember.wtl_code}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+                <span style={{ color: '#555555' }}>Assembly (Booth)</span>
+                <span style={{ color: '#111111', fontWeight: 600 }}>
+                  {selectedMember.assembly_name ? `${selectedMember.assembly_name} (Part ${selectedMember.part_no || '—'})` : '—'}
+                </span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+                <span style={{ color: '#555555' }}>District</span>
+                <span style={{ color: '#111111', fontWeight: 600 }}>{selectedMember.district || '—'}</span>
+              </div>
+              {selectedMember.generated_at && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+                  <span style={{ color: '#555555' }}>Joined Date</span>
+                  <span style={{ color: '#111111', fontWeight: 600 }}>{new Date(selectedMember.generated_at).toLocaleDateString()}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function LocalBodyPanel({ onBack, localBodyInterest, handleLocalBodyInterestSubmit }) {
+  const isLocked = localBodyInterest === 'interested' || localBodyInterest === 'not_interested';
+
+  const handleClick = (value) => {
+    if (isLocked) return;
+    const confirmMsg = value === 'interested'
+      ? 'Are you sure you want to submit "Interested"? This selection cannot be changed later.'
+      : 'Are you sure you want to submit "Not Interested"? This selection cannot be changed later.';
+    
+    if (window.confirm(confirmMsg)) {
+      handleLocalBodyInterestSubmit(value);
+    }
+  };
+
+  return (
+    <div className="chatbot-container brochure-panel">
+      <header className="brochure-header">
+        <div className="brochure-title" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <button 
+            onClick={onBack}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'var(--color-ash)',
+              cursor: 'pointer',
+              padding: '4px 8px 4px 0',
+              fontSize: '18px',
+              display: 'flex',
+              alignItems: 'center',
+              transition: 'color 0.15s'
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-chalk)'}
+            onMouseLeave={(e) => e.currentTarget.style.color = 'var(--color-ash)'}
+            aria-label="Back"
+          >
+            <i className="bi bi-chevron-left" />
+          </button>
+          <i className="bi bi-check-square-fill brochure-title-orange" />
+          <span>Local Body Election</span>
+        </div>
+      </header>
+
+      <div className="brochure-scroll" style={{ padding: '24px 20px', display: 'flex', flexDirection: 'column', gap: 20 }}>
+        <div style={{
+          background: 'var(--color-carbon)',
+          border: '1px solid var(--color-graphite)',
+          borderRadius: 16,
+          padding: '24px 20px',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          textAlign: 'center',
+          gap: 16
+        }}>
+          <div style={{
+            fontSize: 48,
+            background: 'rgba(255, 153, 51, 0.1)',
+            width: 80,
+            height: 80,
+            borderRadius: '50%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginBottom: 8
+          }}>
+            🗳️
+          </div>
+          
+          <h2 style={{ fontSize: 20, fontWeight: 700, color: 'var(--color-chalk)' }}>
+            Local Body Elections
+          </h2>
+          
+          <p style={{ fontSize: 13, lineHeight: '1.6', color: 'var(--color-ash)', maxWidth: 400 }}>
+            BJP Tamil Nadu is preparing a database of active members who are interested in contesting, organizing, or coordinating local initiatives for the upcoming local body elections.
+          </p>
+
+          <div style={{
+            width: '100%',
+            height: '1px',
+            background: 'var(--color-graphite)',
+            margin: '8px 0'
+          }} />
+
+          <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-chalk)' }}>
+            Are you interested in participating or contesting in the upcoming Local Body Elections?
+          </p>
+
+          <div style={{ display: 'flex', gap: 16, width: '100%', marginTop: 8, justifyContent: 'center' }}>
+            <button
+              onClick={() => handleClick('interested')}
+              disabled={isLocked}
+              style={{
+                padding: '12px 24px',
+                borderRadius: 10,
+                border: 'none',
+                fontWeight: 600,
+                cursor: isLocked ? 'not-allowed' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                background: localBodyInterest === 'interested' ? '#2ecc71' : 'var(--color-graphite)',
+                color: localBodyInterest === 'interested' ? '#FFF' : 'var(--color-ash)',
+                opacity: isLocked && localBodyInterest !== 'interested' ? 0.4 : 1,
+                transition: 'all 0.2s'
+              }}
+            >
+              {localBodyInterest === 'interested' ? (
+                <>
+                  <i className="bi bi-check-circle-fill" style={{ fontSize: 16 }} />
+                  Interested
+                </>
+              ) : (
+                'Interested'
+              )}
+            </button>
+            <button
+              onClick={() => handleClick('not_interested')}
+              disabled={isLocked}
+              style={{
+                padding: '12px 24px',
+                borderRadius: 10,
+                border: 'none',
+                fontWeight: 600,
+                cursor: isLocked ? 'not-allowed' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                background: localBodyInterest === 'not_interested' ? '#e74c3c' : 'var(--color-graphite)',
+                color: localBodyInterest === 'not_interested' ? '#FFF' : 'var(--color-ash)',
+                opacity: isLocked && localBodyInterest !== 'not_interested' ? 0.4 : 1,
+                transition: 'all 0.2s'
+              }}
+            >
+              {localBodyInterest === 'not_interested' ? (
+                <>
+                  <i className="bi bi-x-circle-fill" style={{ fontSize: 16 }} />
+                  Not Interested
+                </>
+              ) : (
+                'Not Interested'
+              )}
+            </button>
+          </div>
+
+          {localBodyInterest && (
+            <div style={{
+              marginTop: 16,
+              padding: '12px 16px',
+              borderRadius: 8,
+              background: 'rgba(255, 153, 51, 0.05)',
+              border: '1px solid rgba(255, 153, 51, 0.15)',
+              color: '#FF9933',
+              fontSize: 13,
+              fontWeight: 500,
+              maxWidth: 400,
+              lineHeight: '1.5'
+            }}>
+              {localBodyInterest === 'interested' 
+                ? '🎉 Your interest has been submitted! Our election coordinators will reach out to you.'
+                : 'Thank you for letting us know. You can change your selection at any time.'}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function FullCardPanel({ card, onBack }) {
   const c = card || {}
   const [fullCardData, setFullCardData] = useState(null)
@@ -2399,7 +3353,7 @@ function FullCardPanel({ card, onBack }) {
     if (hasName && hasAssembly) {
       setFullCardData(c)
     } else if (c.epic_no) {
-      publicApi.getCardData(c.epic_no)
+      publicApi.getCardData(c.wtl_code || c.epic_no)
         .then((data) => setFullCardData(data))
         .catch(() => setFullCardData(c))
     }
@@ -2877,8 +3831,9 @@ export default function ChatbotPage() {
   const [cropOpen, setCropOpen]     = useState(false)
   const [modalCard, setModalCard]   = useState(null)
 
-  // Milestones and Appointment state
   const [referredCount, setReferredCount] = useState(0)
+  const [createdAt, setCreatedAt] = useState(null)
+  const [appreciationEarnedAt, setAppreciationEarnedAt] = useState(null)
   const [hasAppointment, setHasAppointment] = useState(false)
   const [localBodyInterest, setLocalBodyInterest] = useState(null)
   const [meetingInterest, setMeetingInterest] = useState(null)
@@ -2932,6 +3887,28 @@ export default function ChatbotPage() {
       const res = await chat.getMemberStatus(code)
       if (res.success) {
         setReferredCount(res.referred_count || 0)
+        setCreatedAt(res.created_at || null)
+        setAppreciationEarnedAt(res.appreciation_earned_at || null)
+        
+        // Auto-unlock and download appreciation letter when reaching 5 referrals
+        if ((res.referred_count || 0) >= 5 && !localStorage.getItem(`appreciation_letter_sent_${code}`)) {
+          localStorage.setItem(`appreciation_letter_sent_${code}`, 'true');
+          const todayDate = res.appreciation_earned_at 
+            ? new Date(res.appreciation_earned_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+            : new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+          const mName = cardRef.current?.name || profileRef.current?.name || 'Member';
+          
+          setTimeout(() => {
+            addMsg('bot', 'text', { text: '🏆 *Congratulations!* You have successfully invited 5 members to join our party.' });
+          }, 500);
+          setTimeout(() => {
+            addMsg('bot', 'text', { text: 'We are pleased to present you with this official Letter of Appreciation from the BJP State President:' });
+          }, 1500);
+          setTimeout(() => {
+            addMsg('bot', 'appreciation_letter', { name: mName, date: todayDate, autoDownload: true });
+          }, 2500);
+        }
+
         setHasAppointment(res.has_appointment || false)
         setLocalBodyInterest(res.local_body_interest || null)
         setVolunteerStatus(res.volunteer_status || null)
@@ -2975,32 +3952,27 @@ export default function ChatbotPage() {
 
   const handleBellClick = () => {
     setBookingError('')
-    const code = cardRef.current?.wtl_code || cardRef.current?.ptc_code || profileRef.current?.wtl_code || profileRef.current?.ptc_code
-    
-    if ((volunteerStatus === 'confirmed' || volunteerStatus === 'rejected') && localStorage.getItem(`ack_vol_status_${code}`) !== volunteerStatus) {
-      if (volunteerStatus === 'confirmed') {
-        setBookingStep(6)
-      } else {
-        setBookingStep(7)
-      }
-    } else if ((boothAgentStatus === 'confirmed' || boothAgentStatus === 'rejected') && localStorage.getItem(`ack_ba_status_${code}`) !== boothAgentStatus) {
-      if (boothAgentStatus === 'confirmed') {
-        setBookingStep(8)
-      } else {
-        setBookingStep(9)
-      }
-    } else if (localBodyInterest === null) {
-      setBookingStep(4)
-    } else if (referredCount >= 5) {
+    if (referredCount >= 5) {
       if (meetingInterest === null) {
         setBookingStep(1)
       } else {
         setBookingStep(3)
       }
-    } else {
-      setBookingStep(5)
+      setShowModal(true)
     }
-    setShowModal(true)
+  }
+
+  const handleSidebarOpen = () => {
+    const sCode = cardRef.current?.wtl_code || cardRef.current?.ptc_code || profileRef.current?.wtl_code || profileRef.current?.ptc_code
+    const volNotif = (volunteerStatus === 'confirmed' || volunteerStatus === 'rejected') &&
+      localStorage.getItem(`ack_vol_status_${sCode}`) !== volunteerStatus
+    const baNotif = (boothAgentStatus === 'confirmed' || boothAgentStatus === 'rejected') &&
+      localStorage.getItem(`ack_ba_status_${sCode}`) !== boothAgentStatus
+    if ((volNotif || baNotif) && !soundPlayedRef.current.sidebarOpen) {
+      soundPlayedRef.current.sidebarOpen = true
+      playNotificationSound()
+    }
+    setSidebarOpen(true)
   }
 
   const handleAcknowledgeStatus = (type, val) => {
@@ -3116,7 +4088,14 @@ export default function ChatbotPage() {
       profileRef.current = cache.profile || {}
       epicRef.current    = cache.card.epic_no || ''
       // Note: mobile is NOT stored in localStorage for PII protection
-      addMsg('bot', 'text', { text: '👋 Welcome back to *BJP Tamil Nadu!*' })
+      
+      const { ref, rid } = getReferralParams()
+      if (ref && rid) {
+        addMsg('bot', 'text', { text: '⚠️ *Already you are a member!* Try to logout and rescan the QR.' })
+      } else {
+        addMsg('bot', 'text', { text: '👋 Welcome back to *BJP Tamil Nadu!*' })
+      }
+
       const wtlCode = cache.card.wtl_code || cache.card.ptc_code
       if (wtlCode) {
         fetchMemberStatus(wtlCode)
@@ -3337,8 +4316,15 @@ export default function ChatbotPage() {
         300
       )
       await sleep(400)
-      const todayDate = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
-      addMsg('bot', 'welcome_letter', { name: card.name, date: todayDate })
+      const regDate = card.created_at || card.generated_at
+        ? new Date(card.created_at || card.generated_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+        : new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+      addMsg('bot', 'welcome_letter', { name: card.name, date: regDate, autoDownload: true })
+
+      if (card.referral_link) {
+        await sleep(1200)
+        addMsg('bot', 'referral_link', { link: card.referral_link })
+      }
 
       setChatState(S.DONE)
     } catch (err) {
@@ -3404,6 +4390,14 @@ export default function ChatbotPage() {
       setActiveView('booth_info')
       return
     }
+    if (action === 'local_body') {
+      setActiveView('local_body')
+      return
+    }
+    if (action === 'my_members') {
+      setActiveView('my_members')
+      return
+    }
     setActiveView('chat')
     const wtlCode = cardRef.current?.wtl_code || cardRef.current?.ptc_code || profileRef.current?.wtl_code || profileRef.current?.ptc_code
 
@@ -3430,11 +4424,6 @@ export default function ChatbotPage() {
           setIsTyping(false)
           await botSay('❌ Unable to load referral link.', 200)
         }
-        break
-      }
-      case 'my_members': {
-        if (!wtlCode) { await botSay('ℹ️ Members list unavailable.', 200); return }
-        navigate(`/my-members/${wtlCode}`)
         break
       }
       default: break
@@ -3473,8 +4462,17 @@ export default function ChatbotPage() {
         return { type: 'text', placeholder: 'EPIC Number (e.g. ABC1234567)', maxLength: 10 }
       case S.AWAIT_BOOTH_NO:
         return { type: 'text', placeholder: 'Enter your Booth Number', maxLength: 30 }
-      default: return null
+      default:
+        return null
     }
+  }
+
+  const getIsSendDisabled = () => {
+    if (isTyping) return true
+    const val = inputValue.trim()
+    if (chatState === S.AWAIT_MOBILE) return val.length !== 10
+    if (chatState === S.AWAIT_EPIC) return val.length !== 10
+    return !val
   }
 
   const handleInputChange = (e) => {
@@ -3532,9 +4530,9 @@ export default function ChatbotPage() {
       case 'generated_card':
         return <GeneratedCardMsg card={msg.card} isNew={msg.isNew || false} />
       case 'welcome_letter':
-        return <WelcomeLetterMsg name={msg.name} date={msg.date} />
+        return <WelcomeLetterMsg name={msg.name} date={msg.date} autoDownload={msg.autoDownload} />
       case 'appreciation_letter':
-        return <AppreciationLetterMsg name={msg.name} date={msg.date} />
+        return <AppreciationLetterMsg name={msg.name} date={msg.date} autoDownload={msg.autoDownload} />
       case 'profile_card':
         return (
           <div className="profile-card">
@@ -3662,10 +4660,14 @@ export default function ChatbotPage() {
   const isDone   = chatState === S.DONE
 
   const code = cardRef.current?.wtl_code || cardRef.current?.ptc_code || profileRef.current?.wtl_code || profileRef.current?.ptc_code
-  const hasPendingNotification = localBodyInterest === null || 
-    (referredCount >= 5 && meetingInterest === null) ||
-    ((volunteerStatus === 'confirmed' || volunteerStatus === 'rejected') && localStorage.getItem(`ack_vol_status_${code}`) !== volunteerStatus) ||
-    ((boothAgentStatus === 'confirmed' || boothAgentStatus === 'rejected') && localStorage.getItem(`ack_ba_status_${code}`) !== boothAgentStatus)
+  const hasPendingNotification = 
+    (referredCount >= 5 && meetingInterest === null)
+
+  const hasVolunteerNotif = (volunteerStatus === 'confirmed' || volunteerStatus === 'rejected') &&
+    localStorage.getItem(`ack_vol_status_${code}`) !== volunteerStatus
+  const hasBoothAgentNotif = (boothAgentStatus === 'confirmed' || boothAgentStatus === 'rejected') &&
+    localStorage.getItem(`ack_ba_status_${code}`) !== boothAgentStatus
+  const hasSidebarNotification = hasVolunteerNotif || hasBoothAgentNotif
 
   return (
     <div className="chatbot-app wtl-theme">
@@ -3680,7 +4682,7 @@ export default function ChatbotPage() {
               <div className="left-menu-profile-info">
                 <div className="left-menu-brand">BJP TAMIL NADU</div>
                 <div className="left-menu-status">
-                  <span className="status-dot-green" /> Console online
+                  <span className="status-dot-green" /> Online
                 </div>
               </div>
             </div>
@@ -3692,9 +4694,7 @@ export default function ChatbotPage() {
                   } ${hasAppointment ? 'bell-booked-btn' : ''}`}
                   onClick={handleBellClick}
                   title={
-                    localBodyInterest === null 
-                      ? 'Local Body Elections interest check' 
-                      : hasAppointment 
+                    hasAppointment 
                       ? 'Meeting Scheduled! Click to view details' 
                       : 'Milestone Achieved! Click to Schedule Meeting with President'
                   }
@@ -3755,9 +4755,16 @@ export default function ChatbotPage() {
               { icon: 'trophy-fill',         label: 'Best Performers',   action: 'best_performers', desc: 'Top 5 referrers list' },
               { icon: 'hand-thumbs-up-fill', label: 'Be an Organizer',    action: 'volunteer',    desc: 'Apply to be a BJP Organizer' },
               { icon: 'building-fill-check', label: 'Be a Booth Agent',  action: 'booth_agent',  desc: 'Apply to be a Booth Agent' },
+              { icon: 'check-square-fill',   label: 'Local Body Election', action: 'local_body',   desc: 'Participate in Local Body elections' },
             ].map((item) => {
               const isComingSoon = false
               const locked = !isDone || (item.action === 'appreciation_letter' && referredCount < 5)
+              const itemHasNotif =
+                (item.action === 'volunteer' && hasVolunteerNotif) ||
+                (item.action === 'booth_agent' && hasBoothAgentNotif)
+              const notifStatus =
+                item.action === 'volunteer' ? volunteerStatus :
+                item.action === 'booth_agent' ? boothAgentStatus : null
               return (
                 <div
                   key={item.action}
@@ -3774,9 +4781,22 @@ export default function ChatbotPage() {
                   </div>
                   <div className="left-chat-details">
                     <div className="left-chat-name-row">
-                      <div style={{ display: 'flex', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                         <span className="left-chat-name">{item.label}</span>
                         {isComingSoon && <span className="coming-soon-badge">Coming Soon</span>}
+                        {itemHasNotif && (
+                          <span style={{
+                            display: 'inline-flex', alignItems: 'center', gap: 3,
+                            background: notifStatus === 'confirmed' ? 'rgba(46,204,113,0.15)' : 'rgba(229,57,53,0.15)',
+                            color: notifStatus === 'confirmed' ? '#2ecc71' : '#e53935',
+                            border: `1px solid ${notifStatus === 'confirmed' ? '#2ecc71' : '#e53935'}`,
+                            borderRadius: 20, padding: '1px 7px', fontSize: 10, fontWeight: 700
+                          }}>
+                            {notifStatus === 'confirmed'
+                              ? <><i className="bi bi-check-circle-fill" /> Accepted</>
+                              : <><i className="bi bi-x-circle-fill" /> Rejected</>}
+                          </span>
+                        )}
                       </div>
                       {locked && <i className="bi bi-lock-fill lock-icon" />}
                     </div>
@@ -3810,14 +4830,24 @@ export default function ChatbotPage() {
             <FullLetterPanel 
               type="welcome" 
               name={cardRef.current?.name || cardRef.current?.voter_name || profileRef.current?.name || 'Member'}
-              date={new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+              date={
+                createdAt
+                  ? new Date(createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+                  : (cardRef.current?.created_at || profileRef.current?.created_at || cardRef.current?.generated_at || profileRef.current?.generated_at)
+                    ? new Date(cardRef.current?.created_at || profileRef.current?.created_at || cardRef.current?.generated_at || profileRef.current?.generated_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+                    : new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+              }
               onBack={() => setActiveView('chat')} 
             />
           ) : activeView === 'appreciation_letter' ? (
             <FullLetterPanel 
               type="appreciation" 
               name={cardRef.current?.name || cardRef.current?.voter_name || profileRef.current?.name || 'Member'}
-              date={new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+              date={
+                appreciationEarnedAt
+                  ? new Date(appreciationEarnedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+                  : new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+              }
               onBack={() => setActiveView('chat')} 
             />
           ) : activeView === 'referral' ? (
@@ -3843,6 +4873,17 @@ export default function ChatbotPage() {
                 isLatest={true}
               />
             </FullFormPanel>
+          ) : activeView === 'local_body' ? (
+            <LocalBodyPanel 
+              onBack={() => setActiveView('chat')} 
+              localBodyInterest={localBodyInterest}
+              handleLocalBodyInterestSubmit={handleLocalBodyInterestSubmit}
+            />
+          ) : activeView === 'my_members' ? (
+            <FullMyMembersPanel 
+              wtlCode={cardRef.current?.wtl_code || cardRef.current?.ptc_code || profileRef.current?.wtl_code || profileRef.current?.ptc_code}
+              onBack={() => setActiveView('chat')} 
+            />
           ) : (
             <div className="chatbot-container">
 
@@ -3851,7 +4892,7 @@ export default function ChatbotPage() {
             <header className="chat-header">
               <div
                 className="chat-header-avatar"
-                onClick={() => isDone && setSidebarOpen(true)}
+                onClick={() => isDone && handleSidebarOpen()}
               >
                 <img src="/bjp_logo.svg" alt="BJP" onError={(e) => { e.target.style.display = 'none' }} />
               </div>
@@ -3861,7 +4902,7 @@ export default function ChatbotPage() {
                   {chatState === S.GENERATING ? (
                     <><span className="status-dot-pulsing" /> Generating membership card...</>
                   ) : isDone ? (
-                    <><span className="status-dot-green" /> Console online</>
+                    <><span className="status-dot-green" /> Online</>
                   ) : (
                     <><span className="status-dot-green" /> Registration in progress</>
                   )}
@@ -3875,9 +4916,7 @@ export default function ChatbotPage() {
                     } ${hasAppointment ? 'bell-booked-btn' : ''}`}
                     onClick={handleBellClick}
                     title={
-                      localBodyInterest === null 
-                        ? 'Local Body Elections interest check' 
-                        : hasAppointment 
+                      hasAppointment 
                         ? 'Meeting Scheduled! Click to view details' 
                         : 'Milestone Achieved! Click to Schedule Meeting with President'
                     }
@@ -3896,7 +4935,7 @@ export default function ChatbotPage() {
                 {isDone && (
                   <button
                     className="chat-header-btn"
-                    onClick={() => setSidebarOpen(true)}
+                    onClick={handleSidebarOpen}
                     title="Menu"
                   >
                     <i className="bi bi-list" />
@@ -4003,8 +5042,9 @@ export default function ChatbotPage() {
                       Card Generated Successfully
                     </span>
                   </div>
-                  <button className="chat-send-btn menu-btn" onClick={() => setSidebarOpen(true)} title="Menu">
+                  <button className="chat-send-btn menu-btn" onClick={handleSidebarOpen} title="Menu" style={{ position: 'relative' }}>
                     <i className="bi bi-grid-3x3-gap-fill" />
+                    {hasSidebarNotification && <span style={{ position: 'absolute', top: 4, right: 4, width: 8, height: 8, borderRadius: '50%', background: '#e53935', display: 'block' }} />}
                   </button>
                 </div>
               ) : inputCfg ? (
@@ -4028,7 +5068,7 @@ export default function ChatbotPage() {
                   <button
                     type="submit"
                     className="chat-send-btn"
-                    disabled={!inputValue.trim() || isTyping}
+                    disabled={getIsSendDisabled()}
                   >
                     <i className="bi bi-send-fill" />
                   </button>
@@ -4086,9 +5126,16 @@ export default function ChatbotPage() {
                 { icon: 'people-fill',         label: 'My Members',        action: 'my_members' },
                 { icon: 'hand-thumbs-up-fill', label: 'Be an Organizer',    action: 'volunteer' },
                 { icon: 'building-fill-check', label: 'Be a Booth Agent',  action: 'booth_agent' },
+                { icon: 'check-square-fill',   label: 'Local Body Election', action: 'local_body' },
               ].map((item) => {
                 const isComingSoon = false
                 const isLocked = item.action === 'appreciation_letter' && referredCount < 5
+                const itemHasNotif =
+                  (item.action === 'volunteer' && hasVolunteerNotif) ||
+                  (item.action === 'booth_agent' && hasBoothAgentNotif)
+                const notifStatus =
+                  item.action === 'volunteer' ? volunteerStatus :
+                  item.action === 'booth_agent' ? boothAgentStatus : null
                 return (
                   <button
                     key={item.action}
@@ -4101,6 +5148,20 @@ export default function ChatbotPage() {
                         <i className={`bi bi-${item.icon}`} />
                         <span>{item.label}</span>
                         {isComingSoon && <span className="coming-soon-badge">Coming Soon</span>}
+                        {itemHasNotif && (
+                          <span style={{
+                            display: 'inline-flex', alignItems: 'center', gap: 4,
+                            background: notifStatus === 'confirmed' ? 'rgba(46,204,113,0.15)' : 'rgba(229,57,53,0.15)',
+                            color: notifStatus === 'confirmed' ? '#2ecc71' : '#e53935',
+                            border: `1px solid ${notifStatus === 'confirmed' ? '#2ecc71' : '#e53935'}`,
+                            borderRadius: 20, padding: '2px 8px', fontSize: 10, fontWeight: 700,
+                            animation: 'pulse 1.5s infinite'
+                          }}>
+                            {notifStatus === 'confirmed'
+                              ? <><i className="bi bi-check-circle-fill" /> Accepted</>  
+                              : <><i className="bi bi-x-circle-fill" /> Rejected</>}
+                          </span>
+                        )}
                       </div>
                       {(isComingSoon || isLocked) && <i className="bi bi-lock-fill" style={{ fontSize: 12, opacity: 0.8 }} />}
                     </div>

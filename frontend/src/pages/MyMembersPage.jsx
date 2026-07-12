@@ -98,7 +98,7 @@ export default function MyMembersPage() {
           {/* Photo */}
           <div style={{ position: 'relative', flexShrink: 0 }}>
             {member.photo_url ? (
-              <img src={member.photo_url} alt={member.name} style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover', border: '1px solid var(--color-graphite)' }} />
+              <img src={member.photo_url} crossOrigin="anonymous" alt={member.name} style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover', border: '1px solid var(--color-graphite)' }} />
             ) : (
               <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#252d27', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--color-graphite)' }}>
                 <i className="bi bi-person-fill" style={{ color: 'var(--color-ash)', fontSize: 14 }} />
@@ -357,8 +357,8 @@ export default function MyMembersPage() {
 
             {/* Information Grid */}
             <div style={{
-              background: '#131915',
-              border: '1px solid var(--color-graphite)',
+              background: '#F9F8F6',
+              border: '1px solid #E2E8F0',
               borderRadius: 16,
               padding: 16,
               display: 'flex',
@@ -366,31 +366,31 @@ export default function MyMembersPage() {
               gap: 12
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-                <span style={{ color: 'var(--color-ash)' }}>Member Name</span>
-                <span style={{ color: 'var(--color-chalk)', fontWeight: 600 }}>{selectedMember.name}</span>
+                <span style={{ color: '#555555' }}>Member Name</span>
+                <span style={{ color: '#111111', fontWeight: 600 }}>{selectedMember.name}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-                <span style={{ color: 'var(--color-ash)' }}>EPIC Number</span>
-                <span style={{ color: 'var(--color-chalk)', fontFamily: 'monospace', fontWeight: 600 }}>{selectedMember.epic_no || '—'}</span>
+                <span style={{ color: '#555555' }}>EPIC Number</span>
+                <span style={{ color: '#111111', fontFamily: 'monospace', fontWeight: 600 }}>{selectedMember.epic_no || '—'}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-                <span style={{ color: 'var(--color-ash)' }}>BJP Code</span>
-                <span style={{ color: 'var(--color-signal-mint)', fontFamily: 'monospace', fontWeight: 700 }}>{selectedMember.wtl_code}</span>
+                <span style={{ color: '#555555' }}>BJP Code</span>
+                <span style={{ color: '#FF9933', fontFamily: 'monospace', fontWeight: 700 }}>{selectedMember.wtl_code}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-                <span style={{ color: 'var(--color-ash)' }}>Assembly (Booth)</span>
-                <span style={{ color: 'var(--color-chalk)', fontWeight: 600 }}>
+                <span style={{ color: '#555555' }}>Assembly (Booth)</span>
+                <span style={{ color: '#111111', fontWeight: 600 }}>
                   {selectedMember.assembly_name ? `${selectedMember.assembly_name} (Part ${selectedMember.part_no || '—'})` : '—'}
                 </span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-                <span style={{ color: 'var(--color-ash)' }}>District</span>
-                <span style={{ color: 'var(--color-chalk)', fontWeight: 600 }}>{selectedMember.district || '—'}</span>
+                <span style={{ color: '#555555' }}>District</span>
+                <span style={{ color: '#111111', fontWeight: 600 }}>{selectedMember.district || '—'}</span>
               </div>
               {selectedMember.generated_at && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-                  <span style={{ color: 'var(--color-ash)' }}>Joined Date</span>
-                  <span style={{ color: 'var(--color-chalk)', fontWeight: 600 }}>{new Date(selectedMember.generated_at).toLocaleDateString()}</span>
+                  <span style={{ color: '#555555' }}>Joined Date</span>
+                  <span style={{ color: '#111111', fontWeight: 600 }}>{new Date(selectedMember.generated_at).toLocaleDateString()}</span>
                 </div>
               )}
             </div>
