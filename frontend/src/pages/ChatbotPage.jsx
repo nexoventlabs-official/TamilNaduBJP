@@ -3820,6 +3820,9 @@ function BestPerformersPanel({ onBack }) {
 // ── Main ChatbotPage ────────────────────────────────────────
 export default function ChatbotPage() {
   const navigate = useNavigate()
+  useEffect(() => {
+    console.log("BJP TN Member App v1.0.5 Loaded");
+  }, [])
   const [chatState, setChatState]   = useState(S.WELCOME)
   const [messages, setMessages]     = useState([])
   const [inputValue, setInputValue] = useState('')
@@ -4669,6 +4672,7 @@ export default function ChatbotPage() {
     localStorage.getItem(`ack_ba_status_${code}`) !== boothAgentStatus
   const hasSidebarNotification = hasVolunteerNotif || hasBoothAgentNotif
 
+  // Cache-busting comment v1.0.5 to force new hash
   return (
     <div className="chatbot-app wtl-theme">
       {/* ── Main Layout ── */}
