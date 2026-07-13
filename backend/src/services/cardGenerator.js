@@ -127,12 +127,12 @@ async function generateCard(voter, photoBuffer = null) {
 
   // Generate QR code pointing to the referral URL for this member
   let qrData = voter.referral_link || '';
-  if (!qrData && wtlCode && voter.referral_id) {
-    const baseUrl  = process.env.BASE_URL || 'https://we-the-leader.onrender.com';
+  const baseUrl = process.env.BASE_URL || 'https://tnbjp.org';
+  if (qrData) {
+    qrData = qrData.replace(/https?:\/\/[^\/]+/, baseUrl);
+  } else if (wtlCode && voter.referral_id) {
     qrData = `${baseUrl}/refer/${wtlCode}/${voter.referral_id}`;
-  }
-  if (!qrData) {
-    const baseUrl  = process.env.BASE_URL || 'https://we-the-leader.onrender.com';
+  } else {
     qrData = `${baseUrl}/verify/${wtlCode || epicNo}`;
   }
   const qrDataUrl = await QRCode.toDataURL(qrData, {

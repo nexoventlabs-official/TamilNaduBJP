@@ -135,11 +135,18 @@ router.get('/api/stats', async (req, res) => {
       { $group: { _id: null, total: { $sum: '$referred_members_count' } } },
     ]).toArray();
 
-    const [pendingVols, confirmedVols, pendingBA, confirmedBA, topReferrals] = await Promise.all([
+    const [
+      pendingVols, confirmedVols,
+      pendingBA, confirmedBA,
+      localBodyCount, meetRequestsCount,
+      topReferrals
+    ] = await Promise.all([
       db.collection('volunteer_requests').countDocuments({ status: 'pending' }),
       db.collection('volunteer_requests').countDocuments({ status: 'confirmed' }),
       db.collection('booth_agent_requests').countDocuments({ status: 'pending' }),
       db.collection('booth_agent_requests').countDocuments({ status: 'confirmed' }),
+      db.collection('generated_voters').countDocuments({ local_body_interest: 'interested' }),
+      db.collection('appointments').countDocuments({ interest: 'interested' }),
       db.collection('generated_voters')
         .find({ referred_members_count: { $gt: 0 } })
         .sort({ referred_members_count: -1 })
@@ -148,19 +155,20 @@ router.get('/api/stats', async (req, res) => {
         .toArray()
     ]);
 
+    await presignPhotoUrls(topReferrals);
+
     const result = {
       // ── Fields matched to DashboardPage.jsx ─────────────────────
-      total_voters:           totalVoters,                      // 5.8cr from DB1
-      users_generated:        sa.total_generated  || 0,         // unique users who generated
-      total_generations:      sa.total_generations || 0,        // total card gen count
-      cards_on_cloud:         sa.cards_on_cloud    || 0,        // cards with Cloudinary URL
-      generated_voters:       generatedCount,                   // generated_voters collection size
-      total_referrals:        referralsAgg[0]?.total || 0,
-      pending_volunteers:     pendingVols,
-      confirmed_volunteers:   confirmedVols,
-      pending_booth_agents:   pendingBA,
-      confirmed_booth_agents: confirmedBA,
-      db_connected:           true,
+      total_voters:              totalVoters,
+      total_members:             generatedCount,
+      total_referrals:           referralsAgg[0]?.total || 0,
+      pending_volunteers:        pendingVols,
+      confirmed_volunteers:      confirmedVols,
+      pending_booth_agents:      pendingBA,
+      confirmed_booth_agents:    confirmedBA,
+      local_body_interest_count: localBodyCount,
+      meet_requests_count:       meetRequestsCount,
+      db_connected:              true,
       top_referrals: topReferrals.map(r => ({
         name: r.VOTER_NAME || `${r.FM_NAME_EN || ''} ${r.LASTNAME_EN || ''}`.trim() || 'Unknown',
         code: r.wtl_code || '',
@@ -177,10 +185,16 @@ router.get('/api/stats', async (req, res) => {
   } catch (err) {
     console.error('stats error:', err);
     return res.json({
-      total_voters: 0, users_generated: 0, total_generations: 0,
-      cards_on_cloud: 0, generated_voters: 0, db_connected: false,
-      total_referrals: 0, pending_volunteers: 0, confirmed_volunteers: 0,
-      pending_booth_agents: 0, confirmed_booth_agents: 0,
+      total_voters: 0,
+      total_members: 0,
+      total_referrals: 0,
+      pending_volunteers: 0,
+      confirmed_volunteers: 0,
+      pending_booth_agents: 0,
+      confirmed_booth_agents: 0,
+      local_body_interest_count: 0,
+      meet_requests_count: 0,
+      db_connected: false
     });
   }
 });
@@ -581,11 +595,8 @@ router.post('/api/volunteer-requests/:wtlCode/reject', async (req, res) => {
 // ────────────────────────────────────────────────────────────────
 router.get('/api/confirmed-volunteers', async (req, res) => {
   try {
-    const { search, page, perPage } = buildListParams(req);
-    const filt = { status: 'confirmed' };
-    if (search) {
-      filt.$or = [{ name: { $regex: search, $options: 'i' } }, { wtl_code: { $regex: search, $options: 'i' } }];
-    }
+    const { search, page, perPage, filt } = buildListParams(req);
+    filt.status = 'confirmed';
     const db = getDb();
     const { items, total, totalPages } = await paginatedList(db, 'volunteer_requests', filt, { reviewed_at: -1 }, page, perPage);
 
@@ -727,11 +738,8 @@ router.post('/api/booth-agent-requests/:wtlCode/reject', async (req, res) => {
 // ────────────────────────────────────────────────────────────────
 router.get('/api/confirmed-booth-agents', async (req, res) => {
   try {
-    const { search, page, perPage } = buildListParams(req);
-    const filt = { status: 'confirmed' };
-    if (search) {
-      filt.$or = [{ name: { $regex: search, $options: 'i' } }, { wtl_code: { $regex: search, $options: 'i' } }];
-    }
+    const { search, page, perPage, filt } = buildListParams(req);
+    filt.status = 'confirmed';
     const db = getDb();
     const { items, total, totalPages } = await paginatedList(db, 'booth_agent_requests', filt, { reviewed_at: -1 }, page, perPage);
 

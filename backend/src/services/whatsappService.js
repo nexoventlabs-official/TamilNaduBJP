@@ -12,6 +12,7 @@
 'use strict';
 
 const axios  = require('axios');
+const Sentry = require('@sentry/node');
 const config = require('../config');
 
 const GRAPH_VERSION = 'v22.0';
@@ -53,6 +54,15 @@ async function sendTextMessage(to, text) {
   } catch (err) {
     const e = err.response?.data?.error || err.message;
     console.error(`[WA] sendTextMessage to ${to} failed:`, JSON.stringify(e));
+    Sentry.captureException(err, {
+      tags:  { operation: 'whatsapp_send', message_type: 'text', whatsapp_api: 'send_message' },
+      extra: {
+        recipient:    to,
+        errorCode:    err.response?.data?.error?.code,
+        errorMessage: err.response?.data?.error?.message || err.message,
+        messageLength: (text || '').length,
+      },
+    });
     return { success: false, error: e };
   }
 }
@@ -97,6 +107,14 @@ async function sendReplyButtons(to, bodyText, buttons, header, footer) {
   } catch (err) {
     const e = err.response?.data?.error || err.message;
     console.error(`[WA] sendReplyButtons to ${to} failed:`, JSON.stringify(e));
+    Sentry.captureException(err, {
+      tags:  { operation: 'whatsapp_send', message_type: 'buttons', whatsapp_api: 'send_message' },
+      extra: {
+        recipient:    to,
+        errorCode:    err.response?.data?.error?.code,
+        errorMessage: err.response?.data?.error?.message || err.message,
+      },
+    });
     return { success: false, error: e };
   }
 }
@@ -124,6 +142,16 @@ async function sendImageMessage(to, imageUrl, caption) {
   } catch (err) {
     const e = err.response?.data?.error || err.message;
     console.error(`[WA] sendImageMessage to ${to} failed:`, JSON.stringify(e));
+    Sentry.captureException(err, {
+      tags:  { operation: 'whatsapp_send', message_type: 'image', whatsapp_api: 'send_message' },
+      extra: {
+        recipient:     to,
+        imageUrl,
+        captionLength: (caption || '').length,
+        errorCode:     err.response?.data?.error?.code,
+        errorMessage:  err.response?.data?.error?.message || err.message,
+      },
+    });
     return { success: false, error: e };
   }
 }
@@ -186,6 +214,15 @@ async function sendFlowMessage(to, flowType) {
   } catch (err) {
     const e = err.response?.data?.error || err.message;
     console.error(`[WA] sendFlowMessage (${flowType}) to ${to} failed:`, JSON.stringify(e));
+    Sentry.captureException(err, {
+      tags:  { operation: 'whatsapp_send', message_type: 'flow', whatsapp_api: 'send_message' },
+      extra: {
+        recipient:    to,
+        flowType,
+        errorCode:    err.response?.data?.error?.code,
+        errorMessage: err.response?.data?.error?.message || err.message,
+      },
+    });
     return { success: false, error: e };
   }
 }
@@ -233,6 +270,15 @@ async function sendCtaUrlMessage(to, headerText, bodyText, footerText, btnLabel,
   } catch (err) {
     const e = err.response?.data?.error || err.message;
     console.error(`[WA] sendCtaUrlMessage to ${to} failed:`, JSON.stringify(e));
+    Sentry.captureException(err, {
+      tags:  { operation: 'whatsapp_send', message_type: 'cta_url', whatsapp_api: 'send_message' },
+      extra: {
+        recipient:    to,
+        url,
+        errorCode:    err.response?.data?.error?.code,
+        errorMessage: err.response?.data?.error?.message || err.message,
+      },
+    });
     return { success: false, error: e };
   }
 }

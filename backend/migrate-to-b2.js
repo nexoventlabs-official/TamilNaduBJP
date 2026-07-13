@@ -13,7 +13,8 @@ const s3 = new S3Client({
   credentials: {
     accessKeyId: config.b2.keyId,
     secretAccessKey: config.b2.appKey
-  }
+  },
+  forcePathStyle: true
 });
 
 const BUCKET_NAME = config.b2.bucketName || 'bjpmembers';

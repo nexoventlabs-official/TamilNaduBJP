@@ -548,17 +548,47 @@ function GeneratedCardMsg({ card, isNew = false }) {  const c = card || {}
   )
 }
 
-function WelcomeLetterMsg({ name, date, autoDownload }) {
+const triggerPDFDownload = (iframeId, fileName) => {
+  const iframe = document.getElementById(iframeId);
+  if (!iframe || !iframe.contentWindow) return;
+
+  const ua = navigator.userAgent || '';
+  const isIOS = /iPad|iPhone|iPod/.test(ua) && !window.MSStream;
+  const isSafari = /^((?!chrome|android).)*safari/i.test(ua);
+  const isMobileSafari = isIOS || isSafari;
+  
+  // Check if Web Share API with files is likely supported.
+  const isShareSupported = typeof navigator.share === 'function' && typeof navigator.canShare === 'function';
+
+  let iosWin = null;
+  if (isMobileSafari && !isShareSupported) {
+    try {
+      iosWin = window.open('', '_blank');
+      if (iosWin) {
+        iosWin.document.write('<html><head><title>Generating PDF...</title><style>body{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;margin:0;font-family:sans-serif;background:#f5f5f5;color:#333;font-size:18px;text-align:center;padding:20px;box-sizing:border-box;}.spinner{border:4px solid rgba(0,0,0,0.1);width:36px;height:36px;border-radius:50%;border-left-color:#ff6600;animation:spin 1s linear infinite;margin-bottom:20px;}@keyframes spin{0%{transform:rotate(0deg);}100%{transform:rotate(360deg);}}</style></head><body><div class="spinner"></div><p>Generating PDF, please wait...</p></body></html>');
+        iosWin.document.close();
+      }
+      window.iosWin = iosWin;
+    } catch (e) {
+      console.warn('Failed to pre-open window on iOS', e);
+    }
+  }
+
+  if (typeof iframe.contentWindow.downloadPDF === 'function') {
+    iframe.contentWindow.downloadPDF(fileName, iosWin);
+  } else {
+    if (iosWin) iosWin.close();
+    iframe.contentWindow.focus();
+    iframe.contentWindow.print();
+  }
+};
+
+function WelcomeLetterMsg({ name, date, refCode, autoDownload }) {
   const safeId = name.replace(/[^a-zA-Z0-9]/g, '-')
+  const wrapperRef = useRef(null)
   
   const handlePrint = () => {
-    const iframe = document.getElementById(`welcome-iframe-${safeId}`)
-    if (iframe && iframe.contentWindow && typeof iframe.contentWindow.downloadPDF === 'function') {
-      iframe.contentWindow.downloadPDF(`Welcome_Letter_${name}`)
-    } else if (iframe && iframe.contentWindow) {
-      iframe.contentWindow.focus()
-      iframe.contentWindow.print()
-    }
+    triggerPDFDownload(`welcome-iframe-${safeId}`, `Welcome_Letter_${name}`);
   }
 
   const hasDownloaded = useRef(false)
@@ -566,20 +596,17 @@ function WelcomeLetterMsg({ name, date, autoDownload }) {
   useEffect(() => {
     if (autoDownload && !hasDownloaded.current) {
       const timer = setTimeout(() => {
-        const iframe = document.getElementById(`welcome-iframe-${safeId}`)
-        if (iframe && iframe.contentWindow && typeof iframe.contentWindow.downloadPDF === 'function') {
-          hasDownloaded.current = true
-          iframe.contentWindow.downloadPDF(`Welcome_Letter_${name}`)
-        }
+        hasDownloaded.current = true
+        triggerPDFDownload(`welcome-iframe-${safeId}`, `Welcome_Letter_${name}`);
       }, 3500)
       return () => clearTimeout(timer)
     }
   }, [autoDownload, name, safeId])
 
-  const letterUrl = `/Welcome_letter.html?name=${encodeURIComponent(name)}&date=${encodeURIComponent(date)}&lang=ta&hideControls=true&v=1.0.4`
+  const letterUrl = `/Welcome_letter.html?name=${encodeURIComponent(name)}&date=${encodeURIComponent(date)}&ref=${encodeURIComponent(refCode || '')}&lang=ta&hideControls=true&apiUrl=${encodeURIComponent(import.meta.env.VITE_API_URL || '')}&v=1.0.4`
 
   return (
-    <div style={{
+    <div ref={wrapperRef} style={{
       background: 'var(--color-carbon)',
       border: '1.5px solid rgba(19, 136, 8, 0.25)',
       borderRadius: '20px',
@@ -828,17 +855,11 @@ function ReferralLinkMsg({ link }) {
   )
 }
 
-function AppreciationLetterMsg({ name, date, autoDownload }) {
+function AppreciationLetterMsg({ name, date, refCode, autoDownload }) {
   const safeId = name.replace(/[^a-zA-Z0-9]/g, '-')
   
   const handlePrint = () => {
-    const iframe = document.getElementById(`appreciation-iframe-${safeId}`)
-    if (iframe && iframe.contentWindow && typeof iframe.contentWindow.downloadPDF === 'function') {
-      iframe.contentWindow.downloadPDF(`Appreciation_Letter_${name}`)
-    } else if (iframe && iframe.contentWindow) {
-      iframe.contentWindow.focus()
-      iframe.contentWindow.print()
-    }
+    triggerPDFDownload(`appreciation-iframe-${safeId}`, `Appreciation_Letter_${name}`);
   }
 
   const hasDownloaded = useRef(false)
@@ -846,17 +867,14 @@ function AppreciationLetterMsg({ name, date, autoDownload }) {
   useEffect(() => {
     if (autoDownload && !hasDownloaded.current) {
       const timer = setTimeout(() => {
-        const iframe = document.getElementById(`appreciation-iframe-${safeId}`)
-        if (iframe && iframe.contentWindow && typeof iframe.contentWindow.downloadPDF === 'function') {
-          hasDownloaded.current = true
-          iframe.contentWindow.downloadPDF(`Appreciation_Letter_${name}`)
-        }
+        hasDownloaded.current = true
+        triggerPDFDownload(`appreciation-iframe-${safeId}`, `Appreciation_Letter_${name}`);
       }, 3500)
       return () => clearTimeout(timer)
     }
   }, [autoDownload, name, safeId])
 
-  const letterUrl = `/Appreciation_letter.html?name=${encodeURIComponent(name)}&date=${encodeURIComponent(date)}&lang=ta&hideControls=true&v=1.0.4`
+  const letterUrl = `/Appreciation_letter.html?name=${encodeURIComponent(name)}&date=${encodeURIComponent(date)}&ref=${encodeURIComponent(refCode || '')}&lang=ta&hideControls=true&apiUrl=${encodeURIComponent(import.meta.env.VITE_API_URL || '')}&v=1.0.4`
 
   return (
     <div style={{
@@ -2245,24 +2263,37 @@ function BrochurePanel({ onBack }) {
   );
 }
 
-function FullLetterPanel({ type, name, date, onBack }) {
+function FullLetterPanel({ type, name, date, refCode, epicNo, onBack }) {
   const [selectedLang, setSelectedLang] = useState('ta')
+  const [resolvedRefCode, setResolvedRefCode] = useState(refCode || '')
+
+  useEffect(() => {
+    if (refCode) {
+      setResolvedRefCode(refCode)
+    }
+  }, [refCode])
+
+  useEffect(() => {
+    if (!resolvedRefCode && epicNo) {
+      publicApi.getCardData(epicNo)
+        .then((data) => {
+          if (data && data.wtl_code) {
+            setResolvedRefCode(data.wtl_code)
+          }
+        })
+        .catch(() => {})
+    }
+  }, [resolvedRefCode, epicNo])
 
   const handleDownloadPDF = () => {
-    const iframe = document.getElementById('full-letter-iframe')
-    if (iframe && iframe.contentWindow && typeof iframe.contentWindow.downloadPDF === 'function') {
-      const fileName = `${type === 'appreciation' ? 'Appreciation_Letter' : 'Welcome_Letter'}_${name}`
-      iframe.contentWindow.downloadPDF(fileName)
-    } else if (iframe && iframe.contentWindow) {
-      iframe.contentWindow.focus()
-      iframe.contentWindow.print()
-    }
+    const fileName = `${type === 'appreciation' ? 'Appreciation_Letter' : 'Welcome_Letter'}_${name}`
+    triggerPDFDownload('full-letter-iframe', fileName);
   }
 
   const isAppreciation = type === 'appreciation';
   const letterUrl = isAppreciation
-    ? `/Appreciation_letter.html?name=${encodeURIComponent(name)}&date=${encodeURIComponent(date)}&lang=${selectedLang}&hideControls=true&v=1.0.4`
-    : `/Welcome_letter.html?name=${encodeURIComponent(name)}&date=${encodeURIComponent(date)}&lang=${selectedLang}&hideControls=true&v=1.0.4`;
+    ? `/Appreciation_letter.html?name=${encodeURIComponent(name)}&date=${encodeURIComponent(date)}&ref=${encodeURIComponent(resolvedRefCode || '')}&lang=${selectedLang}&hideControls=true&apiUrl=${encodeURIComponent(import.meta.env.VITE_API_URL || '')}&v=1.0.4`
+    : `/Welcome_letter.html?name=${encodeURIComponent(name)}&date=${encodeURIComponent(date)}&ref=${encodeURIComponent(resolvedRefCode || '')}&lang=${selectedLang}&hideControls=true&apiUrl=${encodeURIComponent(import.meta.env.VITE_API_URL || '')}&v=1.0.4`;
 
   return (
     <div className="chatbot-container brochure-panel">
@@ -3583,7 +3614,7 @@ function BestPerformersPanel({ onBack }) {
 
                     <div style={{ position: 'relative', flexShrink: 0 }}>
                       {p.photo_url ? (
-                        <img src={p.photo_url} alt={p.name} style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', border: '1.5px solid var(--color-graphite)' }} />
+                        <img src={p.photo_url} crossOrigin="anonymous" alt={p.name} style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', border: '1.5px solid var(--color-graphite)' }} />
                       ) : (
                         <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#252d27', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1.5px solid var(--color-graphite)' }}>
                           <i className="bi bi-person-fill" style={{ color: 'var(--color-ash)', fontSize: 18 }} />
@@ -3822,6 +3853,94 @@ export default function ChatbotPage() {
   const navigate = useNavigate()
   useEffect(() => {
     console.log("BJP TN Member App v1.0.5 Loaded");
+
+    window.handlePDFGenerated = (pdfBlob, filename) => {
+      console.log('Parent received generated PDF blob:', filename);
+      const file = new File([pdfBlob], filename, { type: 'application/pdf' });
+      
+      const uploadAndDownloadPDF = () => {
+        const reader = new FileReader();
+        reader.readAsDataURL(pdfBlob);
+        reader.onloadend = () => {
+          const base64data = reader.result.split(',')[1];
+          const apiUrl = import.meta.env.VITE_API_URL || '';
+          const uploadUrl = `${apiUrl}/api/verify/pdf/upload`;
+          
+          fetch(uploadUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              pdfData: base64data,
+              filename: filename
+            })
+          })
+          .then((res) => {
+            if (!res.ok) throw new Error('Upload failed');
+            return res.json();
+          })
+          .then((data) => {
+            const downloadId = data.downloadId;
+            const downloadUrl = `${apiUrl}/api/verify/pdf/download/${downloadId}?disposition=attachment`;
+            
+            // If we pre-opened a window, use it
+            if (window.iosWin && !window.iosWin.closed) {
+              window.iosWin.location.href = downloadUrl;
+              window.iosWin = null;
+            } else {
+              // Otherwise navigate parent
+              window.location.href = downloadUrl;
+            }
+          })
+          .catch((err) => {
+            console.error('Server upload failed, saving locally:', err);
+            if (window.iosWin && !window.iosWin.closed) {
+              try { window.iosWin.close(); } catch (e) {}
+              window.iosWin = null;
+            }
+            // Fallback: programmatically click a blob link
+            const blobUrl = URL.createObjectURL(pdfBlob);
+            const a = document.createElement('a');
+            a.href = blobUrl;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(blobUrl);
+          });
+        };
+      };
+
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        if (window.iosWin && !window.iosWin.closed) {
+          try { window.iosWin.close(); } catch (e) {}
+          window.iosWin = null;
+        }
+        navigator.share({
+          files: [file],
+          title: filename,
+          text: 'Your Official BJP Tamil Nadu Letter'
+        })
+        .then(() => {
+          console.log('PDF shared successfully');
+        })
+        .catch((err) => {
+          console.warn('PDF share failed or canceled:', err);
+          // If the user cancelled the share sheet (AbortError), don't trigger download fallback.
+          // Otherwise, if it was a real failure, fall back to upload/download.
+          if (err.name !== 'AbortError') {
+            uploadAndDownloadPDF();
+          }
+        });
+      } else {
+        uploadAndDownloadPDF();
+      }
+    };
+
+    return () => {
+      delete window.handlePDFGenerated;
+    };
   }, [])
   const [chatState, setChatState]   = useState(S.WELCOME)
   const [messages, setMessages]     = useState([])
@@ -4322,7 +4441,7 @@ export default function ChatbotPage() {
       const regDate = card.created_at || card.generated_at
         ? new Date(card.created_at || card.generated_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
         : new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-      addMsg('bot', 'welcome_letter', { name: card.name, date: regDate, autoDownload: true })
+      addMsg('bot', 'welcome_letter', { name: card.name, date: regDate, ref: card.wtl_code || card.ptc_code, autoDownload: true })
 
       if (card.referral_link) {
         await sleep(1200)
@@ -4533,14 +4652,14 @@ export default function ChatbotPage() {
       case 'generated_card':
         return <GeneratedCardMsg card={msg.card} isNew={msg.isNew || false} />
       case 'welcome_letter':
-        return <WelcomeLetterMsg name={msg.name} date={msg.date} autoDownload={msg.autoDownload} />
+        return <WelcomeLetterMsg name={msg.name} date={msg.date} refCode={msg.ref || cardRef.current?.wtl_code || cardRef.current?.ptc_code || profileRef.current?.wtl_code || profileRef.current?.ptc_code} autoDownload={msg.autoDownload} />
       case 'appreciation_letter':
-        return <AppreciationLetterMsg name={msg.name} date={msg.date} autoDownload={msg.autoDownload} />
+        return <AppreciationLetterMsg name={msg.name} date={msg.date} refCode={msg.ref || cardRef.current?.wtl_code || cardRef.current?.ptc_code || profileRef.current?.wtl_code || profileRef.current?.ptc_code} autoDownload={msg.autoDownload} />
       case 'profile_card':
         return (
           <div className="profile-card">
             {msg.profile?.photo_url && (
-              <img src={msg.profile.photo_url} alt="Profile" className="profile-photo" />
+              <img src={msg.profile.photo_url} crossOrigin="anonymous" alt="Profile" className="profile-photo" />
             )}
             <div className="profile-details">
               <h4>{msg.profile?.name || 'Member'}</h4>
@@ -4841,6 +4960,8 @@ export default function ChatbotPage() {
                     ? new Date(cardRef.current?.created_at || profileRef.current?.created_at || cardRef.current?.generated_at || profileRef.current?.generated_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
                     : new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
               }
+              refCode={cardRef.current?.wtl_code || cardRef.current?.ptc_code || profileRef.current?.wtl_code || profileRef.current?.ptc_code}
+              epicNo={epicRef.current || cardRef.current?.epic_no || profileRef.current?.epic_no}
               onBack={() => setActiveView('chat')} 
             />
           ) : activeView === 'appreciation_letter' ? (
@@ -4852,6 +4973,8 @@ export default function ChatbotPage() {
                   ? new Date(appreciationEarnedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
                   : new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
               }
+              refCode={cardRef.current?.wtl_code || cardRef.current?.ptc_code || profileRef.current?.wtl_code || profileRef.current?.ptc_code}
+              epicNo={epicRef.current || cardRef.current?.epic_no || profileRef.current?.epic_no}
               onBack={() => setActiveView('chat')} 
             />
           ) : activeView === 'referral' ? (

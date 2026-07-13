@@ -44,7 +44,7 @@ export default function VoterDetailPage() {
           <div style={{ padding: 16 }}>
             <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start', marginBottom: 14 }}>
               {v.photo_url ? (
-                <img src={v.photo_url} alt="Voter" className="voter-photo-preview" />
+                <img src={v.photo_url} crossOrigin="anonymous" alt="Voter" className="voter-photo-preview" />
               ) : (
                 <div style={{ width: 70, height: 90, background: 'rgba(229,57,53,0.08)', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <i className="bi bi-person" style={{ fontSize: 28, color: '#E53935' }} />

@@ -16,8 +16,10 @@ const express = require('express');
 const router  = express.Router();
 const crypto  = require('crypto');
 const axios   = require('axios');
+const Sentry  = require('@sentry/node');
 const config  = require('../config');
 const { getDb, findVoterByEpic } = require('../db');
+const { trackMongoOperation } = require('../utils/dbErrorHandler');
 const {
   sendTextMessage,
   sendReplyButtons,
@@ -266,6 +268,9 @@ async function handleTextMessage(from, mobile, db) {
 
 // ── Image: download, generate card, send ─────────────────────────
 async function handleImageMessage(from, mobile, imageInfo, db) {
+  // Identify the user on every error raised within this operation
+  Sentry.setUser({ id: mobile, mobile, source: 'whatsapp' });
+
   try {
     const pending = await db.collection('pending_registrations').findOne({ mobile });
     if (!pending || pending.status !== 'awaiting_photo') {
@@ -279,6 +284,13 @@ async function handleImageMessage(from, mobile, imageInfo, db) {
 
     const epicNo = pending.epic_no;
     console.log('[Webhook] Photo received from ' + mobile + ' for EPIC ' + epicNo);
+
+    Sentry.addBreadcrumb({
+      category: 'card.generation',
+      message:  'Starting card generation',
+      level:    'info',
+      data:     { mobile, epicNo },
+    });
 
     await db.collection('pending_registrations').updateOne(
       { mobile },
@@ -294,6 +306,13 @@ async function handleImageMessage(from, mobile, imageInfo, db) {
       const ACCESS  = config.whatsapp.accessToken;
       const GRAPH   = 'https://graph.facebook.com/v22.0';
 
+      Sentry.addBreadcrumb({
+        category: 'card.generation',
+        message:  'Downloading photo from WhatsApp',
+        level:    'info',
+        data:     { mediaId },
+      });
+
       const mediaResp = await axios.get(GRAPH + '/' + mediaId, {
         headers: { Authorization: 'Bearer ' + ACCESS },
       });
@@ -304,8 +323,21 @@ async function handleImageMessage(from, mobile, imageInfo, db) {
       });
       photoBuffer = Buffer.from(imgResp.data);
       console.log('[Webhook] Photo downloaded: ' + Math.round(photoBuffer.length / 1024) + ' KB');
+
+      Sentry.addBreadcrumb({
+        category: 'card.generation',
+        message:  'Photo downloaded successfully',
+        level:    'info',
+        data:     { sizeKB: Math.round(photoBuffer.length / 1024) },
+      });
     } catch (e) {
       console.error('[Webhook] Photo download error:', e.message);
+
+      Sentry.captureException(e, {
+        tags: { operation: 'photo_download', source: 'whatsapp', stage: 'card_generation' },
+        extra: { mobile, epicNo, mediaId: imageInfo.id, errorType: 'download_failed' },
+      });
+
       await sendTextMessage(from, 'Could not download your photo. Please send it again.');
       await db.collection('pending_registrations').updateOne(
         { mobile }, { $set: { status: 'awaiting_photo' } },
@@ -318,7 +350,11 @@ async function handleImageMessage(from, mobile, imageInfo, db) {
     // Fetch voter from DB1 to get PART_NO (booth number)
     let partNo = '';
     try {
-      const voterDoc = await findVoterByEpic(epicNo);
+      const voterDoc = await trackMongoOperation(
+        () => findVoterByEpic(epicNo),
+        'find_voter_by_epic',
+        { epicNo, mobile, source: 'whatsapp_webhook' },
+      );
       if (voterDoc) partNo = String(voterDoc.PART_NO || voterDoc.part_no || '').trim();
     } catch (_) {}
 
@@ -339,8 +375,109 @@ async function handleImageMessage(from, mobile, imageInfo, db) {
       wtl_code:      wtlCode,
     };
 
-    const frontBuffer = await generateCard(voterData, photoBuffer);
-    const photoUrl = await uploadPhoto(photoBuffer,  epicNo, mobile);
+    // Generate card (Puppeteer) with dedicated error tracking
+    let frontBuffer;
+    const cardGenStartTime = Date.now();
+    try {
+      Sentry.addBreadcrumb({
+        category: 'card.generation',
+        message:  'Starting Puppeteer card generation',
+        level:    'info',
+      });
+
+      frontBuffer = await Sentry.startSpan(
+        { op: 'card.render', name: 'Generate card with Puppeteer' },
+        () => generateCard(voterData, photoBuffer),
+      );
+
+      const cardGenDuration = Date.now() - cardGenStartTime;
+      console.log(`[Webhook] Card generated in ${cardGenDuration}ms`);
+
+      Sentry.addBreadcrumb({
+        category: 'card.generation',
+        message:  'Card generated successfully',
+        level:    'info',
+        data:     { durationMs: cardGenDuration },
+      });
+
+      if (cardGenDuration > 10000) {
+        Sentry.captureMessage('Slow card generation detected', {
+          level: 'warning',
+          tags:  { operation: 'card_generation', source: 'whatsapp', performance: 'slow' },
+          extra: {
+            mobile, epicNo, wtlCode,
+            durationMs:  cardGenDuration,
+            photoSizeKB: Math.round(photoBuffer.length / 1024),
+          },
+        });
+      }
+    } catch (cardError) {
+      const cardGenDuration = Date.now() - cardGenStartTime;
+      console.error('[Webhook] Card generation error:', cardError.message);
+
+      Sentry.captureException(cardError, {
+        tags: {
+          operation:    'card_generation',
+          source:       'whatsapp',
+          stage:        'puppeteer_render',
+          failure_type: cardError.name || 'unknown',
+        },
+        extra: {
+          mobile, epicNo, wtlCode,
+          voterName:   pending.voter_name,
+          photoSizeKB: Math.round(photoBuffer.length / 1024),
+          durationMs:  cardGenDuration,
+          errorMessage: cardError.message,
+        },
+      });
+
+      await db.collection('pending_registrations').updateOne(
+        { mobile }, { $set: { status: 'awaiting_photo' } },
+      );
+      await sendTextMessage(from, 'Card generation failed. Please send your photo again.');
+      return;
+    }
+
+    // Upload photo to B2 with dedicated error tracking
+    let photoUrl;
+    const photoUploadStartTime = Date.now();
+    try {
+      Sentry.addBreadcrumb({
+        category: 'card.generation',
+        message:  'Uploading photo to B2',
+        level:    'info',
+      });
+
+      photoUrl = await Sentry.startSpan(
+        { op: 'storage.upload', name: 'Upload photo to Backblaze B2' },
+        () => uploadPhoto(photoBuffer, epicNo, mobile),
+      );
+
+      Sentry.addBreadcrumb({
+        category: 'card.generation',
+        message:  'Photo uploaded successfully',
+        level:    'info',
+        data:     { durationMs: Date.now() - photoUploadStartTime },
+      });
+    } catch (uploadError) {
+      console.error('[Webhook] Photo upload error:', uploadError.message);
+
+      Sentry.captureException(uploadError, {
+        tags: { operation: 'photo_upload', source: 'whatsapp', storage: 'backblaze_b2' },
+        extra: {
+          mobile, epicNo, wtlCode,
+          photoSizeKB: Math.round(photoBuffer.length / 1024),
+          durationMs:  Date.now() - photoUploadStartTime,
+          errorType:   'b2_upload_failed',
+        },
+      });
+
+      await db.collection('pending_registrations').updateOne(
+        { mobile }, { $set: { status: 'awaiting_photo' } },
+      );
+      await sendTextMessage(from, 'Failed to save your photo. Please try again.');
+      return;
+    }
 
     const fs = require('fs');
     const path = require('path');
@@ -460,6 +597,12 @@ async function handleImageMessage(from, mobile, imageInfo, db) {
 
   } catch (err) {
     console.error('[Webhook] handleImageMessage error (' + mobile + '):', err.message);
+
+    Sentry.captureException(err, {
+      tags:  { operation: 'card_generation', source: 'whatsapp', stage: 'unknown' },
+      extra: { mobile, function: 'handleImageMessage', errorMessage: err.message },
+    });
+
     try {
       await db.collection('pending_registrations').updateOne(
         { mobile }, { $set: { status: 'awaiting_photo' } },

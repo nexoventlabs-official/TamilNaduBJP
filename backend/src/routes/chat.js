@@ -19,6 +19,7 @@ const express  = require('express');
 const router   = express.Router();
 const multer   = require('multer');
 const crypto   = require('crypto');
+const Sentry   = require('@sentry/node');
 
 const { validateMobile, validateEpic, validatePin, validateOtp } = require('../utils/validators');
 const { hashPin, verifyPin } = require('../utils/security');
@@ -33,6 +34,7 @@ const {
   chatValidateEpicLimiter,
 } = require('../middleware/rateLimiter');
 const { getDb, findVoterByEpic } = require('../db');
+const { trackMongoOperation } = require('../utils/dbErrorHandler');
 
 // ── Multer — memory storage, 10 MB limit ─────────────────────────
 // MIME filter here is UX only; magic-byte check is done post-upload
@@ -693,9 +695,12 @@ router.post('/validate-epic', chatValidateEpicLimiter, async (req, res) => {
       });
     }
 
-    const doc = await findVoterByEpic(epicNo);
+    const doc = await trackMongoOperation(
+      () => findVoterByEpic(epicNo),
+      'find_voter_by_epic',
+      { epicNo, mobile, source: 'web_validate_epic' },
+    );
     if (!doc) {
-      const Sentry = require('@sentry/node');
       Sentry.captureMessage(`EPIC validation lookup failed: ${epicNo} not found in database`, {
         level: 'warning',
         extra: { epicNo, mobile }
@@ -736,6 +741,15 @@ router.post('/generate-card', chatGenerateCardLimiter, upload.single('photo'), a
     const db = getDb();
     const mobile      = req.session.verified_mobile || String(req.body.mobile || '').trim() || '';
 
+    // Identify the user for any error captured within this request
+    Sentry.setUser({ id: mobile || reqId, mobile, epicNo });
+    Sentry.addBreadcrumb({
+      category: 'card.generation',
+      message:  'Web form card generation started',
+      level:    'info',
+      data:     { epicNo, photoSizeKB: Math.round(req.file.buffer.length / 1024) },
+    });
+
     // ── Hard block: one card per mobile number ───────────────────────────────────
     const existingCard = await db.collection('generated_voters').findOne({
       $or: [
@@ -772,7 +786,11 @@ router.post('/generate-card', chatGenerateCardLimiter, upload.single('photo'), a
     }
 
     // EPIC lookup from DB1
-    const rawVoter = await findVoterByEpic(epicNo);
+    const rawVoter = await trackMongoOperation(
+      () => findVoterByEpic(epicNo),
+      'find_voter_by_epic',
+      { epicNo, mobile, source: 'web_generate_card' },
+    );
     if (!rawVoter) {
       return res.status(404).json({ success: false, message: 'EPIC Number not found.' });
     }
@@ -873,6 +891,14 @@ router.post('/generate-card', chatGenerateCardLimiter, upload.single('photo'), a
         photoUrl = await uploadPhoto(photoBuffer, epicNo, mobile);
       } catch (e) {
         console.error('Photo upload failed:', e.message);
+        Sentry.captureException(e, {
+          tags:  { operation: 'photo_upload', source: 'web', storage: 'backblaze_b2' },
+          extra: {
+            epicNo, mobile, wtlCode,
+            photoSizeKB: Math.round(photoBuffer.length / 1024),
+            errorType:   'b2_upload_failed',
+          },
+        });
       }
 
       // Card image files are not generated/stored in Cloudinary for web chatbot registrations.
@@ -958,6 +984,10 @@ router.post('/generate-card', chatGenerateCardLimiter, upload.single('photo'), a
 
   } catch (err) {
     console.error('generate-card error:', err.message);
+    Sentry.captureException(err, {
+      tags:  { operation: 'card_generation', source: 'web' },
+      extra: { reqId, errorMessage: err.message },
+    });
     return res.status(500).json({ success: false, message: 'Card generation failed. Please try again.' });
   }
 });

@@ -1,7 +1,12 @@
-import React, { useRef, useEffect } from 'react'
+import React, { useRef, useEffect, useState } from 'react'
 
 export const CardPreviewIframe = React.forwardRef(({ cardData, width = 340 }, ref) => {
   const iframeRef = useRef(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    setLoading(true)
+  }, [cardData])
 
   const download = () => {
     const iframe = iframeRef.current
@@ -15,6 +20,7 @@ export const CardPreviewIframe = React.forwardRef(({ cardData, width = 340 }, re
   }))
 
   const handleIframeLoad = () => {
+    setLoading(false)
     const iframe = iframeRef.current
     if (!iframe || !cardData) return
 
@@ -140,6 +146,52 @@ export const CardPreviewIframe = React.forwardRef(({ cardData, width = 340 }, re
       border: '1px solid var(--color-graphite)',
       background: '#F9F8F6',
     }}>
+      {loading && (
+        <div style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          background: '#f8f9fa',
+          display: 'flex',
+          flexDirection: 'column',
+          zIndex: 10,
+          padding: '16px',
+          boxSizing: 'border-box',
+          gap: '16px',
+        }}>
+          <style>{`
+            @keyframes pulse {
+              0% { opacity: 0.6; }
+              50% { opacity: 0.3; }
+              100% { opacity: 0.6; }
+            }
+            .skeleton-element {
+              animation: pulse 1.5s infinite ease-in-out;
+              background: rgba(0, 0, 0, 0.06);
+              border-radius: 6px;
+            }
+          `}</style>
+          {/* Header Banner */}
+          <div className="skeleton-element" style={{ width: '100%', height: '30%', borderRadius: '8px', background: 'linear-gradient(90deg, rgba(242,101,34,0.2) 0%, rgba(255,153,51,0.1) 100%)' }} />
+          {/* Circular Photo */}
+          <div style={{ display: 'flex', gap: '16px', alignItems: 'center', width: '100%' }}>
+            <div className="skeleton-element" style={{ width: '48px', height: '48px', borderRadius: '50%' }} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1 }}>
+              <div className="skeleton-element" style={{ width: '70%', height: '12px' }} />
+              <div className="skeleton-element" style={{ width: '40%', height: '8px' }} />
+            </div>
+          </div>
+          {/* Details lines */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', flex: 1, justifyContent: 'center' }}>
+            <div className="skeleton-element" style={{ width: '90%', height: '10px' }} />
+            <div className="skeleton-element" style={{ width: '85%', height: '10px' }} />
+            <div className="skeleton-element" style={{ width: '80%', height: '10px' }} />
+            <div className="skeleton-element" style={{ width: '50%', height: '10px' }} />
+          </div>
+        </div>
+      )}
       <iframe
         ref={iframeRef}
         src="/bjp_card_design.html?v=2"

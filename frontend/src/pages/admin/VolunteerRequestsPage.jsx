@@ -24,20 +24,28 @@ export default function VolunteerRequestsPage() {
   const [page, setPage]       = useState(1)
   const [statusFilter, setStatusFilter] = useState('pending')
   const [actionLoading, setActionLoading] = useState({})
+  const [search, setSearch]   = useState('')
+  const [searchInput, setSearchInput] = useState('')
 
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await admin.getVolunteerRequests({ page, status: statusFilter, per_page: 20 })
+      const res = await admin.getVolunteerRequests({ page, status: statusFilter, search, per_page: 20 })
       setData({ requests: res.requests || res.data || [], total: res.total || 0 })
     } catch {
       setData({ requests: [], total: 0 })
     } finally {
       setLoading(false)
     }
-  }, [page, statusFilter])
+  }, [page, statusFilter, search])
 
   useEffect(() => { loadData() }, [loadData])
+
+  const handleSearch = (e) => {
+    e.preventDefault()
+    setSearch(searchInput)
+    setPage(1)
+  }
 
   const handleAction = async (wtlCode, action) => {
     if (!window.confirm(`Are you sure you want to ${action} this organizer request?`)) return
@@ -65,7 +73,24 @@ export default function VolunteerRequestsPage() {
       <div className="admin-card">
         <div className="admin-card-header">
           <h6 className="admin-card-title"><i className="bi bi-table" /> Requests</h6>
-          <div className="admin-card-tools">
+          <div className="admin-card-tools" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            <form onSubmit={handleSearch} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <input
+                className="admin-search-input"
+                type="text"
+                placeholder="Search name / EPIC / BJP Code…"
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+              />
+              <button type="submit" style={{ background: 'var(--color-coral-pulse)', border: 'none', color: '#fff', padding: '7px 14px', borderRadius: 'var(--radius-buttons)', fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
+                <i className="bi bi-search" /> Search
+              </button>
+              {search && (
+                <button type="button" onClick={() => { setSearch(''); setSearchInput(''); setPage(1) }} style={{ background: '#f1f5f9', border: '1px solid rgba(0,0,0,0.1)', color: '#475569', padding: '7px 14px', borderRadius: 'var(--radius-buttons)', fontSize: 13, cursor: 'pointer' }}>
+                  Clear
+                </button>
+              )}
+            </form>
             <select
               className="admin-select"
               aria-label="Filter by status"

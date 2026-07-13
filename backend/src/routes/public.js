@@ -457,4 +457,85 @@ router.get('/verify/photo/file/:fileName',     voterPhotoFileHandler);
 router.get('/api/verify/photo/:epicNo', voterPhotoHandler);
 router.get('/verify/photo/:epicNo',     voterPhotoHandler);
 
+// In-memory storage for temporary PDFs
+const tempPdfs = new Map();
+
+// ── POST /api/verify/pdf/upload ──
+// Receives a base64 encoded PDF and stores it temporarily, returning a download ID
+router.post('/api/verify/pdf/upload', (req, res) => {
+  try {
+    const { pdfData, filename } = req.body;
+    if (!pdfData) {
+      return res.status(400).send('PDF data required');
+    }
+    const crypto = require('crypto');
+    const downloadId = crypto.randomBytes(16).toString('hex');
+    const safeFilename = (filename || 'download.pdf').replace(/[^a-zA-Z0-9_\.-]/g, '_');
+    const pdfBuffer = Buffer.from(pdfData, 'base64');
+    
+    // Store in map
+    tempPdfs.set(downloadId, {
+      pdfBuffer,
+      filename: safeFilename
+    });
+    
+    // Set auto-expiry of 5 minutes to prevent memory leaks
+    setTimeout(() => {
+      tempPdfs.delete(downloadId);
+    }, 5 * 60 * 1000);
+    
+    return res.json({ downloadId });
+  } catch (err) {
+    console.error('PDF upload helper error:', err);
+    return res.status(500).send('Failed to process upload');
+  }
+});
+
+// ── GET /api/verify/pdf/download/:downloadId ──
+// Streams the pre-uploaded PDF back as an attachment download
+router.get('/api/verify/pdf/download/:downloadId', (req, res) => {
+  try {
+    const { downloadId } = req.params;
+    const item = tempPdfs.get(downloadId);
+    if (!item) {
+      res.setHeader('Content-Type', 'text/html');
+      return res.status(404).send('<h3>Download link expired or not found. Please try downloading again.</h3>');
+    }
+    
+    // Extract and delete immediately since it is downloaded
+    const { pdfBuffer, filename } = item;
+    tempPdfs.delete(downloadId);
+    
+    const disposition = req.query.disposition === 'inline' ? 'inline' : 'attachment';
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `${disposition}; filename="${filename}"`);
+    res.setHeader('Content-Length', pdfBuffer.length);
+    return res.send(pdfBuffer);
+  } catch (err) {
+    console.error('PDF download helper error:', err);
+    return res.status(500).send('Failed to process download');
+  }
+});
+
+// ── POST /api/verify/pdf/download ──
+// Legacy route for backward compatibility (receives a base64 encoded PDF and filename, echoes it back as an attachment download)
+router.post('/api/verify/pdf/download', (req, res) => {
+  try {
+    const { pdfData, filename } = req.body;
+    if (!pdfData) {
+      return res.status(400).send('PDF data required');
+    }
+    const safeFilename = (filename || 'download.pdf').replace(/[^a-zA-Z0-9_\.-]/g, '_');
+    const pdfBuffer = Buffer.from(pdfData, 'base64');
+    
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${safeFilename}"`);
+    res.setHeader('Content-Length', pdfBuffer.length);
+    return res.send(pdfBuffer);
+  } catch (err) {
+    console.error('PDF download helper error:', err);
+    return res.status(500).send('Failed to process download');
+  }
+});
+
 module.exports = router;

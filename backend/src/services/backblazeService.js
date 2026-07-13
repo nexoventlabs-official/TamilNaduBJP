@@ -5,6 +5,7 @@
 const { S3Client, PutObjectCommand, GetObjectCommand } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const sharp = require('sharp');
+const Sentry = require('@sentry/node');
 const config = require('../config');
 
 // Initialize S3 client for Backblaze B2
@@ -44,19 +45,35 @@ async function uploadPhoto(buffer, epicNo, mobile) {
   const suffix = mobile ? `_${mobile}` : '';
   const key = `member_photos/${epicNo.toUpperCase()}${suffix}.jpg`.replace(/[/\\]/g, '_');
 
-  // Compress before upload for faster serving
-  const compressed = await compressPhoto(buffer);
+  try {
+    // Compress before upload for faster serving
+    const compressed = await compressPhoto(buffer);
 
-  await s3.send(new PutObjectCommand({
-    Bucket: BUCKET_NAME,
-    Key: key,
-    Body: compressed,
-    ContentType: 'image/jpeg',
-    CacheControl: 'public, max-age=31536000, immutable'
-  }));
+    await s3.send(new PutObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: key,
+      Body: compressed,
+      ContentType: 'image/jpeg',
+      CacheControl: 'public, max-age=31536000, immutable'
+    }));
 
-  // Store the relative path key in the database
-  return key;
+    // Store the relative path key in the database
+    return key;
+  } catch (error) {
+    console.error('[B2] Photo upload failed:', error.message);
+    Sentry.captureException(error, {
+      tags: { operation: 'file_upload', storage: 'backblaze_b2', file_type: 'photo' },
+      extra: {
+        epicNo,
+        mobile,
+        fileSizeKB:   Math.round((buffer?.length || 0) / 1024),
+        bucketName:   BUCKET_NAME,
+        errorMessage: error.message,
+        errorCode:    error.code || error.$metadata?.httpStatusCode,
+      },
+    });
+    throw error;
+  }
 }
 
 /**

@@ -93,7 +93,7 @@ export default function VerifyPage() {
         <div style={{ background: 'var(--color-carbon)', border: '1px solid var(--color-graphite)', borderRadius: 12, padding: 20, marginBottom: 16 }}>
           <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', marginBottom: 20 }}>
             {photoUrl ? (
-              <img src={photoUrl} alt="Profile" style={{ width: 72, height: 90, objectFit: 'cover', borderRadius: 6, border: '1px solid var(--color-graphite)', flexShrink: 0 }} />
+              <img src={photoUrl} crossOrigin="anonymous" alt="Profile" style={{ width: 72, height: 90, objectFit: 'cover', borderRadius: 6, border: '1px solid var(--color-graphite)', flexShrink: 0 }} />
             ) : (
               <div style={{ width: 72, height: 90, background: 'var(--color-abyss)', borderRadius: 6, border: '1px solid var(--color-graphite)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 <i className="bi bi-person" style={{ fontSize: 32, color: 'var(--color-ash)' }} />

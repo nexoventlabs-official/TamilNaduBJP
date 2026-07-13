@@ -11,7 +11,38 @@ const Sentry = require('@sentry/node');
 // Initialize Sentry before requiring other route modules to ensure auto-instrumentation works
 Sentry.init({
   dsn: "https://9beaab4828c82c718969bbcb7d4db92b@o4511709522886656.ingest.us.sentry.io/4511709628989441",
-  tracesSampleRate: 1.0,
+
+  // Sample 10% of transactions to stay within the Sentry free tier
+  tracesSampleRate: 0.1,
+
+  // Environment tracking (production vs development)
+  environment: process.env.NODE_ENV || 'development',
+
+  // Release tracking — helps identify which version introduced a bug
+  release: `tnbjp-backend@${require('../package.json').version}`,
+
+  // Server name — useful once scaled to multiple droplets
+  serverName: process.env.SERVER_NAME || require('os').hostname(),
+
+  // Security: scrub sensitive fields before anything leaves the server
+  beforeSend(event) {
+    const sensitiveFields = ['otp', 'pin', 'new_pin', 'password', 'secret_pin'];
+    if (event.request && event.request.data) {
+      sensitiveFields.forEach((field) => {
+        if (event.request.data[field] !== undefined) {
+          event.request.data[field] = '[REDACTED]';
+        }
+      });
+    }
+    if (event.extra) {
+      sensitiveFields.forEach((field) => {
+        if (event.extra[field] !== undefined) {
+          event.extra[field] = '[REDACTED]';
+        }
+      });
+    }
+    return event;
+  },
 });
 
 const express    = require('express');
@@ -97,7 +128,12 @@ app.use((req, res, next) => {
   return cors({
     origin: (origin, cb) => {
       if (!origin) return cb(null, true);
-      if (allowedOrigins.includes(origin)) return cb(null, true);
+      const isAllowed = allowedOrigins.some(allowed => {
+        if (allowed === origin) return true;
+        const normalize = url => url.replace(/^https?:\/\/(www\.)?/, "");
+        return normalize(allowed) === normalize(origin);
+      });
+      if (isAllowed) return cb(null, true);
       cb(new Error(`Origin ${origin} not allowed by CORS`), false);
     },
     credentials:    true,

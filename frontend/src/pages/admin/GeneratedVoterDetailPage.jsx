@@ -178,7 +178,7 @@ export default function GeneratedVoterDetailPage() {
         {/* Action verify button */}
         <div style={{ zIndex: 2 }}>
           {v.epic_no && (
-            <a href={`https://tamilnadubjp.live/verify/${v.wtl_code || v.epic_no}`} target="_blank" rel="noreferrer" className="btn-action btn-view" style={{
+            <a href={`/verify/${v.wtl_code || v.epic_no}`} target="_blank" rel="noreferrer" className="btn-action btn-view" style={{
               padding: '10px 20px',
               borderRadius: 'var(--radius-buttons)',
               fontWeight: '600',
@@ -429,24 +429,6 @@ export default function GeneratedVoterDetailPage() {
               </div>
               <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
                 <CardPreviewIframe ref={cardPreviewRef} cardData={v} width={300} />
-                <button
-                  onClick={() => cardPreviewRef.current?.download()}
-                  className="btn-action btn-view"
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 8,
-                    padding: '10px 20px',
-                    borderRadius: 'var(--radius-buttons)',
-                    fontSize: 13,
-                    fontWeight: '600',
-                    cursor: 'pointer',
-                    border: 'none',
-                    fontFamily: 'inherit',
-                  }}
-                >
-                  <i className="bi bi-download" /> Download Card Image
-                </button>
               </div>
             </div>
           )}

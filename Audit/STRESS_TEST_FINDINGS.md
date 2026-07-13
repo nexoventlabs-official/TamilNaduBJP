@@ -46,7 +46,7 @@ Before executing any tests, the codebase configurations and integration boundari
    - Parse Request → Multer buffer check → Verify session/mobile → MongoDB App DB check → MongoDB Voter DB query (234 parallel queries) → Cloudinary upload (mocked) → MongoDB App DB write → Release Lock.
 
 9. **Test Client socket limits**:
-   - Load tests executed directly on the remote staging droplet (`129.212.233.215`) to eliminate network latency bottlenecks. Local socket limits (`ulimit -n`) raised to `65536`.
+   - Load tests executed directly on the remote staging droplet (`142.93.10.77`) to eliminate network latency bottlenecks. Local socket limits (`ulimit -n`) raised to `65536`.
 
 ---
 

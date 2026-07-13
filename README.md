@@ -40,8 +40,8 @@ Create a `.env` file in the `backend/` directory. Refer to the table below for c
 # General
 PORT=5000
 NODE_ENV=production
-BASE_URL=https://tamilnadubjp.live
-FRONTEND_URL=https://tamilnadubjp.live
+BASE_URL=https://tnbjp.org
+FRONTEND_URL=https://tnbjp.org
 
 # Admin Panel Credentials
 ADMIN_USERNAME=BJP
