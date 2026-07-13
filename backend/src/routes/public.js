@@ -8,6 +8,27 @@ const { getDb, getVoterDb, findVoterByEpic } = require('../db');
 const { publicVerifyLimiter } = require('../middleware/rateLimiter');
 const { getPhotoPresignedUrl, getPhotoStream } = require('../services/backblazeService');
 
+// ── In-memory photo cache ─────────────────────────────────────────────
+// Stores {buffer, contentType} keyed by fileName or epicNo
+// Max 200 entries (~200 photos × ~50KB avg = ~10MB RAM, safe for a 2GB droplet)
+const PHOTO_CACHE = new Map();
+const PHOTO_CACHE_MAX = 200;
+function cachePhoto(key, buffer, contentType) {
+  if (PHOTO_CACHE.size >= PHOTO_CACHE_MAX) {
+    // Evict the oldest entry
+    PHOTO_CACHE.delete(PHOTO_CACHE.keys().next().value);
+  }
+  PHOTO_CACHE.set(key, { buffer, contentType });
+}
+async function streamToBuffer(stream) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    stream.on('data', chunk => chunks.push(chunk));
+    stream.on('end', () => resolve(Buffer.concat(chunks)));
+    stream.on('error', reject);
+  });
+}
+
 // ── Health check — for uptime monitors and Render/Cloudways ────────
 router.get('/health', async (req, res) => {
   let appDb = 'disconnected';
@@ -395,12 +416,26 @@ async function voterPhotoFileHandler(req, res) {
       return res.status(400).send('Filename required');
     }
 
-    // Set Cache-Control header to cache the image in browser for 24 hours
-    res.setHeader('Cache-Control', 'public, max-age=86400');
-    res.setHeader('Content-Type', 'image/jpeg');
+    // Browser cache: 7 days
+    res.setHeader('Cache-Control', 'public, max-age=604800, immutable');
 
+    // ── Serve from server-side in-memory cache if available ──
+    if (PHOTO_CACHE.has(fileName)) {
+      const cached = PHOTO_CACHE.get(fileName);
+      res.setHeader('Content-Type', cached.contentType);
+      res.setHeader('X-Cache', 'HIT');
+      return res.send(cached.buffer);
+    }
+
+    // ── Fetch from Backblaze B2 and populate cache ──
     const stream = await getPhotoStream(fileName);
-    stream.pipe(res);
+    const buffer = await streamToBuffer(stream);
+    const contentType = 'image/jpeg';
+    cachePhoto(fileName, buffer, contentType);
+
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('X-Cache', 'MISS');
+    return res.send(buffer);
   } catch (err) {
     console.error('voterPhotoFileHandler error:', err.message);
     // Graceful fallback to server logo on download caps / fetching errors
