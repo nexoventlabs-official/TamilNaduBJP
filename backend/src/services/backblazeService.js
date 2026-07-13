@@ -14,7 +14,8 @@ const s3 = new S3Client({
   credentials: {
     accessKeyId: config.b2.keyId,
     secretAccessKey: config.b2.appKey
-  }
+  },
+  forcePathStyle: true
 });
 
 const BUCKET_NAME = config.b2.bucketName || 'bjpmembers';
@@ -70,14 +71,24 @@ async function getPhotoPresignedUrl(photoUrlOrKey) {
     return photoUrlOrKey;
   }
 
-  // Extract key if it's a full Backblaze URL
+  // Extract EPIC number from key/url to use the permanent backend proxy URL
+  try {
+    const cleanKey = photoUrlOrKey.replace(/\\/g, '_').replace(/\//g, '_');
+    const match = cleanKey.match(/(?:member_photos_)?([A-Z]{3}\d{7}|[A-Z]{3}[A-Z0-9]{7})/i) || cleanKey.match(/member_photos_([A-Z0-9/\-_]+)/i);
+    if (match && match[1]) {
+      const epic = match[1].split('_')[0].toUpperCase();
+      return `${config.baseUrl}/api/verify/photo/${epic}`;
+    }
+  } catch (err) {
+    console.warn('Error parsing key for proxy URL:', err.message);
+  }
+
+  // Fallback to S3 presigned URL
   let key = photoUrlOrKey;
   if (photoUrlOrKey.startsWith('http')) {
     try {
       const url = new URL(photoUrlOrKey);
-      // Path-style: /file/bjpmembers/member_photos/... or /bjpmembers/member_photos/...
       const pathParts = url.pathname.split('/').filter(Boolean);
-      // Remove 'file' and bucket name if present
       if (pathParts[0] === 'file') pathParts.shift();
       if (pathParts[0] === BUCKET_NAME) pathParts.shift();
       key = pathParts.join('/');
@@ -86,7 +97,6 @@ async function getPhotoPresignedUrl(photoUrlOrKey) {
     }
   }
 
-  // Clean key prefix just in case
   key = key.replace(/^\/+/, '');
 
   try {
@@ -94,14 +104,40 @@ async function getPhotoPresignedUrl(photoUrlOrKey) {
       Bucket: BUCKET_NAME,
       Key: key
     });
-    // Generate pre-signed URL valid for 7 days (max S3 duration limit)
     const url = await getSignedUrl(s3, command, { expiresIn: 604800 });
     return url;
   } catch (err) {
     console.error(`Error generating pre-signed URL for key ${key}:`, err.message);
-    // Fall back to public URL structure
     return `https://f005.backblazeb2.com/file/${BUCKET_NAME}/${key}`;
   }
+}
+
+/**
+ * Fetch a photo from Backblaze B2 as a readable stream.
+ */
+async function getPhotoStream(photoUrlOrKey) {
+  if (!photoUrlOrKey) throw new Error('Photo key is empty');
+
+  let key = photoUrlOrKey;
+  if (photoUrlOrKey.startsWith('http')) {
+    try {
+      const url = new URL(photoUrlOrKey);
+      const pathParts = url.pathname.split('/').filter(Boolean);
+      if (pathParts[0] === 'file') pathParts.shift();
+      if (pathParts[0] === BUCKET_NAME) pathParts.shift();
+      key = pathParts.join('/');
+    } catch (_) {
+      // ignore
+    }
+  }
+  key = key.replace(/^\/+/, '');
+
+  const command = new GetObjectCommand({
+    Bucket: BUCKET_NAME,
+    Key: key
+  });
+  const response = await s3.send(command);
+  return response.Body;
 }
 
 // ── Drop-in Stubs for card generation (cards generated entirely client-side for Web) ─
@@ -112,6 +148,7 @@ async function uploadCombinedCard(buffer, epicNo, mobile) { return ''; }
 module.exports = {
   uploadPhoto,
   getPhotoPresignedUrl,
+  getPhotoStream,
   uploadCard,
   uploadBackCard,
   uploadCombinedCard

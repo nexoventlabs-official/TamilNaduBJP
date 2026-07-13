@@ -39,20 +39,26 @@ const connectDB = async () => {
     process.exit(1);
   }
 
-  // ── DB1: Voter roll (DigitalOcean) — read-only ─────────────────
-  if (!config.mongoVoterUrl) {
-    console.warn('[DB1] MONGO_VOTER_URL not set — voter EPIC lookups will fail.');
+  // ── DB1: Voter roll — read-only ─────────────────
+  let voterUri = config.mongoVoterUrl;
+  const isLocalVoter = !config.mongoVoterUrl || process.env.USE_LOCAL_VOTER_DB === 'true';
+  if (isLocalVoter) {
+    voterUri = 'mongodb://127.0.0.1:27017/voter_db';
+  }
+
+  if (!voterUri) {
+    console.warn('[DB1] Voter database URI not set — voter EPIC lookups will fail.');
     return;
   }
   try {
-    await voterConn.openUri(config.mongoVoterUrl, {
+    await voterConn.openUri(voterUri, {
       dbName:                   config.mongoVoterDbName,
       maxPoolSize:              10,
       minPoolSize:              2,
       serverSelectionTimeoutMS: 15000,
     });
     voterConnected = true;
-    console.log(`[DB1] Voter DB connected (db: ${config.mongoVoterDbName}) — READ-ONLY`);
+    console.log(`[DB1] Voter DB connected (db: ${config.mongoVoterDbName}) — READ-ONLY [${isLocalVoter ? 'LOCAL' : 'REMOTE'}]`);
   } catch (err) {
     // Non-fatal: app still works, just EPIC validation will be unavailable
     console.error('[DB1] Voter DB connection error:', err.message);
