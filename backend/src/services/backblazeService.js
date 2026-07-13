@@ -71,16 +71,20 @@ async function getPhotoPresignedUrl(photoUrlOrKey) {
     return photoUrlOrKey;
   }
 
-  // Extract EPIC number from key/url to use the permanent backend proxy URL
+  // Extract the flat filename key to use the permanent backend proxy URL
   try {
-    const cleanKey = photoUrlOrKey.replace(/\\/g, '_').replace(/\//g, '_');
-    const match = cleanKey.match(/(?:member_photos_)?([A-Z]{3}\d{7}|[A-Z]{3}[A-Z0-9]{7})/i) || cleanKey.match(/member_photos_([A-Z0-9/\-_]+)/i);
-    if (match && match[1]) {
-      const epic = match[1].split('_')[0].toUpperCase();
-      return `${config.baseUrl}/api/verify/photo/${epic}`;
+    let fileName = photoUrlOrKey;
+    if (photoUrlOrKey.startsWith('http')) {
+      const url = new URL(photoUrlOrKey);
+      fileName = url.pathname.split('/').pop();
+    } else {
+      fileName = photoUrlOrKey.split('/').pop().split('\\').pop();
+    }
+    if (fileName) {
+      return `${config.baseUrl}/api/verify/photo/file/${fileName}`;
     }
   } catch (err) {
-    console.warn('Error parsing key for proxy URL:', err.message);
+    console.warn('Error parsing key for proxy file URL:', err.message);
   }
 
   // Fallback to S3 presigned URL

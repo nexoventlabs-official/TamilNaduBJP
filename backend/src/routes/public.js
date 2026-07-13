@@ -125,7 +125,7 @@ async function verifyVoterHandler(req, res) {
     const district = voter?.DISTRICT || voter?.DISTRICT_NAME || genDoc.DISTRICT_NAME || '';
     const partNo   = String(voter?.PART_NO || genDoc.PART_NO || '');
     const cardUrl  = genDoc.card_url  || stat.card_url  || '';
-    const photoUrl = (genDoc.photo_url || stat.photo_url) ? `${config.baseUrl}/api/verify/photo/${epicNo}` : '';
+    const photoUrl = await getPhotoPresignedUrl(genDoc.photo_url || stat.photo_url || '');
     const wtlCode  = genDoc.wtl_code || '';
     const isMember = Boolean(wtlCode);
 
@@ -244,7 +244,7 @@ router.get('/api/card/:epicNo', async (req, res) => {
       card_url:     genDoc.card_url     || stat.card_url     || '',
       back_url:     genDoc.back_url     || stat.back_url     || '',
       combined_url: genDoc.combined_url || stat.combined_url || '',
-      photo_url:    (genDoc.photo_url || stat.photo_url) ? `${config.baseUrl}/api/verify/photo/${epicNo}` : '',
+      photo_url:    await getPhotoPresignedUrl(genDoc.photo_url || stat.photo_url || ''),
       wtl_code:     genDoc.wtl_code   || '',
       gen_count:    stat.count        || 0,
       name,
@@ -387,7 +387,39 @@ async function voterPhotoHandler(req, res) {
   }
 }
 
-router.get('/api/verify/photo/:epicNo', publicVerifyLimiter, voterPhotoHandler);
-router.get('/verify/photo/:epicNo',     publicVerifyLimiter, voterPhotoHandler);
+// ── GET /api/verify/photo/file/:fileName ──
+async function voterPhotoFileHandler(req, res) {
+  try {
+    const fileName = req.params.fileName.trim();
+    if (!fileName) {
+      return res.status(400).send('Filename required');
+    }
+
+    // Set Cache-Control header to cache the image in browser for 24 hours
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    res.setHeader('Content-Type', 'image/jpeg');
+
+    const stream = await getPhotoStream(fileName);
+    stream.pipe(res);
+  } catch (err) {
+    console.error('voterPhotoFileHandler error:', err.message);
+    // Graceful fallback to server logo on download caps / fetching errors
+    try {
+      const fs = require('fs');
+      const path = require('path');
+      res.setHeader('Content-Type', 'image/png');
+      res.setHeader('Cache-Control', 'no-store');
+      fs.createReadStream(path.join(__dirname, '../../public/newlogo.png')).pipe(res);
+    } catch (fsErr) {
+      res.status(500).send('Error loading placeholder');
+    }
+  }
+}
+
+router.get('/api/verify/photo/file/:fileName', voterPhotoFileHandler);
+router.get('/verify/photo/file/:fileName',     voterPhotoFileHandler);
+
+router.get('/api/verify/photo/:epicNo', voterPhotoHandler);
+router.get('/verify/photo/:epicNo',     voterPhotoHandler);
 
 module.exports = router;
