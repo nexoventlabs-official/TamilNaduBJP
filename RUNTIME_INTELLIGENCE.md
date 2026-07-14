@@ -32,7 +32,7 @@ This document outlines the detailed runtime behavior, architectures, execution f
 
 ## SYSTEM RUNTIME ARCHITECTURE
 
-The application runs as a Node.js Express server on a remote droplet VPS, serving both an API backend and a compiled Vite/React frontend. The runtime interacts with a local MongoDB data store, a read-only remote voter database cluster, Cloudinary for asset hosting, and Meta's WhatsApp Cloud API.
+The application runs as a Node.js Express server on a DigitalOcean droplet VPS (**4 vCPU, 8 GB RAM, 240 GB SSD, Singapore**; no swap), serving both an API backend and a compiled Vite/React frontend. The runtime interacts with **local MongoDB** for both the app DB (`bjptamilnadu`) and the read-only voter roll (`voter_db`, `USE_LOCAL_VOTER_DB=true`), a **managed Redis** instance (voter/EPIC cache, rate limiting, sessions), Backblaze B2 / Cloudinary for asset hosting, and Meta's WhatsApp Cloud API.
 
 ```mermaid
 flowchart TD
@@ -86,7 +86,7 @@ flowchart TD
   * Remote Voter Database: `voter_db` (via `MONGO_VOTER_URL`).
   * Session Store: Creates a collection named `sessions` in the local DB for persistent session management.
   * [db.js:L93-L123](file:///c:/Users/Admin/Desktop/bjptn/backend/src/db.js#L93-L123) ensures indexes:
-    * `generated_voters`: `MOBILE_NO` (unique), `EPIC_NO` (unique), `wtl_code` (unique), `referred_by_wtl`.
+    * `generated_voters`: `MOBILE_NO` (unique), `EPIC_NO` (unique), `bjp_code` (unique), `referred_by_bjp`.
     * `pending_registrations`: `mobile` (unique), `epic_no`.
     * `processed_wamids`: `wamid` (unique, TTL index of 7 days).
     * `generation_locks`: `mobile` (unique, TTL index of 120 seconds).
@@ -95,7 +95,7 @@ flowchart TD
 * **Queue Interactions**: N/A
 * **Background Jobs**: N/A
 * **Locks / Transactions Used**: N/A
-* **Cache Usage**: Initializes `_epicCache` in memory inside `db.js`.
+* **Cache Usage**: Initializes the Redis client (`redis.js`) used for the voter/EPIC cache; falls back to a bounded in-memory Map (max 50k entries) in `db.js` when Redis is unavailable.
 * **Response Returned**: Standard stdout/stderr log output representing status.
 * **Logging Performed**: Logs database connection states, collection indexes, and runtime environment parameters to console.
 * **Failure Points**: Missing `.env` validation throws an error and aborts process boot. MongoDB connection errors loop until connected.
@@ -156,11 +156,11 @@ flowchart TD
 * **Queue Interactions**: N/A
 * **Background Jobs**: N/A
 * **Locks / Transactions Used**: N/A
-* **Cache Usage**: Checks and updates `_epicCache` in memory.
+* **Cache Usage**: Checks and updates the Redis voter cache (`epic:<EPIC>`, 1-hour TTL), with a bounded in-memory fallback.
   * **Rule Update**: Stale/null entries are **never** cached. Only successful voter lookups populate the cache to prevent false "not found" states on temporary timeouts.
 * **Response Returned**: 
   * Success: `{ success: true, voter }`
-  * Duplicate: `{ success: false, already_registered: true, card_url, wtl_code ... }`
+  * Duplicate: `{ success: false, already_registered: true, card_url, bjp_code ... }`
   * Not Found: `{ success: false, message: 'EPIC Number not found.' }`
 * **Failure Points**: Database connectivity loss, parallel query timeouts (timeout threshold = 8000ms).
 * **Retry / Recovery**: If query fails or times out, the result is *not* cached, prompting a fresh query on next try.
@@ -196,7 +196,7 @@ flowchart TD
 * **External APIs Called**: Cloudinary Upload API.
 * **Locks Used**: A distributed lock inside the `generation_locks` collection prevents concurrent duplicate uploads for the same phone number (TTL = 120 seconds).
 * **Response Returned**:
-  * Success: `{ success: true, photo_url, wtl_code ... }`
+  * Success: `{ success: true, photo_url, bjp_code ... }`
 * **Failure Points**: Cloudinary API timeouts, invalid file types.
 * **Retry / Recovery**: If generation fails mid-way, the lock is automatically deleted in a `finally` block and the user can retry immediately.
 * **Estimated Execution Complexity**: $O(1)$
@@ -261,7 +261,7 @@ This section details how cards are compiled and rendered.
 * **Database Aggregations**:
   * Computes total members count.
   * Summarizes registration numbers filtered by District/Assembly.
-  * Lists top referrers using a `$group` pipeline on `referred_by_wtl`.
+  * Lists top referrers using a `$group` pipeline on `referred_by_bjp`.
 * **Response Returned**: JSON payload containing all computed stats.
 * **Performance Concerns**: High latency on large collections without adequate compound indexes.
 * **Related Source Files**: [routes/admin.js](file:///c:/Users/Admin/Desktop/bjptn/backend/src/routes/admin.js)
@@ -445,7 +445,7 @@ sequenceDiagram
         Cloudinary-->>API: Returns optimized photo_url (~30KB-50KB)
         deactivate Cloudinary
         API->>Lock: Release lock
-        API-->>UI: HTTP 200 { success: true, photo_url, wtl_code }
+        API-->>UI: HTTP 200 { success: true, photo_url, bjp_code }
         UI->>Member: Render Card preview in browser iframe
     else Lock Held by another request
         API-->>UI: HTTP 429 Generation in progress
@@ -589,7 +589,8 @@ sequenceDiagram
 ## CONFIDENCE SCORE & UNKNOWN AREAS
 
 ### Unknown Areas (NOT VERIFIED)
-* **DigitalOcean MongoDB cluster capacity**: We cannot inspect the connection limits or hardware specs of the external managed DB cluster. High concurrency voter lookups could saturate its connection pool first.
+* **Voter DB now local**: the voter roll runs on the droplet's local MongoDB (not an external cluster). Its connection pool is `maxPoolSize 10`; a burst of unique cold lookups can still saturate it (raising to 50 is recommended).
+* **Fresh load-test numbers**: capacity figures for the current 4 vCPU / 8 GB droplet are engineering re-estimates pending a controlled load test (see `STRESS_TEST_FINDINGS.md` §4.0).
 * **SMS Gateway Provider**: The actual SMS delivery provider endpoint is referenced by configuration variables but its exact response format and routing could not be verified.
 
 ### CONFIDENCE SCORE: 9.8 / 10

@@ -9,10 +9,38 @@ const api = axios.create({
   timeout: 30000,
 })
 
+// ── CSRF token handling for admin mutating requests (FIX-08) ──────
+let _csrfToken = null
+async function ensureCsrfToken() {
+  if (_csrfToken) return _csrfToken
+  const base = import.meta.env.VITE_API_URL || ''
+  const res = await axios.get(base + '/admin/api/csrf-token', { withCredentials: true })
+  _csrfToken = res.data && res.data.csrfToken ? res.data.csrfToken : null
+  return _csrfToken
+}
+
+api.interceptors.request.use(async (cfg) => {
+  const url = cfg.url || ''
+  const method = (cfg.method || 'get').toLowerCase()
+  const mutating = ['post', 'put', 'patch', 'delete'].includes(method)
+  if (mutating && url.startsWith('/admin/api') && !url.includes('/admin/api/login')) {
+    try {
+      const token = await ensureCsrfToken()
+      if (token) {
+        cfg.headers = cfg.headers || {}
+        cfg.headers['x-csrf-token'] = token
+      }
+    } catch (_) { /* proceed; server will 403 if token is required */ }
+  }
+  return cfg
+})
+
 api.interceptors.response.use(
   (response) => response.data,
   (error) => {
     if (error.response) {
+      // Stale/invalid CSRF token → drop the cache so the next attempt refetches
+      if (error.response.status === 403) _csrfToken = null
       return Promise.reject(error.response.data || { message: 'Server error' })
     }
     if (error.code === 'ECONNABORTED') {
@@ -32,21 +60,6 @@ export const chat = {
   checkMobile: (mobile) =>
     api.post('/api/check-mobile', { mobile }),
 
-  verifyPin: (mobile, pin) =>
-    api.post('/api/verify-pin', { mobile, pin }),
-
-  forgotPin: (mobile) =>
-    api.post('/api/forgot-pin', { mobile }),
-
-  verifyForgotOtp: (mobile, otp) =>
-    api.post('/api/verify-forgot-otp', { mobile, otp }),
-
-  resetPin: (mobile, otp, newPin) =>
-    api.post('/api/reset-pin', { mobile, otp, new_pin: newPin }),
-
-  setPin: (mobile, pin, epicNo) =>
-    api.post('/api/set-pin', { mobile, pin, epic_no: epicNo }),
-
   validateEpic: (epicNo, mobile) =>
     api.post('/api/validate-epic', { epic_no: epicNo, mobile }),
 
@@ -62,11 +75,11 @@ export const chat = {
   getBooth: (epicNo) =>
     api.get(`/api/booth/${epicNo}`),
 
-  getReferralLink: (wtlCode) =>
-    api.get(`/api/referral-link/${wtlCode}`),
+  getReferralLink: (bjpCode) =>
+    api.get(`/api/referral-link/${bjpCode}`),
 
-  getMyMembers: (wtlCode) =>
-    api.get(`/api/my-members/${wtlCode}`),
+  getMyMembers: (bjpCode) =>
+    api.get(`/api/my-members/${bjpCode}`),
 
   getBestPerformers: () =>
     api.get('/api/best-performers'),
@@ -74,32 +87,32 @@ export const chat = {
   getDistrictsData: () =>
     api.get('/api/districts-data'),
 
-  getRequestStatus: (wtlCode) =>
-    api.get(`/api/request-status/${wtlCode}`),
+  getRequestStatus: (bjpCode) =>
+    api.get(`/api/request-status/${bjpCode}`),
 
-  requestVolunteer: (wtlCode, epicNo, wing) =>
-    api.post('/api/request-volunteer', { wtl_code: wtlCode, epic_no: epicNo, wing }),
+  requestVolunteer: (bjpCode, epicNo, wing) =>
+    api.post('/api/request-volunteer', { bjp_code: bjpCode, epic_no: epicNo, wing }),
 
-  requestBoothAgent: (wtlCode, epicNo, boothNo, assembly, district) =>
+  requestBoothAgent: (bjpCode, epicNo, boothNo, assembly, district) =>
     api.post('/api/request-booth-agent', {
-      wtl_code: wtlCode,
+      bjp_code: bjpCode,
       epic_no: epicNo,
       booth_no: boothNo,
       assembly,
       district,
     }),
 
-  getMemberStatus: (wtlCode) =>
-    api.get(`/api/member-status/${wtlCode}`),
+  getMemberStatus: (bjpCode) =>
+    api.get(`/api/member-status/${bjpCode}`),
 
-  bookAppointment: (wtlCode, date, time) =>
-    api.post('/api/book-appointment', { wtl_code: wtlCode, date, time }),
+  bookAppointment: (bjpCode, date, time) =>
+    api.post('/api/book-appointment', { bjp_code: bjpCode, date, time }),
 
-  saveLocalBodyInterest: (wtlCode, interest) =>
-    api.post('/api/local-body-interest', { wtl_code: wtlCode, interest }),
+  saveLocalBodyInterest: (bjpCode, interest) =>
+    api.post('/api/local-body-interest', { bjp_code: bjpCode, interest }),
 
-  saveMeetingInterest: (wtlCode, interest) =>
-    api.post('/api/save-meeting-interest', { wtl_code: wtlCode, interest }),
+  saveMeetingInterest: (bjpCode, interest) =>
+    api.post('/api/save-meeting-interest', { bjp_code: bjpCode, interest }),
 
   logout: () =>
     api.post('/api/logout'),
@@ -131,17 +144,17 @@ export const admin = {
   getGeneratedVoters: (params) =>
     api.get('/admin/api/generated-voters', { params }),
 
-  getGeneratedVoterDetail: (wtlCode) =>
-    api.get(`/admin/api/generated-voters/${wtlCode}`),
+  getGeneratedVoterDetail: (bjpCode) =>
+    api.get(`/admin/api/generated-voters/${bjpCode}`),
 
   getVolunteerRequests: (params) =>
     api.get('/admin/api/volunteer-requests', { params }),
 
-  confirmVolunteer: (wtlCode) =>
-    api.post(`/admin/api/volunteer-requests/${wtlCode}/confirm`),
+  confirmVolunteer: (bjpCode) =>
+    api.post(`/admin/api/volunteer-requests/${bjpCode}/confirm`),
 
-  rejectVolunteer: (wtlCode) =>
-    api.post(`/admin/api/volunteer-requests/${wtlCode}/reject`),
+  rejectVolunteer: (bjpCode) =>
+    api.post(`/admin/api/volunteer-requests/${bjpCode}/reject`),
 
   getConfirmedVolunteers: (params) =>
     api.get('/admin/api/confirmed-volunteers', { params }),
@@ -149,11 +162,11 @@ export const admin = {
   getBoothAgentRequests: (params) =>
     api.get('/admin/api/booth-agent-requests', { params }),
 
-  confirmBoothAgent: (wtlCode) =>
-    api.post(`/admin/api/booth-agent-requests/${wtlCode}/confirm`),
+  confirmBoothAgent: (bjpCode) =>
+    api.post(`/admin/api/booth-agent-requests/${bjpCode}/confirm`),
 
-  rejectBoothAgent: (wtlCode) =>
-    api.post(`/admin/api/booth-agent-requests/${wtlCode}/reject`),
+  rejectBoothAgent: (bjpCode) =>
+    api.post(`/admin/api/booth-agent-requests/${bjpCode}/reject`),
 
   getConfirmedBoothAgents: (params) =>
     api.get('/admin/api/confirmed-booth-agents', { params }),

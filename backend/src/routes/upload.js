@@ -10,7 +10,7 @@ const router  = express.Router();
 const crypto  = require('crypto');
 const config  = require('../config');
 const { getDb } = require('../db');
-const { uploadPhoto, uploadCard, uploadBackCard } = require('../services/backblazeService');
+const { uploadPhoto, uploadCard, uploadBackCard, getCardPresignedUrl } = require('../services/backblazeService');
 const { generateCard, generateBackCard }          = require('../services/cardGenerator');
 const { sendTextMessage, sendImageMessage }       = require('../services/whatsappService');
 
@@ -21,7 +21,7 @@ function statusPage(title, message, bgColor, textColor) {
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>WTL Member Card</title>
+<title>BJP Member Card</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0d0d0d;color:#fff;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
@@ -85,14 +85,14 @@ router.get('/:token', async (req, res) => {
 
     // Already has a generated card
     const genDoc = await db.collection('generated_voters').findOne(
-      { EPIC_NO: epicNo }, { projection: { card_url: 1, VOTER_NAME: 1, wtl_code: 1 } },
+      { EPIC_NO: epicNo }, { projection: { card_url: 1, VOTER_NAME: 1, bjp_code: 1 } },
     );
     if (genDoc && genDoc.card_url) {
       return res.send(statusPage(
         '✅ Already Registered!',
         `Your Digital Member ID Card has already been generated.<br><br>
          <strong>${genDoc.VOTER_NAME || ''}</strong><br>
-         BJP Code: <strong>${genDoc.wtl_code || ''}</strong><br><br>
+         BJP Code: <strong>${genDoc.bjp_code || ''}</strong><br><br>
          Please check your WhatsApp — your card was sent there.<br>
          If you need it again, send <strong>"hi"</strong> to the WhatsApp bot.`,
         '#0a220a', '#5cf05c'
@@ -134,7 +134,7 @@ router.get('/:token', async (req, res) => {
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"/>
-<title>Upload Photo — WTL Member Card</title>
+<title>Upload Photo — BJP Member Card</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{height:100%}
@@ -567,7 +567,7 @@ router.post('/:token', upload.single('photo'), async (req, res) => {
       await sendTextMessage(waTo, '⏳ Generating your Digital Member ID Card… please wait a moment.');
 
       const photoBuffer = req.file.buffer;
-      const wtlCode     = 'BJP-' + crypto.randomBytes(4).toString('hex').toUpperCase();
+      const bjpCode     = 'BJP-' + crypto.randomBytes(4).toString('hex').toUpperCase();
 
       // Fetch voter from DB1 to get PART_NO (booth number)
       let partNo = '';
@@ -589,36 +589,24 @@ router.post('/:token', upload.single('photo'), async (req, res) => {
         PART_NO:       partNo,
         booth:         partNo,
         mobile,        MOBILE_NO: mobile,
-        wtl_code:      wtlCode,
+        bjp_code:      bjpCode,
       };
 
       const frontBuffer = await generateCard(voterData, photoBuffer);
       const photoUrl    = await uploadPhoto(photoBuffer, epicNo, mobile);
 
-      const fs = require('fs');
-      const path = require('path');
-      const isProd = config.nodeEnv === 'production';
-      const tempCardsDir = isProd
-        ? '/var/www/bjptn/dist/cards'
-        : path.join(__dirname, '../../../frontend/dist/cards');
-
-      if (!fs.existsSync(tempCardsDir)) {
-        fs.mkdirSync(tempCardsDir, { recursive: true });
-      }
-
-      const fileName = `${wtlCode}-${epicNo}.png`;
-      const filePath = path.join(tempCardsDir, fileName);
-      fs.writeFileSync(filePath, frontBuffer);
-
-      const frontUrl = `${config.baseUrl}/cards/${fileName}`;
+      // FIX-06: store the card in Backblaze B2 (private, unguessable key) and
+      // serve it via a time-limited presigned URL — no public static file.
+      const cardKey  = await uploadCard(frontBuffer, epicNo, mobile);
+      const frontUrl = await getCardPresignedUrl(cardKey);
       const now      = new Date();
 
       await db.collection('generated_voters').updateOne(
         { MOBILE_NO: mobile },
         {
           $set: {
-            EPIC_NO: epicNo, wtl_code: wtlCode,
-            photo_url: photoUrl, card_url: frontUrl, back_url: '', combined_url: frontUrl,
+            EPIC_NO: epicNo, bjp_code: bjpCode,
+            photo_url: photoUrl, card_b2_key: cardKey, card_url: frontUrl, back_url: '', combined_url: frontUrl,
             generated_at: now,
             VOTER_NAME:    pending.voter_name    || '',
             ASSEMBLY_NAME: pending.assembly_name || '',
@@ -640,26 +628,15 @@ router.post('/:token', upload.single('photo'), async (req, res) => {
         `👤 Name     : ${pending.voter_name    || ''}`,
         `🗳️  EPIC No  : ${epicNo}`,
         `🏛️  Assembly : ${pending.assembly_name || ''}`,
-        `🔖 BJP Code : ${wtlCode}`,
+        `🔖 BJP Code : ${bjpCode}`,
         '', 'BJP Tamil Nadu — Nation First',
       ].join('\n');
 
       await sendImageMessage(waTo, frontUrl, frontCaption);
 
-      // Clean up the temp card file after 60 seconds (gives WhatsApp's CDN time to fetch/cache it)
-      setTimeout(() => {
-        fs.unlink(filePath, (err) => {
-          if (err && err.code !== 'ENOENT') {
-            console.error(`[Upload] Failed to delete temp card: ${filePath}`, err.message);
-          } else {
-            console.log(`[Upload] Temporary card deleted: ${filePath}`);
-          }
-        });
-      }, 60000);
-
       await new Promise(r => setTimeout(r, 800));
       await sendTextMessage(waTo,
-        `🎉 *Registration Complete!*\n\nWelcome to BJP Tamil Nadu, *${pending.voter_name || 'Member'}*!\n\nYour BJP Code: *${wtlCode}*\n\nShare and invite others to join!`);
+        `🎉 *Registration Complete!*\n\nWelcome to BJP Tamil Nadu, *${pending.voter_name || 'Member'}*!\n\nYour BJP Code: *${bjpCode}*\n\nShare and invite others to join!`);
 
       console.log(`[Upload] Card generated & sent for ${mobile} / ${epicNo}`);
     } catch (err) {

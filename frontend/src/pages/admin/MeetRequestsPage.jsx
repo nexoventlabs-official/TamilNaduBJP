@@ -123,7 +123,7 @@ export default function MeetRequestsPage() {
                 </thead>
                 <tbody>
                   {requests.map((v, i) => {
-                    const codeVal = v.wtl_code
+                    const codeVal = v.bjp_code
                     return (
                       <tr 
                         key={codeVal || v.epic_no || i}

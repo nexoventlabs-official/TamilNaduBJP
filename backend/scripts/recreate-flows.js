@@ -44,14 +44,14 @@ const AUTH         = { Authorization: `Bearer ${ACCESS_TOKEN}` };
 // ── Flow definitions ──────────────────────────────────────────────
 const flows = [
   {
-    name     : 'WTL Member Registration',
+    name     : 'BJP Member Registration',
     category : 'SIGN_UP',
     envKey   : 'WHATSAPP_FLOW_REGISTRATION_ID',
     oldId    : process.env.WHATSAPP_FLOW_REGISTRATION_ID,
     jsonPath : path.join(__dirname, '../src/assets/flow_registration.json'),
   },
   {
-    name     : 'WTL Member Login',
+    name     : 'BJP Member Login',
     category : 'SIGN_IN',
     envKey   : 'WHATSAPP_FLOW_LOGIN_ID',
     oldId    : process.env.WHATSAPP_FLOW_LOGIN_ID,

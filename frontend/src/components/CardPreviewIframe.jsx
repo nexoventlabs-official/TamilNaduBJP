@@ -64,8 +64,8 @@ export const CardPreviewIframe = React.forwardRef(({ cardData, width = 340 }, re
       const assembly = String(cardData.assembly_name || cardData.assembly || cardData.ASSEMBLY_NAME || '').toUpperCase()
       const booth = String(cardData.part_no || cardData.booth_no || cardData.PART_NO || '')
       const district = String(cardData.district || cardData.DISTRICT || cardData.DISTRICT_NAME || '').toUpperCase()
-      const wtlCode = cardData.wtl_code || cardData.ptc_code || cardData.PTC_CODE || ''
-      const midVal = wtlCode || (epic ? `BJP-${epic.slice(-6)}` : '')
+      const bjpCode = cardData.bjp_code || cardData.ptc_code || cardData.PTC_CODE || ''
+      const midVal = bjpCode || (epic ? `BJP-${epic.slice(-6)}` : '')
       const photoUrl = cardData.photo_url || cardData.PHOTO_URL || ''
 
       if (nameInput) nameInput.value = name
@@ -99,11 +99,11 @@ export const CardPreviewIframe = React.forwardRef(({ cardData, width = 340 }, re
 
       if (qrImg && epic) {
         let qrData = cardData.referral_link || '';
-        if (!qrData && wtlCode && cardData.referral_id) {
-          qrData = `${window.location.origin}/refer/${wtlCode}/${cardData.referral_id}`;
+        if (!qrData && bjpCode && cardData.referral_id) {
+          qrData = `${window.location.origin}/refer/${bjpCode}/${cardData.referral_id}`;
         }
         if (!qrData) {
-          qrData = `${window.location.origin}/verify/${wtlCode || epic}`;
+          qrData = `${window.location.origin}/verify/${bjpCode || epic}`;
         }
         qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&ecc=H&data=${encodeURIComponent(qrData)}`;
       }

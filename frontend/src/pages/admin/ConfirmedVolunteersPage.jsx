@@ -100,7 +100,7 @@ export default function ConfirmedVolunteersPage() {
                 </thead>
                 <tbody>
                   {volunteers.map((v, i) => {
-                    const codeVal = v.wtl_code || v.ptc_code
+                    const codeVal = v.bjp_code || v.ptc_code
                     return (
                       <tr 
                         key={codeVal || v.epic_no || i}

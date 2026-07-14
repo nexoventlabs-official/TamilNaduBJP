@@ -5,31 +5,6 @@
 const crypto = require('crypto');
 
 /**
- * Hash a 4-digit PIN using PBKDF2-SHA256.
- * Returns "salt$hash" string — same format as Python.
- */
-function hashPin(pin) {
-  const salt = crypto.randomBytes(16).toString('hex'); // 32-char hex = 16 bytes
-  const hash = crypto.pbkdf2Sync(pin, salt, 100000, 32, 'sha256').toString('hex');
-  return `${salt}$${hash}`;
-}
-
-/**
- * Verify a PIN against its stored hash.
- */
-function verifyPin(pin, hashed) {
-  try {
-    const [salt, storedHash] = hashed.split('$');
-    if (!salt || !storedHash) return false;
-    const hash = crypto.pbkdf2Sync(pin, salt, 100000, 32, 'sha256').toString('hex');
-    // Constant-time comparison
-    return crypto.timingSafeEqual(Buffer.from(hash, 'hex'), Buffer.from(storedHash, 'hex'));
-  } catch {
-    return false;
-  }
-}
-
-/**
  * Track failed admin login attempts per IP — ported from LoginAttemptTracker class.
  */
 class LoginAttemptTracker {
@@ -72,4 +47,4 @@ class LoginAttemptTracker {
   }
 }
 
-module.exports = { hashPin, verifyPin, LoginAttemptTracker };
+module.exports = { LoginAttemptTracker };

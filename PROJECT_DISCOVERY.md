@@ -203,7 +203,7 @@ Defined and loaded in [backend/src/config.js](file:///c:/Users/Admin/Desktop/bjp
 ---
 
 ## 12. CURRENT DEPLOYMENT ARCHITECTURE
-The system is deployed on a virtual droplet server. Requests hitting the web app are processed by an Nginx server proxying traffic to the Node backend process listening on port `5000` under PM2 control. 
+The system is deployed on a DigitalOcean droplet (**4 vCPU, 8 GB RAM, 240 GB SSD, Singapore**; no swap). Requests hitting the web app are processed by an Nginx server proxying traffic to the Node backend process listening on port `5000` under PM2 control. A managed Redis instance backs the voter/EPIC cache, cross-instance rate limiting, and sessions.
 
 ---
 
@@ -219,13 +219,14 @@ All metadata (registration logs, lock variables, referral relations) is recorded
 ---
 
 ## 15. CURRENT DATABASE ARCHITECTURE
-* **`bjptamilnadu` (App DB)**: Local database on droplet (`127.0.0.1:27017`) holding registrations.
-* **`voter_db` (Voter Registry)**: Remote read-only cluster queried across 234 assembly collections in parallel for validation.
+* **`bjptamilnadu` (App DB)**: Local MongoDB on droplet (`127.0.0.1:27017`) holding registrations.
+* **`voter_db` (Voter Registry)**: Now also **local on the droplet** (`USE_LOCAL_VOTER_DB=true`, `127.0.0.1:27017`), ~58M records read-only, queried across 234 assembly collections in parallel for validation. (Previously a remote cluster.)
+* **Redis**: Managed instance for the voter/EPIC cache (`epic:<EPIC>`, 1-hour TTL), rate-limit counters, and session store.
 
 ---
 
 ## 16. BACKGROUND PROCESSES
-No persistent queue system (like Redis or RabbitMQ) is configured in the codebase. Asynchronous operations (like triggering WhatsApp card delivery after photo confirmation) are run in the background using JavaScript's native `setImmediate` event loop hooks.
+Redis is configured for caching, rate limiting, and sessions, but **no job/queue system** (e.g. BullMQ, RabbitMQ) is used yet. Asynchronous operations (like triggering WhatsApp card delivery after photo confirmation) run in the background using JavaScript's native `setImmediate` event loop hooks. A render queue for WhatsApp Puppeteer generation is recommended (see `STRESS_TEST_FINDINGS.md` §8).
 
 ---
 
@@ -238,7 +239,7 @@ No persistent queue system (like Redis or RabbitMQ) is configured in the codebas
   3. `frontend/public` — 6.26 MB
   4. `backend/src/assets` — 3.90 MB
 * **Largest Files (excl. node_modules)**:
-  1. `backend/public/wtl_final_11.html` — 2.05 MB
+  1. `backend/public/bjp_final_11.html` — 2.05 MB
   2. `backend/src/assets/front1.png` — 1.90 MB
   3. `frontend/dist/favicon.ico` — 1.32 MB
   4. `frontend/public/favicon.ico` — 1.32 MB
@@ -253,7 +254,7 @@ No persistent queue system (like Redis or RabbitMQ) is configured in the codebas
 ---
 
 ## 19. UNKNOWN AREAS
-* **DigitalOcean MongoDB cluster specifications**: Memory sizing and maximum connection pool parameters of the remote voter cluster could not be verified from the codebase.
+* **Voter DB is now local**: the previous remote-cluster sizing question no longer applies — the voter roll runs on the droplet's local MongoDB. Connection pool is `maxPoolSize 10` (raising to 50 is recommended).
 * **SMS Gateway Provider**: The exact name of the carrier API provider for the OTP text messages could not be verified.
 
 ---

@@ -185,7 +185,7 @@ async function handleImageMessage(from, mobile, imageInfo, db) {
       return;
     }
 
-    const wtlCode   = generateWtlCode();
+    const bjpCode   = generateBjpCode();
 
     // Fetch voter from DB1 to get PART_NO (booth number)
     let partNo = '';
@@ -208,7 +208,7 @@ async function handleImageMessage(from, mobile, imageInfo, db) {
       booth:         partNo,
       mobile:        mobile,
       MOBILE_NO:     mobile,
-      wtl_code:      wtlCode,
+      bjp_code:      bjpCode,
     };
 
     // Generate card with error tracking
@@ -245,7 +245,7 @@ async function handleImageMessage(from, mobile, imageInfo, db) {
           extra: {
             mobile,
             epicNo,
-            wtlCode,
+            bjpCode,
             durationMs: cardGenDuration,
             photoSizeKB: Math.round(photoBuffer.length / 1024)
           }
@@ -266,7 +266,7 @@ async function handleImageMessage(from, mobile, imageInfo, db) {
         extra: {
           mobile,
           epicNo,
-          wtlCode,
+          bjpCode,
           voterName: pending.voter_name,
           photoSizeKB: Math.round(photoBuffer.length / 1024),
           durationMs: cardGenDuration,
@@ -318,7 +318,7 @@ async function handleImageMessage(from, mobile, imageInfo, db) {
         extra: {
           mobile,
           epicNo,
-          wtlCode,
+          bjpCode,
           photoSizeKB: Math.round(photoBuffer.length / 1024),
           durationMs: uploadDuration,
           errorType: 'b2_upload_failed'
@@ -649,7 +649,7 @@ async function uploadPhoto(photoBuffer, epicNo, mobile) {
   }
 }
 
-async function uploadCard(cardBuffer, epicNo, wtlCode) {
+async function uploadCard(cardBuffer, epicNo, bjpCode) {
   try {
     // ... existing upload code ...
     return url;
@@ -664,7 +664,7 @@ async function uploadCard(cardBuffer, epicNo, wtlCode) {
       },
       extra: {
         epicNo,
-        wtlCode,
+        bjpCode,
         fileSizeKB: Math.round(cardBuffer.length / 1024),
         errorMessage: error.message
       }

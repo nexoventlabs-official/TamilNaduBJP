@@ -172,7 +172,7 @@ async function sendFlowMessage(to, flowType) {
   }
 
   const flowToken  = `${flowType}_${to}_${Date.now()}`;
-  const headerText = isLogin ? 'Welcome Back! 👋' : 'Join We The Leaders! 🎉';
+  const headerText = isLogin ? 'Welcome Back! 👋' : 'Join BJP Tamil Nadu! 🎉';
   const bodyText   = isLogin
     ? 'You are already a registered member. Tap below to log in and access your Digital Member ID Card.'
     : 'You are not yet registered. Tap below to verify your Voter ID and generate your free Digital Member ID Card.';
@@ -190,7 +190,7 @@ async function sendFlowMessage(to, flowType) {
           type: 'flow',
           header: { type: 'text', text: headerText },
           body:   { text: bodyText },
-          footer: { text: 'We The Leaders — Lead the Change' },
+          footer: { text: 'BJP Tamil Nadu — Lead the Change' },
           action: {
             name: 'flow',
             parameters: {

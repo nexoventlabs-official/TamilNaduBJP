@@ -116,11 +116,11 @@ This builds static assets into `frontend/dist/`. Copy or map this directory to y
 
 ## 📊 Performance & Capacity Summary
 
-A thorough capacity audit performed in **July 2026** outlines the limits and behaviors of the staging server (1 vCPU, 2GB RAM):
+A capacity audit performed in **July 2026** (originally on a 1 vCPU / 2 GB staging box) has been re-estimated for the **current production droplet: 4 vCPU / 8 GB RAM (Singapore), local voter DB, Redis-backed cache/rate-limiting/sessions**. Numbers below are engineering estimates pending a fresh load test:
 
-- **Web Registration Flow**: High-performance. By shifting card rendering to client-side canvas iframes, backend processing time was reduced from ~10 seconds to **under 2 seconds**.
-- **EPIC Lookup limits**: Capped by DB1 connection pool size (10 connections). It handles up to **200 concurrent lookups** smoothly before scaling queue latency triggers query timeouts.
-- **Card Rendering (Backend Puppeteer)**: Backend Puppeteer rendering is restricted to low-volume WhatsApp requests. It sustains up to **5 concurrent renders** smoothly; going over **20 concurrent processes** risks crashing the server due to OOM constraints.
+- **Web Registration Flow** (client-side canvas render): high-performance; backend work is just EPIC validation + photo upload. Scales to roughly **~150–250 concurrent** registrations (hundreds–~1,000/min).
+- **EPIC Lookup**: repeat lookups now served from **Redis** (~56 ms); cold lookups (234 local collections, ~166 ms) are capped by the DB1 pool (`maxPoolSize 10`) and degrade past ~150–200 concurrent uniques. Raising the pool to 50 is recommended.
+- **Card Rendering (Backend Puppeteer, WhatsApp)**: the real bottleneck — sustains roughly **~4–8 concurrent** renders (~30–60/min). Large bursts still risk an OOM crash (no swap, single shared browser), so a render queue is recommended.
 
 For more details, see [STRESS_TEST_FINDINGS.md](file:///c:/Users/Admin/Desktop/bjptn/STRESS_TEST_FINDINGS.md).
 

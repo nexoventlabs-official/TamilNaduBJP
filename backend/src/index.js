@@ -1,5 +1,5 @@
 /**
- * We The Leaders — Express API Server
+ * BJP Tamil Nadu — Express API Server
  * =====================================
  * Node.js port of Flask app.py
  * Lead the Change
@@ -48,10 +48,13 @@ Sentry.init({
 const express    = require('express');
 const session    = require('express-session');
 const MongoStore = require('connect-mongo');
+const RedisSessionStore = require('./redisSessionStore');
+const redis      = require('./redis');
 const cors       = require('cors');
 const helmet     = require('helmet');
 const crypto     = require('crypto');
 const path       = require('path');
+const cookieParser = require('cookie-parser');
 const config     = require('./config');
 const { connectDB } = require('./db');
 
@@ -164,25 +167,34 @@ app.use('/api/webhook', webhookRoutes);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// ── Sessions with MongoDB store ───────────────────────────────────
+// Cookie parser — required by csrf-csrf (populates req.cookies)
+app.use(cookieParser());
+
+// ── Sessions ──────────────────────────────────────────────────────
+// Prefer Redis (shared across instances, fast); fall back to MongoDB.
+const sessionStore = redis.client
+  ? new RedisSessionStore({ client: redis.client, prefix: 'sess:', ttl: 86400 })
+  : MongoStore.create({
+      mongoUrl:       config.mongoUri,
+      dbName:         config.mongoDb,
+      collectionName: 'sessions',
+      ttl:            86400,
+      autoRemove:     'native',
+    });
+console.log(`[Session] Using ${redis.client ? 'Redis' : 'MongoDB'} store`);
+
 app.use(session({
   secret:            config.sessionSecret,
   resave:            false,
   saveUninitialized: false,
-  store: MongoStore.create({
-    mongoUrl:       config.mongoUri,
-    dbName:         config.mongoDb,
-    collectionName: 'sessions',
-    ttl:            86400,
-    autoRemove:     'native',
-  }),
+  store: sessionStore,
   cookie: {
     httpOnly: true,
     sameSite: config.nodeEnv === 'production' ? 'none' : 'lax',
     secure:   config.nodeEnv === 'production',
     maxAge:   86400 * 1000,
   },
-  name: 'wtl.session',
+  name: 'bjp.session',
 }));
 
 // ── Static files ──────────────────────────────────────────────────
@@ -196,6 +208,42 @@ if (require('fs').existsSync(staticDir)) {
 // ── Health check endpoint (required by Render) ──────────────────
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// ── CSRF protection for admin state-changing routes (FIX-08) ──────
+// Double-submit cookie pattern via csrf-csrf. The admin UI fetches a
+// token from /admin/api/csrf-token and echoes it in the X-CSRF-Token
+// header on every mutating request. A cross-site attacker cannot read
+// the token (same-origin policy) so forged POSTs are rejected.
+const { doubleCsrf } = require('csrf-csrf');
+const {
+  doubleCsrfProtection,
+  generateCsrfToken,
+  invalidCsrfTokenError,
+} = doubleCsrf({
+  getSecret:            () => config.sessionSecret,
+  getSessionIdentifier: (req) => req.sessionID || '',
+  cookieName:           config.nodeEnv === 'production' ? '__Host-bjp.csrf' : 'bjp.csrf',
+  cookieOptions: {
+    sameSite: config.nodeEnv === 'production' ? 'none' : 'lax',
+    secure:   config.nodeEnv === 'production',
+    path:     '/',
+  },
+  size: 64,
+  getCsrfTokenFromRequest: (req) => req.headers['x-csrf-token'],
+});
+
+// Endpoint the admin frontend calls to obtain a CSRF token
+app.get('/admin/api/csrf-token', (req, res) => {
+  return res.json({ success: true, csrfToken: generateCsrfToken(req, res) });
+});
+
+// Enforce CSRF on admin mutating requests (safe methods + login are exempt)
+app.use('/admin/api', (req, res, next) => {
+  if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS') return next();
+  const pathOnly = (req.originalUrl || '').split('?')[0];
+  if (pathOnly.endsWith('/admin/api/login')) return next(); // login has no prior token
+  return doubleCsrfProtection(req, res, next);
 });
 
 // ── API Routes ────────────────────────────────────────────────────
@@ -214,6 +262,11 @@ Sentry.setupExpressErrorHandler(app);
 
 // ── Global error handler — never leak stack traces ────────────────
 app.use((err, req, res, _next) => {
+  // CSRF validation failures (FIX-08) → 403, not 500
+  if (err === invalidCsrfTokenError || err?.code === 'EBADCSRFTOKEN' || err?.code === 'ERR_BAD_CSRF_TOKEN') {
+    if (res.headersSent) return _next(err);
+    return res.status(403).json({ success: false, message: 'Invalid or missing CSRF token.' });
+  }
   const correlationId = crypto.randomUUID();
   if (config.nodeEnv === 'production') {
     console.error(`[${correlationId}] Unhandled error: ${err.message}`);

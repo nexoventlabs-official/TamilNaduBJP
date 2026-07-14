@@ -27,7 +27,7 @@ async function sendWAImage(imageUrl, caption) {
 (async () => {
   console.log(`\nRegenerating card for mobile ${MOBILE}...`);
   const conn = await mongoose.createConnection(process.env.MONGO_URI, {
-    dbName: process.env.MONGO_DB || 'wetheleaders', serverSelectionTimeoutMS: 10000,
+    dbName: process.env.MONGO_DB || 'bjptamilnadu', serverSelectionTimeoutMS: 10000,
   }).asPromise();
   const db = conn.db;
 
@@ -53,7 +53,7 @@ async function sendWAImage(imageUrl, caption) {
     part_no:       doc.PART_NO       || '', PART_NO:       doc.PART_NO       || '',
     booth:         doc.PART_NO       || '',
     mobile: MOBILE, MOBILE_NO: MOBILE,
-    wtl_code: doc.wtl_code || doc.ptc_code || '',
+    bjp_code: doc.bjp_code || doc.ptc_code || '',
   };
 
   console.log('Generating front card...');
@@ -81,7 +81,7 @@ async function sendWAImage(imageUrl, caption) {
     `👤 Name     : ${doc.VOTER_NAME}`,
     `🗳️  EPIC No  : ${epicNo}`,
     `🏛️  Assembly : ${doc.ASSEMBLY_NAME}`,
-    `🔖 BJP Code : ${doc.wtl_code || doc.ptc_code || ''}`,
+    `🔖 BJP Code : ${doc.bjp_code || doc.ptc_code || ''}`,
     '', 'BJP Tamil Nadu — Nation First',
   ].join('\n');
 

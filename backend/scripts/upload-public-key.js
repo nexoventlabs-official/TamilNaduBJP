@@ -49,7 +49,7 @@ try {
 
 (async () => {
   console.log('\n══════════════════════════════════════════════');
-  console.log('  WTL — Upload Public Key to Meta');
+  console.log('  BJP — Upload Public Key to Meta');
   console.log('══════════════════════════════════════════════\n');
 
   const url = `https://graph.facebook.com/${GRAPH_VERSION}/${PHONE_NUMBER_ID}/whatsapp_business_encryption`;

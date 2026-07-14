@@ -109,7 +109,7 @@ async function handleImageMessage(from, mobile, imageInfo, db) {
       description: 'Generate card with Puppeteer'
     });
     
-    const wtlCode = generateWtlCode();
+    const bjpCode = generateBjpCode();
     let frontBuffer;
     
     try {
@@ -118,7 +118,7 @@ async function handleImageMessage(from, mobile, imageInfo, db) {
       
       frontBuffer = await generateCard(voterData, photoBuffer);
       
-      cardGenSpan.setData('wtl_code', wtlCode);
+      cardGenSpan.setData('bjp_code', bjpCode);
       cardGenSpan.setData('epic_no', epicNo);
       cardGenSpan.setStatus('ok');
     } catch (cardError) {
@@ -182,7 +182,7 @@ async function handleImageMessage(from, mobile, imageInfo, db) {
     // Mark transaction as successful
     transaction.setStatus('ok');
     transaction.setData('epic_no', epicNo);
-    transaction.setData('wtl_code', wtlCode);
+    transaction.setData('bjp_code', bjpCode);
     
   } catch (err) {
     transaction.setStatus('error');

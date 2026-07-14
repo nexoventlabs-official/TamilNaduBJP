@@ -4,7 +4,7 @@ import { chat } from '../api'
 import { FlipCard3D } from '../components/FlipCard3D'
 
 export default function MyMembersPage() {
-  const { wtlCode } = useParams()
+  const { bjpCode } = useParams()
   const navigate = useNavigate()
   const [root, setRoot] = useState(null)
   const [tree, setTree] = useState([])
@@ -13,8 +13,8 @@ export default function MyMembersPage() {
   const [selectedMember, setSelectedMember] = useState(null)
 
   useEffect(() => {
-    if (!wtlCode) return
-    chat.getMyMembers(wtlCode)
+    if (!bjpCode) return
+    chat.getMyMembers(bjpCode)
       .then((data) => {
         setRoot(data.root || null)
         setTree(data.tree || [])
@@ -25,7 +25,7 @@ export default function MyMembersPage() {
       .finally(() => {
         setLoading(false)
       })
-  }, [wtlCode])
+  }, [bjpCode])
 
   if (loading) {
     return (
@@ -62,7 +62,7 @@ export default function MyMembersPage() {
     const nodeWidth = isRoot ? '210px' : '180px'
     
     return (
-      <div key={member.wtl_code} className={`tree-node level-${level}`} style={{
+      <div key={member.bjp_code} className={`tree-node level-${level}`} style={{
         display: 'flex',
         alignItems: 'center',
         position: 'relative',
@@ -124,7 +124,7 @@ export default function MyMembersPage() {
           {/* Details */}
           <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, textAlign: 'left' }}>
             <span style={{ fontSize: 11, fontWeight: 'bold', color: 'var(--color-chalk)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{member.name}</span>
-            <span style={{ fontSize: 9, color: 'var(--color-signal-mint)', fontFamily: 'monospace', fontWeight: 600 }}>{member.wtl_code}</span>
+            <span style={{ fontSize: 9, color: 'var(--color-signal-mint)', fontFamily: 'monospace', fontWeight: 600 }}>{member.bjp_code}</span>
           </div>
 
           <i className="bi bi-chevron-right" style={{ color: 'var(--color-ash)', fontSize: 10, flexShrink: 0 }} />
@@ -214,7 +214,7 @@ export default function MyMembersPage() {
               {tree.map(parent => {
                 const hasChildren = parent.referrals && parent.referrals.length > 0
                 return (
-                  <div key={parent.wtl_code} style={{
+                  <div key={parent.bjp_code} style={{
                     display: 'flex',
                     alignItems: 'center',
                     position: 'relative',
@@ -268,7 +268,7 @@ export default function MyMembersPage() {
                         )}
 
                         {parent.referrals.map(child => (
-                          <div key={child.wtl_code} style={{ display: 'flex', alignItems: 'center', gap: '16px', position: 'relative' }}>
+                          <div key={child.bjp_code} style={{ display: 'flex', alignItems: 'center', gap: '16px', position: 'relative' }}>
                             {/* Vertical link line up to node */}
                             <div style={{
                               position: 'absolute',
@@ -346,7 +346,7 @@ export default function MyMembersPage() {
                   assembly_name: selectedMember.assembly_name,
                   district: selectedMember.district,
                   part_no: selectedMember.part_no,
-                  wtl_code: selectedMember.wtl_code,
+                  bjp_code: selectedMember.bjp_code,
                   photo_url: selectedMember.photo_url
                 }}
                 width={360}
@@ -375,7 +375,7 @@ export default function MyMembersPage() {
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
                 <span style={{ color: '#555555' }}>BJP Code</span>
-                <span style={{ color: '#FF9933', fontFamily: 'monospace', fontWeight: 700 }}>{selectedMember.wtl_code}</span>
+                <span style={{ color: '#FF9933', fontFamily: 'monospace', fontWeight: 700 }}>{selectedMember.bjp_code}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
                 <span style={{ color: '#555555' }}>Assembly (Booth)</span>

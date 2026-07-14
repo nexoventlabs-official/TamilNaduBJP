@@ -47,17 +47,17 @@ export default function BoothAgentRequestsPage() {
     setPage(1)
   }
 
-  const handleAction = async (wtlCode, action) => {
+  const handleAction = async (bjpCode, action) => {
     if (!window.confirm(`Are you sure you want to ${action} this booth agent request?`)) return
-    setActionLoading((prev) => ({ ...prev, [wtlCode]: action }))
+    setActionLoading((prev) => ({ ...prev, [bjpCode]: action }))
     try {
-      if (action === 'confirm') await admin.confirmBoothAgent(wtlCode)
-      else                      await admin.rejectBoothAgent(wtlCode)
+      if (action === 'confirm') await admin.confirmBoothAgent(bjpCode)
+      else                      await admin.rejectBoothAgent(bjpCode)
       loadData()
     } catch (err) {
       alert(err.message || `Failed to ${action} request`)
     } finally {
-      setActionLoading((prev) => { const n = { ...prev }; delete n[wtlCode]; return n })
+      setActionLoading((prev) => { const n = { ...prev }; delete n[bjpCode]; return n })
     }
   }
 
@@ -129,7 +129,7 @@ export default function BoothAgentRequestsPage() {
                 <tbody>
                   {requests.map((r, i) => {
                     const status    = r.status || 'pending'
-                    const codeVal   = r.wtl_code || r.ptc_code
+                    const codeVal   = r.bjp_code || r.ptc_code
                     const key       = codeVal || r.epic_no || i
                     const isLoading = actionLoading[codeVal]
                     return (

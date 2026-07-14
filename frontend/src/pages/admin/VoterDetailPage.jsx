@@ -67,7 +67,7 @@ export default function VoterDetailPage() {
                 ))}
               </div>
             </div>
-            {(v.card_url || v.wtl_code || v.ptc_code) && (
+            {(v.card_url || v.bjp_code || v.ptc_code) && (
               <div>
                 <div className="detail-label" style={{ marginBottom: 6 }}>Generated Card</div>
                 <CardPreviewIframe cardData={v} width={280} />
@@ -89,7 +89,7 @@ export default function VoterDetailPage() {
                 <thead><tr><th>#</th><th>Generated At</th><th>Mobile</th><th>BJP Code</th></tr></thead>
                 <tbody>
                   {generations.map((g, i) => {
-                    const codeVal = g.wtl_code || g.ptc_code
+                    const codeVal = g.bjp_code || g.ptc_code
                     return (
                       <tr key={i}>
                         <td style={{ color: '#8696a0' }}>{i + 1}</td>

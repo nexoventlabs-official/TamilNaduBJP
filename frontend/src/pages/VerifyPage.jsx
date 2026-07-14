@@ -40,7 +40,7 @@ export default function VerifyPage() {
   }
 
   const v = voter?.voter || voter || {}
-  const isRegistered = !!(v.wtl_code || v.ptc_code || v.card_url || voter?.card_url)
+  const isRegistered = !!(v.bjp_code || v.ptc_code || v.card_url || voter?.card_url)
   const hasCard = isRegistered
   const isVolunteer = voter?.is_volunteer || v.is_volunteer
   const isBoothAgent = voter?.is_booth_agent || v.is_booth_agent
@@ -104,9 +104,9 @@ export default function VerifyPage() {
               {(v.father_name || v.FatherName) && (
                 <div style={{ fontSize: 12, color: 'var(--color-ash)' }}>S/o, D/o: {v.father_name || v.FatherName}</div>
               )}
-              {(v.wtl_code || v.ptc_code) && (
+              {(v.bjp_code || v.ptc_code) && (
                 <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'rgba(63, 226, 128, 0.05)', border: '1px solid var(--color-signal-mint)', borderRadius: 20, padding: '2px 10px', fontSize: 11, color: 'var(--color-signal-mint)', fontWeight: 500, width: 'fit-content' }}>
-                  <i className="bi bi-qr-code" /> BJP: {v.wtl_code || v.ptc_code}
+                  <i className="bi bi-qr-code" /> BJP: {v.bjp_code || v.ptc_code}
                 </div>
               )}
             </div>

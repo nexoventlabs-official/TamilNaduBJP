@@ -46,8 +46,11 @@ Emotional goal: civic pride and a sense of belonging. The member should feel rec
 
 ## Performance & Scalability Constraints
 
-Based on the July 2026 Capacity Audit, the following architectural boundaries are established:
+Updated for the current production droplet (**4 vCPU / 8 GB RAM**, local voter DB, Redis-backed cache/rate-limiting/sessions). Numbers below are engineering estimates pending a fresh load test.
 
-1. **Client-Side Rendering Priority**: Backend-based card generation (Puppeteer) is limited to a concurrency of **5** before latency becomes unacceptable (>10s) and crashes entirely at **20+ concurrent renders** (droplet memory exhaustion). All web-based registrations must utilize the client-side canvas rendering engine to bypass this limit.
-2. **Voter DB Lookup Limits**: The parallel search across 234 assembly collections is connection-pool bound. With a `maxPoolSize` of `10`, the system experiences query timeouts and false 404s starting at **200 concurrent lookups**.
-3. **Recovery Characteristics**: Droplet recovery is not automatic following a Puppeteer overload. A hard reboot is required. Production deployment requires resource scaling (RAM/CPU) and connection pool limits raised to at least 50.
+1. **Two card paths, very different ceilings**:
+   - **Web registration (client-side canvas render)**: server work is just EPIC validation + photo upload, so this scales to roughly **~150–250 concurrent** registrations (hundreds–~1,000/min). This must remain the default path for web flows.
+   - **WhatsApp card generation (server Puppeteer)**: the real bottleneck — safely **~4–8 concurrent** renders, ~30–60 cards/min. A burst beyond that risks an OOM crash because the shared browser has no concurrency cap and the droplet has **no swap**.
+2. **Voter DB Lookup Limits**: the parallel search across 234 assembly collections is connection-pool bound at `maxPoolSize 10`. Repeat lookups are now served from **Redis** (fast), but a burst of unique *cold* lookups still degrades past ~150–200 concurrent. Raising the pool to 50 is recommended.
+3. **Recovery Characteristics**: 8 GB gives more headroom than the legacy 2 GB box, but with **no swap** a severe Puppeteer overload can still wedge the droplet and require a reboot. Durable fixes: a WhatsApp render queue (cap ~4 concurrent) and 2–4 GB swap.
+4. **Scaling readiness**: cache, rate limiting, and sessions now live in Redis, so the app can run multiple instances behind a load balancer without weakening rate limits or duplicating cache.

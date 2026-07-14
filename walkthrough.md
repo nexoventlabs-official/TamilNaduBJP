@@ -4,10 +4,10 @@
 
 ### 1. Unique Member Verification Fixes
 * **QR Generation (`cardGenerator.js`) & Chatbot (`chat.js`)**:
-  - The QR code printed on the card and the text messages sent to users now point to `/verify/${wtlCode}` instead of `/verify/${epicNo}`.
-  - Since `wtlCode` (the BJP membership code) is unique to every single registration (even if they share an EPIC), the QR scan will always load that exact person's record.
+  - The QR code printed on the card and the text messages sent to users now point to `/verify/${bjpCode}` instead of `/verify/${epicNo}`.
+  - Since `bjpCode` (the BJP membership code) is unique to every single registration (even if they share an EPIC), the QR scan will always load that exact person's record.
 * **Multi-ID Verification Handler**:
-  - If the ID parameter starts with `BJP-` (a `wtlCode`), the backend queries `generated_voters` directly by `wtl_code: id`.
+  - If the ID parameter starts with `BJP-` (a `bjpCode`), the backend queries `generated_voters` directly by `bjp_code: id`.
   - If it is a standard EPIC number, it queries by `EPIC_NO` (falling back to the most recently registered user for that EPIC).
   - This ensures 100% backwards-compatibility with old cards, while making new cards fully unique!
 * **Session & Query Mobile Lookup for Profiles**:
@@ -33,7 +33,7 @@
 
 ### 3. Admin Search Improvements
 * **Endpoint Unification (`admin.js`)**: Updated the `/api/confirmed-volunteers` and `/api/confirmed-booth-agents` routes to inherit search criteria from `buildListParams(req)`.
-* **Complete Search Fields**: Searching now scans `name`, `wtl_code`, `epic_no`, and `mobile` using regex filters.
+* **Complete Search Fields**: Searching now scans `name`, `bjp_code`, `epic_no`, and `mobile` using regex filters.
 * **Organizer & Booth Agent Requests UI**: Embedded search input forms in `VolunteerRequestsPage.jsx` and `BoothAgentRequestsPage.jsx`, allowing administrators to search by Name, EPIC, and BJP Code.
 * **PM2 Server Restarts**: Restarted the production backend processes to apply search upgrades immediately.
 

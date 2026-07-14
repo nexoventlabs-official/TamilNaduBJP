@@ -34,7 +34,7 @@ async function getFlowStatus(flowId) {
 
 (async () => {
   console.log('\n══════════════════════════════════════════════');
-  console.log('  WTL — WhatsApp Flow Status Check');
+  console.log('  BJP — WhatsApp Flow Status Check');
   console.log('══════════════════════════════════════════════\n');
 
   let allPublished = true;

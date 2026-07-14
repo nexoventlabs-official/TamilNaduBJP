@@ -138,7 +138,7 @@ export default function BestPerformersPage() {
 
                 return (
                   <div 
-                    key={p.wtl_code}
+                    key={p.bjp_code}
                     onClick={() => setSelectedMember(p)}
                     style={{
                       display: 'flex',
@@ -196,7 +196,7 @@ export default function BestPerformersPage() {
                     {/* Identity Details */}
                     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, textAlign: 'left' }}>
                       <span style={{ fontSize: 15, fontWeight: 'bold', color: 'var(--color-chalk)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</span>
-                      <span style={{ fontSize: 11, color: 'var(--color-ash)', fontFamily: 'monospace' }}>BJP Code: <span style={{ color: 'var(--color-signal-mint)', fontWeight: 600 }}>{p.wtl_code}</span></span>
+                      <span style={{ fontSize: 11, color: 'var(--color-ash)', fontFamily: 'monospace' }}>BJP Code: <span style={{ color: 'var(--color-signal-mint)', fontWeight: 600 }}>{p.bjp_code}</span></span>
                     </div>
 
                     {/* Referrals Score */}
@@ -274,7 +274,7 @@ export default function BestPerformersPage() {
                   assembly_name: selectedMember.assembly_name,
                   district: selectedMember.district,
                   part_no: selectedMember.part_no,
-                  wtl_code: selectedMember.wtl_code,
+                  bjp_code: selectedMember.bjp_code,
                   photo_url: selectedMember.photo_url
                 }}
                 width={360}
@@ -303,7 +303,7 @@ export default function BestPerformersPage() {
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
                 <span style={{ color: 'var(--color-ash)' }}>BJP Code</span>
-                <span style={{ color: 'var(--color-signal-mint)', fontFamily: 'monospace', fontWeight: 700 }}>{selectedMember.wtl_code}</span>
+                <span style={{ color: 'var(--color-signal-mint)', fontFamily: 'monospace', fontWeight: 700 }}>{selectedMember.bjp_code}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
                 <span style={{ color: 'var(--color-ash)' }}>Assembly (Booth)</span>

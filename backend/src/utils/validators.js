@@ -30,16 +30,6 @@ function validateEpic(epic) {
 }
 
 /**
- * Validate 4-digit PIN.
- */
-function validatePin(pin) {
-  const s = String(pin || '').trim();
-  if (!s) return { valid: false, value: 'PIN is required' };
-  if (!/^\d{4}$/.test(s)) return { valid: false, value: 'PIN must be exactly 4 digits' };
-  return { valid: true, value: s };
-}
-
-/**
  * Validate 6-digit OTP.
  */
 function validateOtp(otp) {
@@ -60,4 +50,4 @@ function sanitizeSearch(search, maxLength = 100) {
     .trim();
 }
 
-module.exports = { validateMobile, validateEpic, validatePin, validateOtp, sanitizeSearch };
+module.exports = { validateMobile, validateEpic, validateOtp, sanitizeSearch };

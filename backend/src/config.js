@@ -3,8 +3,8 @@ require('dotenv').config();
 const nodeEnv = process.env.NODE_ENV || 'development';
 
 // ── Startup secret validations ────────────────────────────────────
-if (!process.env.ADMIN_USERNAME || !process.env.ADMIN_PASSWORD) {
-  throw new Error('ADMIN_USERNAME and ADMIN_PASSWORD must be set in .env');
+if (!process.env.ADMIN_USERNAME || !process.env.ADMIN_PASSWORD_HASH) {
+  throw new Error('ADMIN_USERNAME and ADMIN_PASSWORD_HASH must be set in .env');
 }
 
 if (!process.env.SESSION_SECRET || process.env.SESSION_SECRET.length < 32) {
@@ -21,11 +21,16 @@ const config = {
 
   // ── DB2: App data (Atlas) — writes happen here ──────────────────
   mongoUri: process.env.MONGO_URI || '',
-  mongoDb:  process.env.MONGO_DB  || 'wetheleaders',
+  mongoDb:  process.env.MONGO_DB  || 'bjptamilnadu',
 
   // ── DB1: Voter roll (DigitalOcean) — READ-ONLY ──────────────────
   mongoVoterUrl:    process.env.MONGO_VOTER_URL    || '',
   mongoVoterDbName: process.env.MONGO_VOTER_DB_NAME || 'voter_db',
+
+  // ── Redis (shared cache, rate limiting, sessions) ───────────────
+  // If unset, the app falls back to in-memory cache + MongoDB sessions
+  // (correct for a single instance only).
+  redisUrl: process.env.REDIS_URL || '',
 
   b2: {
     endpoint:   process.env.B2_ENDPOINT     || 's3.us-east-005.backblazeb2.com',
@@ -36,8 +41,8 @@ const config = {
   },
 
   admin: {
-    username: process.env.ADMIN_USERNAME,
-    password: process.env.ADMIN_PASSWORD,
+    username:     process.env.ADMIN_USERNAME,
+    passwordHash: process.env.ADMIN_PASSWORD_HASH,
   },
 
   smsApiKey:          process.env.SMS_API_KEY          || '',

@@ -51,7 +51,7 @@ async function main() {
     // Verify real member still exists
     const realMember = await db.collection('generated_voters').findOne({ MOBILE_NO: '7623498076' });
     console.log(`\n✅ Real member (7623498076) still in DB: ${!!realMember} | photo: ${realMember?.photo_url ? 'YES' : 'MISSING'}`);
-    console.log(`   Name: ${realMember?.VOTER_NAME}, wtl_code: ${realMember?.wtl_code}`);
+    console.log(`   Name: ${realMember?.VOTER_NAME}, bjp_code: ${realMember?.bjp_code}`);
 
     // Check total for this EPIC
     const remaining = await db.collection('generated_voters').countDocuments({ EPIC_NO: 'KFD3627734' });

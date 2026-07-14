@@ -763,7 +763,7 @@
   margin: 0;
 }
 
-.profile-details .wtl,
+.profile-details .bjp,
 .profile-details .ptc {
   color: var(--color-signal-mint);
   font-family: monospace;
@@ -949,8 +949,8 @@
   color: var(--color-ash);
 }
 
-/* ── WTL Theme (ID Card style) ───────────────────────────── */
-.chatbot-app.wtl-theme {
+/* ── BJP Theme (ID Card style) ───────────────────────────── */
+.chatbot-app.bjp-theme {
   --color-abyss:       #fff8f1; /* chat/input bg — saffron-tinted cream canvas */
   --color-carbon:      #ffffff; /* Floating cards bg */
   --color-graphite:    rgba(250, 93, 0, 0.12); /* Saffron hairline borders */
@@ -961,7 +961,7 @@
   font-family: 'Barlow', sans-serif !important;
 }
 
-.chatbot-app.wtl-theme {
+.chatbot-app.bjp-theme {
   background-color: var(--color-abyss);
   position: fixed;
   inset: 0;
@@ -970,7 +970,7 @@
   flex-direction: column;
 }
 
-.chatbot-app.wtl-theme .main-content-layout.single-layout {
+.chatbot-app.bjp-theme .main-content-layout.single-layout {
   display: flex;
   gap: 0;
   width: 100%;
@@ -982,7 +982,7 @@
   overflow: hidden;
 }
 
-.chatbot-app.wtl-theme .right-chat-panel {
+.chatbot-app.bjp-theme .right-chat-panel {
   flex: 1;
   height: 100%;
   display: flex;
@@ -990,7 +990,7 @@
   min-width: 0;
 }
 
-.chatbot-app.wtl-theme .chatbot-container {
+.chatbot-app.bjp-theme .chatbot-container {
   width: 100%;
   height: 100%;
   border: none;
@@ -1002,7 +1002,7 @@
 }
 
 /* ── Left Menu Panel (WhatsApp style) ───────────────────────── */
-.chatbot-app.wtl-theme .left-menu-panel {
+.chatbot-app.bjp-theme .left-menu-panel {
   display: flex;
   flex-direction: column;
   width: 360px;
@@ -1013,12 +1013,12 @@
 }
 
 @media (max-width: 1023px) {
-  .chatbot-app.wtl-theme .left-menu-panel {
+  .chatbot-app.bjp-theme .left-menu-panel {
     display: none !important; /* Hide on mobile/tablet */
   }
 }
 
-.chatbot-app.wtl-theme .left-menu-header {
+.chatbot-app.bjp-theme .left-menu-header {
   height: 64px;
   background-color: var(--color-abyss);
   border-bottom: 1px solid rgba(255, 102, 0, 0.12);
@@ -1029,24 +1029,24 @@
   flex-shrink: 0;
 }
 
-.chatbot-app.wtl-theme .left-menu-profile {
+.chatbot-app.bjp-theme .left-menu-profile {
   display: flex;
   align-items: center;
   gap: 10px;
 }
 
-.chatbot-app.wtl-theme .left-menu-profile img {
+.chatbot-app.bjp-theme .left-menu-profile img {
   width: 36px;
   height: 36px;
   object-fit: contain;
 }
 
-.chatbot-app.wtl-theme .left-menu-profile-info {
+.chatbot-app.bjp-theme .left-menu-profile-info {
   display: flex;
   flex-direction: column;
 }
 
-.chatbot-app.wtl-theme .left-menu-brand {
+.chatbot-app.bjp-theme .left-menu-brand {
   font-size: 13.5px;
   font-weight: 700;
   color: var(--color-signal-mint);
@@ -1054,7 +1054,7 @@
   font-family: 'Barlow Condensed', sans-serif !important;
 }
 
-.chatbot-app.wtl-theme .left-menu-status {
+.chatbot-app.bjp-theme .left-menu-status {
   font-size: 10px;
   color: var(--color-ash);
   display: flex;
@@ -1062,7 +1062,7 @@
   gap: 4px;
 }
 
-.chatbot-app.wtl-theme .left-menu-header-actions {
+.chatbot-app.bjp-theme .left-menu-header-actions {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1071,13 +1071,13 @@
 /* Vertical Stepper in Left Panel */
 
 /* Chat List */
-.chatbot-app.wtl-theme .left-chat-list {
+.chatbot-app.bjp-theme .left-chat-list {
   flex: 1;
   overflow-y: auto;
   background-color: var(--color-carbon);
 }
 
-.chatbot-app.wtl-theme .left-chat-item {
+.chatbot-app.bjp-theme .left-chat-item {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -1087,15 +1087,15 @@
   transition: background-color 0.15s;
 }
 
-.chatbot-app.wtl-theme .left-chat-item:hover {
+.chatbot-app.bjp-theme .left-chat-item:hover {
   background-color: rgba(255, 102, 0, 0.02);
 }
 
-.chatbot-app.wtl-theme .left-chat-item.active {
+.chatbot-app.bjp-theme .left-chat-item.active {
   background-color: rgba(255, 102, 0, 0.05);
 }
 
-.chatbot-app.wtl-theme .left-chat-avatar {
+.chatbot-app.bjp-theme .left-chat-avatar {
   width: 44px;
   height: 44px;
   border-radius: 50%;
@@ -1108,35 +1108,35 @@
   flex-shrink: 0;
 }
 
-.chatbot-app.wtl-theme .left-chat-avatar.bot-avatar {
+.chatbot-app.bjp-theme .left-chat-avatar.bot-avatar {
   background-color: var(--color-signal-mint);
   color: var(--color-carbon);
 }
 
-.chatbot-app.wtl-theme .left-chat-details {
+.chatbot-app.bjp-theme .left-chat-details {
   flex: 1;
   min-width: 0;
 }
 
-.chatbot-app.wtl-theme .left-chat-name-row {
+.chatbot-app.bjp-theme .left-chat-name-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 3px;
 }
 
-.chatbot-app.wtl-theme .left-chat-name {
+.chatbot-app.bjp-theme .left-chat-name {
   font-size: 13.5px;
   font-weight: 600;
   color: var(--color-chalk);
 }
 
-.chatbot-app.wtl-theme .left-chat-time {
+.chatbot-app.bjp-theme .left-chat-time {
   font-size: 10px;
   color: var(--color-ink-dim);
 }
 
-.chatbot-app.wtl-theme .left-chat-msg {
+.chatbot-app.bjp-theme .left-chat-msg {
   font-size: 11.5px;
   color: var(--color-ink-dim);
   white-space: nowrap;
@@ -1144,16 +1144,16 @@
   text-overflow: ellipsis;
 }
 
-.chatbot-app.wtl-theme .left-chat-item.locked {
+.chatbot-app.bjp-theme .left-chat-item.locked {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
-.chatbot-app.wtl-theme .left-chat-item.locked:hover {
+.chatbot-app.bjp-theme .left-chat-item.locked:hover {
   background-color: transparent;
 }
 
-.chatbot-app.wtl-theme .lock-icon {
+.chatbot-app.bjp-theme .lock-icon {
   font-size: 12px;
   color: #888888;
 }
@@ -1161,7 +1161,7 @@
 
 
 /* ── WhatsApp Template Interactive Buttons ─────────────────── */
-.chatbot-app.wtl-theme .msg-bubble-interactive {
+.chatbot-app.bjp-theme .msg-bubble-interactive {
   padding: 0 !important;
   background-color: var(--color-carbon) !important;
   border: 1px solid rgba(255, 102, 0, 0.12) !important;
@@ -1172,17 +1172,17 @@
   flex-direction: column;
 }
 
-.chatbot-app.wtl-theme .interactive-body {
+.chatbot-app.bjp-theme .interactive-body {
   padding: 10px 14px;
 }
 
-.chatbot-app.wtl-theme .interactive-buttons {
+.chatbot-app.bjp-theme .interactive-buttons {
   display: flex;
   border-top: 1px solid rgba(255, 102, 0, 0.12);
   background-color: var(--color-carbon);
 }
 
-.chatbot-app.wtl-theme .interactive-btn {
+.chatbot-app.bjp-theme .interactive-btn {
   flex: 1;
   background: none;
   border: none;
@@ -1198,126 +1198,126 @@
   transition: background-color 0.15s;
 }
 
-.chatbot-app.wtl-theme .interactive-btn:hover:not(:disabled) {
+.chatbot-app.bjp-theme .interactive-btn:hover:not(:disabled) {
   background-color: rgba(255, 102, 0, 0.04);
 }
 
-.chatbot-app.wtl-theme .interactive-btn:not(:last-child) {
+.chatbot-app.bjp-theme .interactive-btn:not(:last-child) {
   border-right: 1px solid rgba(255, 102, 0, 0.12);
 }
 
-.chatbot-app.wtl-theme .interactive-btn:disabled {
+.chatbot-app.bjp-theme .interactive-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
-.chatbot-app.wtl-theme .msg-bubble {
+.chatbot-app.bjp-theme .msg-bubble {
   max-width: 75%;
 }
 
 @media (min-width: 1024px) {
-  .chatbot-app.wtl-theme .msg-bubble {
+  .chatbot-app.bjp-theme .msg-bubble {
     max-width: 60%;
   }
 }
 
 /* Stepper tweaks */
 /* Chat Header tweaks */
-.chatbot-app.wtl-theme .chat-header {
+.chatbot-app.bjp-theme .chat-header {
   background-color: var(--color-carbon);
   border-bottom: 2px solid var(--color-signal-mint); /* Dark green accent line like card */
 }
 @media (min-width: 1024px) {
-  .chatbot-app.wtl-theme .chat-header {
+  .chatbot-app.bjp-theme .chat-header {
     display: none !important; /* Hide redundant header on desktop since left sidebar is always visible */
   }
 }
-.chatbot-app.wtl-theme .chat-header-name {
+.chatbot-app.bjp-theme .chat-header-name {
   font-weight: 700;
   color: var(--color-signal-mint);
   letter-spacing: 0.05em;
 }
-.chatbot-app.wtl-theme .chat-header-status {
+.chatbot-app.bjp-theme .chat-header-status {
   color: var(--color-ash);
 }
-.chatbot-app.wtl-theme .chat-header-btn {
+.chatbot-app.bjp-theme .chat-header-btn {
   border-color: rgba(255, 102, 0, 0.2);
   color: var(--color-signal-mint);
 }
-.chatbot-app.wtl-theme .chat-header-btn:hover {
+.chatbot-app.bjp-theme .chat-header-btn:hover {
   background-color: rgba(255, 102, 0, 0.05);
   border-color: var(--color-signal-mint);
 }
 
 /* Messages area */
-.chatbot-app.wtl-theme .chat-messages {
+.chatbot-app.bjp-theme .chat-messages {
   background-color: var(--color-abyss); /* Soft beige background behind bubbles */
 }
 
 /* Chat Bubble tweaks */
-.chatbot-app.wtl-theme .msg-row.bot .msg-bubble {
+.chatbot-app.bjp-theme .msg-row.bot .msg-bubble {
   background-color: var(--color-carbon);
   border: 1px solid rgba(255, 102, 0, 0.12);
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
   color: var(--color-chalk);
 }
-.chatbot-app.wtl-theme .msg-row.user .msg-bubble {
+.chatbot-app.bjp-theme .msg-row.user .msg-bubble {
   background-color: rgba(255, 102, 0, 0.05); /* Soft green background for user message */
   border: 1px solid rgba(255, 102, 0, 0.25);
   color: var(--color-chalk);
 }
-.chatbot-app.wtl-theme .msg-time {
+.chatbot-app.bjp-theme .msg-time {
   color: var(--color-ink-dim);
 }
 
 /* Input area */
-.chatbot-app.wtl-theme .chat-input-area {
+.chatbot-app.bjp-theme .chat-input-area {
   background-color: var(--color-carbon);
   border-top: 1px solid rgba(255, 102, 0, 0.15);
 }
-.chatbot-app.wtl-theme .chat-input-wrapper {
+.chatbot-app.bjp-theme .chat-input-wrapper {
   border: 1px solid rgba(255, 102, 0, 0.15);
   background-color: var(--color-abyss);
 }
-.chatbot-app.wtl-theme .chat-input-wrapper:focus-within {
+.chatbot-app.bjp-theme .chat-input-wrapper:focus-within {
   border-color: var(--color-signal-mint);
 }
-.chatbot-app.wtl-theme .chat-input {
+.chatbot-app.bjp-theme .chat-input {
   color: var(--color-chalk);
 }
-.chatbot-app.wtl-theme .chat-input::placeholder {
+.chatbot-app.bjp-theme .chat-input::placeholder {
   color: var(--color-ink-dim);
 }
 
 /* Send button arrow color */
-.chatbot-app.wtl-theme .chat-send-btn {
+.chatbot-app.bjp-theme .chat-send-btn {
   color: var(--color-carbon); /* White arrow on dark green circle */
 }
 
 /* Scrollbar styling for theme consistency */
-.chatbot-app.wtl-theme .chat-messages::-webkit-scrollbar-thumb {
+.chatbot-app.bjp-theme .chat-messages::-webkit-scrollbar-thumb {
   background-color: rgba(255, 102, 0, 0.15);
 }
-.chatbot-app.wtl-theme .chat-messages::-webkit-scrollbar-thumb:hover {
+.chatbot-app.bjp-theme .chat-messages::-webkit-scrollbar-thumb:hover {
   background-color: rgba(255, 102, 0, 0.3);
 }
 
 /* Crop Modal */
-.chatbot-app.wtl-theme .crop-modal {
+.chatbot-app.bjp-theme .crop-modal {
   background-color: var(--color-carbon);
   border: 1px solid rgba(255, 102, 0, 0.2);
 }
-.chatbot-app.wtl-theme .crop-modal-header {
+.chatbot-app.bjp-theme .crop-modal-header {
   border-bottom: 1px solid rgba(255, 102, 0, 0.15);
   color: var(--color-signal-mint);
 }
-.chatbot-app.wtl-theme .crop-modal-body {
+.chatbot-app.bjp-theme .crop-modal-body {
   background-color: var(--color-abyss);
 }
-.chatbot-app.wtl-theme .crop-modal-footer {
+.chatbot-app.bjp-theme .crop-modal-footer {
   border-top: 1px solid rgba(255, 102, 0, 0.15);
 }
-.chatbot-app.wtl-theme .crop-hint {
+.chatbot-app.bjp-theme .crop-hint {
   color: var(--color-ash);
 }
 

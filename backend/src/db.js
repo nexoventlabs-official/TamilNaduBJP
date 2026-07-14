@@ -2,7 +2,7 @@
  * Dual-database setup
  * ─────────────────────────────────────────────────────────────────
  * DB1 — voter_db (DigitalOcean)   READ-ONLY  — 5.8 cr voter roll
- * DB2 — wetheleaders (Atlas)      READ/WRITE — generated cards,
+ * DB2 — bjptamilnadu (Atlas)      READ/WRITE — generated cards,
  *        generation_stats, otp_sessions, volunteer/booth requests
  *
  * IMPORTANT: Never write to DB1. All writes must go to DB2.
@@ -11,6 +11,7 @@
 
 const mongoose = require('mongoose');
 const config   = require('./config');
+const redis    = require('./redis');
 
 // ── Two separate Mongoose connections ────────────────────────────
 const appConn   = mongoose.createConnection(); // DB2 — app data (Atlas)
@@ -79,9 +80,9 @@ async function ensureAppIndexes() {
     // Recreate indexes with new uniqueness constraints
     await db.collection('generated_voters').createIndex({ MOBILE_NO: 1 },      { unique: true, background: true });
     await db.collection('generated_voters').createIndex({ EPIC_NO: 1 },        { background: true });
-    await db.collection('generated_voters').createIndex({ wtl_code: 1 },        { unique: true, sparse: true, background: true });
+    await db.collection('generated_voters').createIndex({ bjp_code: 1 },        { unique: true, sparse: true, background: true });
     await db.collection('generated_voters').createIndex({ ptc_code: 1 },        { unique: true, sparse: true, background: true });
-    await db.collection('generated_voters').createIndex({ referred_by_wtl: 1 }, { background: true });
+    await db.collection('generated_voters').createIndex({ referred_by_bjp: 1 }, { background: true });
     await db.collection('generated_voters').createIndex({ referred_by_ptc: 1 }, { background: true });
 
     await db.collection('generation_stats').createIndex({ auth_mobile: 1 }, { unique: true, background: true });
@@ -91,9 +92,9 @@ async function ensureAppIndexes() {
     await db.collection('otp_sessions').createIndex({ created_at: 1 }, { expireAfterSeconds: 600, background: true });
 
     // Unique indexes prevent TOCTOU races on volunteer/booth requests
-    await db.collection('volunteer_requests').createIndex(   { wtl_code: 1 }, { unique: true, sparse: true, background: true });
+    await db.collection('volunteer_requests').createIndex(   { bjp_code: 1 }, { unique: true, sparse: true, background: true });
     await db.collection('volunteer_requests').createIndex(   { ptc_code: 1 }, { unique: true, sparse: true, background: true });
-    await db.collection('booth_agent_requests').createIndex( { wtl_code: 1 }, { unique: true, sparse: true, background: true });
+    await db.collection('booth_agent_requests').createIndex( { bjp_code: 1 }, { unique: true, sparse: true, background: true });
     await db.collection('booth_agent_requests').createIndex( { ptc_code: 1 }, { unique: true, sparse: true, background: true });
 
     // Deduplication for processed WhatsApp message IDs (TTL 24 h)
@@ -157,17 +158,57 @@ const getVoterTotalCount = async () => {
  * Why parallel? If we queried sequentially, timeout would be impossible.
  * Why first-match? ~90% of time EPIC found in first 20-30 queries, no need to wait for rest.
  */
+// ── Voter cache ──────────────────────────────────────────────────
+// Primary: Redis (shared across instances, bounded, survives restarts).
+// Fallback: a *bounded* in-memory Map (max 50k entries) used only when
+// Redis is unavailable — prevents the unbounded-growth OOM risk.
+const EPIC_CACHE_TTL     = 60 * 60 * 1000; // 1 hour (ms)
+const EPIC_CACHE_TTL_SEC = 60 * 60;        // 1 hour (s, for Redis EX)
+const EPIC_MEM_MAX       = 50000;          // hard cap on in-memory fallback
 const _epicCache = new Map();
-const EPIC_CACHE_TTL = 60 * 60 * 1000; // 1 hour
+const _epicKey = (epicNo) => `epic:${epicNo}`;
+
+// Read from cache: Redis first, then bounded in-memory fallback.
+async function _cacheGet(epicNo) {
+  if (redis.isReady()) {
+    try {
+      const raw = await redis.client.get(_epicKey(epicNo));
+      if (raw) return JSON.parse(raw);
+    } catch (e) {
+      console.warn(`[Redis] cache get failed for ${epicNo}: ${e.message}`);
+    }
+  }
+  const mem = _epicCache.get(epicNo);
+  if (mem && Date.now() - mem.timestamp < EPIC_CACHE_TTL) return mem.data;
+  if (mem) _epicCache.delete(epicNo); // expired
+  return null;
+}
+
+// Write to cache: Redis (with TTL) and the bounded in-memory fallback.
+async function _cacheSet(epicNo, data) {
+  if (redis.isReady()) {
+    try {
+      await redis.client.set(_epicKey(epicNo), JSON.stringify(data), 'EX', EPIC_CACHE_TTL_SEC);
+    } catch (e) {
+      console.warn(`[Redis] cache set failed for ${epicNo}: ${e.message}`);
+    }
+  }
+  // Bounded in-memory fallback — evict oldest entry when at capacity
+  if (_epicCache.size >= EPIC_MEM_MAX) {
+    const oldestKey = _epicCache.keys().next().value;
+    if (oldestKey !== undefined) _epicCache.delete(oldestKey);
+  }
+  _epicCache.set(epicNo, { data, timestamp: Date.now() });
+}
 
 const findVoterByEpic = async (epicNo) => {
   if (!voterConnected) return null;
-  
-  // Check in-memory cache first — same EPIC = instant response
-  const cached = _epicCache.get(epicNo);
-  if (cached && Date.now() - cached.timestamp < EPIC_CACHE_TTL) {
+
+  // Check cache first — same EPIC = instant response
+  const cached = await _cacheGet(epicNo);
+  if (cached) {
     console.log(`[DB1] Cache HIT for ${epicNo} ⚡`);
-    return cached.data;
+    return cached;
   }
 
   console.log(`[DB1] Cache MISS for ${epicNo} — querying all 234 collections`);
@@ -223,7 +264,7 @@ const findVoterByEpic = async (epicNo) => {
     // Caching null would cause false "not found" errors for up to 1 hour
     // if a lookup fails due to a timeout, race condition, or transient DB error.
     if (result) {
-      _epicCache.set(epicNo, { data: result, timestamp: Date.now() });
+      await _cacheSet(epicNo, result);
       console.log(`[DB1] ✓ Found ${epicNo}: ${result.VOTER_NAME || result.FM_NAME_EN || 'Unknown'} — cached ✅`);
     } else {
       console.log(`[DB1] ✗ EPIC ${epicNo} not found in any collection (not cached — will retry next request)`);

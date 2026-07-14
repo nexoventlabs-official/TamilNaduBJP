@@ -67,7 +67,7 @@ router.get('/', async (req, res) => {
 
   res.json({
     success:   true,
-    service:   'We The Leaders — API Server',
+    service:   'BJP Tamil Nadu — API Server',
     tagline:   'Lead the Change',
     version:   '1.0.0',
     timestamp: new Date().toISOString(),
@@ -101,7 +101,7 @@ router.get('/health', async (req, res) => {
   res.status(healthy ? 200 : 503).json({
     success:   healthy,
     status:    healthy ? 'healthy' : 'degraded',
-    service:   'We The Leaders API',
+    service:   'BJP Tamil Nadu API',
     timestamp: new Date().toISOString(),
     env:       config.nodeEnv,
     checks: {
@@ -127,7 +127,7 @@ async function verifyVoterHandler(req, res) {
     let epicNo = id;
 
     if (id.startsWith('BJP-')) {
-      genDoc = await db.collection('generated_voters').findOne({ wtl_code: id }) || {};
+      genDoc = await db.collection('generated_voters').findOne({ bjp_code: id }) || {};
       epicNo = genDoc.EPIC_NO || '';
     } else {
       genDoc = await db.collection('generated_voters').findOne({ EPIC_NO: id }, { sort: { generated_at: -1 } }) || {};
@@ -147,8 +147,8 @@ async function verifyVoterHandler(req, res) {
     const partNo   = String(voter?.PART_NO || genDoc.PART_NO || '');
     const cardUrl  = genDoc.card_url  || stat.card_url  || '';
     const photoUrl = await getPhotoPresignedUrl(genDoc.photo_url || stat.photo_url || '');
-    const wtlCode  = genDoc.wtl_code || '';
-    const isMember = Boolean(wtlCode);
+    const bjpCode  = genDoc.bjp_code || '';
+    const isMember = Boolean(bjpCode);
 
     // ── If request is from a browser (QR scan), return HTML verify page ─
     const accept = req.headers['accept'] || '';
@@ -161,7 +161,7 @@ async function verifyVoterHandler(req, res) {
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Member Verification — We The Leaders</title>
+<title>Member Verification — BJP Tamil Nadu</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0d0d0d;color:#fff;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:24px 16px 48px}
@@ -194,11 +194,11 @@ ${cardUrl ? `.view-card{display:block;margin-top:20px;padding:14px;background:#f
     ${assembly ? `<div class="row"><span class="row-label">Assembly</span><span class="row-value">${esc(assembly)}</span></div>` : ''}
     ${district ? `<div class="row"><span class="row-label">District</span><span class="row-value">${esc(district)}</span></div>` : ''}
     ${partNo   ? `<div class="row"><span class="row-label">Booth No</span><span class="row-value">${esc(partNo)}</span></div>` : ''}
-    ${wtlCode  ? `<div class="row"><span class="row-label">WTL Code</span><span class="row-value">${esc(wtlCode)}</span></div>` : ''}
+    ${bjpCode  ? `<div class="row"><span class="row-label">BJP Code</span><span class="row-value">${esc(bjpCode)}</span></div>` : ''}
     ${cardUrl  ? `<a class="view-card" href="${esc(cardUrl)}" target="_blank">📥 View My ID Card</a>` : ''}
   </div>
 </div>
-<div class="footer">We The Leaders Foundation<br>Verified via QR Code</div>
+<div class="footer">BJP Tamil Nadu Foundation<br>Verified via QR Code</div>
 </body>
 </html>`;
       return res.setHeader('Content-Type','text/html').send(html);
@@ -212,7 +212,7 @@ ${cardUrl ? `.view-card{display:block;margin-top:20px;padding:14px;background:#f
     const out = {
       success: true, verified: Boolean(voter), epic_no: epicNo, name, assembly, district,
       age: voter?.AGE || '', gender: voter?.GENDER || '', part_no: partNo,
-      wtl_code: wtlCode, photo_url: photoUrl, card_url: cardUrl,
+      bjp_code: bjpCode, photo_url: photoUrl, card_url: cardUrl,
       gen_count: stat.count || 0,
       last_generated: stat.last_generated ? String(stat.last_generated).slice(0,19).replace('T',' ') : '',
       auth_mobile_masked: authMob.length >= 4 ? `****${authMob.slice(-4)}` : '',
@@ -241,7 +241,7 @@ router.get('/api/card/:epicNo', async (req, res) => {
     let epicNo = id;
 
     if (id.startsWith('BJP-')) {
-      genDoc = await db.collection('generated_voters').findOne({ wtl_code: id }) || {};
+      genDoc = await db.collection('generated_voters').findOne({ bjp_code: id }) || {};
       epicNo = genDoc.EPIC_NO || '';
     } else {
       genDoc = await db.collection('generated_voters').findOne({ EPIC_NO: id }, { sort: { generated_at: -1 } }) || {};
@@ -266,7 +266,7 @@ router.get('/api/card/:epicNo', async (req, res) => {
       back_url:     genDoc.back_url     || stat.back_url     || '',
       combined_url: genDoc.combined_url || stat.combined_url || '',
       photo_url:    await getPhotoPresignedUrl(genDoc.photo_url || stat.photo_url || ''),
-      wtl_code:     genDoc.wtl_code   || '',
+      bjp_code:     genDoc.bjp_code   || '',
       gen_count:    stat.count        || 0,
       name,
       epic_no:      epicNo,
@@ -289,14 +289,14 @@ router.get('/api/whatsapp-channel', (req, res) => {
 });
 
 // ── Referral landing  ─────────────────────────────────────────────
-//  GET /refer/:wtlCode/:referralId  →  Python's referral_landing
-router.get('/refer/:wtlCode/:referralId', async (req, res) => {
+//  GET /refer/:bjpCode/:referralId  →  Python's referral_landing
+router.get('/refer/:bjpCode/:referralId', async (req, res) => {
   try {
-    const wtlCode = String(req.params.wtlCode || '').trim().toUpperCase();
+    const bjpCode = String(req.params.bjpCode || '').trim().toUpperCase();
     const referralId = String(req.params.referralId || '').trim().toUpperCase();
     const db  = getDb();
     const doc = await db.collection('generated_voters').findOne(
-      { wtl_code: wtlCode, referral_id: referralId },
+      { bjp_code: bjpCode, referral_id: referralId },
       { projection: { VOTER_NAME: 1, FM_NAME_EN: 1, LASTNAME_EN: 1 } }
     );
 
@@ -306,7 +306,7 @@ router.get('/refer/:wtlCode/:referralId', async (req, res) => {
 
     const name = doc.VOTER_NAME ||
                  `${doc.FM_NAME_EN || ''} ${doc.LASTNAME_EN || ''}`.trim() ||
-                 'A We The Leaders Member';
+                 'A BJP Tamil Nadu Member';
     // HTML-escape the name before embedding in OG meta tags
     const escapeHtml = (s) => String(s)
       .replace(/&/g, '&amp;')
@@ -315,7 +315,7 @@ router.get('/refer/:wtlCode/:referralId', async (req, res) => {
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#39;');
     const referrerName = escapeHtml(name);
-    const redirectUrl  = `${config.frontendUrl || config.baseUrl}/?ref=${wtlCode}&rid=${referralId}`;
+    const redirectUrl  = `${config.frontendUrl || config.baseUrl}/?ref=${bjpCode}&rid=${referralId}`;
     const bannerUrl    = `${config.baseUrl}/static/banner.jpg`;
 
     // Return HTML with OG meta tags + instant redirect (mirrors Python response)
@@ -323,18 +323,18 @@ router.get('/refer/:wtlCode/:referralId', async (req, res) => {
 <html>
 <head>
   <meta charset="UTF-8">
-  <meta property="og:title"       content="We The Leaders — Become a Member!">
-  <meta property="og:description" content="${referrerName} invites you to join We The Leaders! Generate your free Digital Member ID Card now.">
+  <meta property="og:title"       content="BJP Tamil Nadu — Become a Member!">
+  <meta property="og:description" content="${referrerName} invites you to join BJP Tamil Nadu! Generate your free Digital Member ID Card now.">
   <meta property="og:image"       content="${bannerUrl}">
-  <meta property="og:url"         content="${config.baseUrl}/refer/${wtlCode}/${referralId}">
+  <meta property="og:url"         content="${config.baseUrl}/refer/${bjpCode}/${referralId}">
   <meta name="twitter:card"       content="summary_large_image">
-  <meta name="twitter:title"      content="We The Leaders — Become a Member!">
+  <meta name="twitter:title"      content="BJP Tamil Nadu — Become a Member!">
   <meta name="twitter:image"      content="${bannerUrl}">
   <meta http-equiv="refresh"      content="0;url=${redirectUrl}">
-  <title>We The Leaders — Join Now!</title>
+  <title>BJP Tamil Nadu — Join Now!</title>
 </head>
 <body style="font-family:sans-serif;text-align:center;padding:40px;">
-  <h2>We The Leaders</h2>
+  <h2>BJP Tamil Nadu</h2>
   <p><em>Lead the Change</em></p>
   <p>Redirecting… <a href="${redirectUrl}">Click here</a> if not redirected.</p>
   <script>window.location.href="${redirectUrl}";</script>
@@ -374,7 +374,7 @@ async function voterPhotoHandler(req, res) {
     let epicNo = id;
 
     if (id.startsWith('BJP-')) {
-      genDoc = await db.collection('generated_voters').findOne({ wtl_code: id }) || {};
+      genDoc = await db.collection('generated_voters').findOne({ bjp_code: id }) || {};
       epicNo = genDoc.EPIC_NO || '';
     } else {
       genDoc = await db.collection('generated_voters').findOne({ EPIC_NO: id }, { sort: { generated_at: -1 } }) || {};

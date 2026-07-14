@@ -161,10 +161,64 @@ async function getPhotoStream(photoUrlOrKey) {
   return response.Body;
 }
 
-// ── Drop-in Stubs for card generation (cards generated entirely client-side for Web) ─
-async function uploadCard(buffer, epicNo, mobile) { return ''; }
-async function uploadBackCard(buffer, epicNo, mobile) { return ''; }
-async function uploadCombinedCard(buffer, epicNo, mobile) { return ''; }
+/**
+ * Upload a generated card PNG to Backblaze B2 (FIX-06).
+ * Stored under an unguessable private key; served only via presigned URLs.
+ * Returns the relative file key.
+ */
+async function uploadCard(buffer, epicNo, mobile, variant = 'front') {
+  const suffix = mobile ? `_${mobile}` : '';
+  const key = `member_cards/${variant}_${epicNo.toUpperCase()}${suffix}.png`.replace(/[/\\]/g, '_');
+  try {
+    await s3.send(new PutObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: key,
+      Body: buffer,
+      ContentType: 'image/png',
+      CacheControl: 'private, max-age=604800',
+    }));
+    return key;
+  } catch (error) {
+    console.error('[B2] Card upload failed:', error.message);
+    Sentry.captureException(error, {
+      tags:  { operation: 'file_upload', storage: 'backblaze_b2', file_type: 'card' },
+      extra: { epicNo, mobile, variant, bucketName: BUCKET_NAME, errorMessage: error.message },
+    });
+    throw error;
+  }
+}
+
+async function uploadBackCard(buffer, epicNo, mobile) { return uploadCard(buffer, epicNo, mobile, 'back'); }
+async function uploadCombinedCard(buffer, epicNo, mobile) { return uploadCard(buffer, epicNo, mobile, 'combined'); }
+
+/**
+ * Generate a direct, unguessable, time-limited presigned GET URL for a
+ * card key. Valid 7 days — long enough for WhatsApp's CDN to fetch and
+ * for the member to re-download. Regenerate on read for persistence.
+ */
+async function getCardPresignedUrl(keyOrUrl) {
+  if (!keyOrUrl) return '';
+  // Already a full non-B2 URL → return as-is
+  if (keyOrUrl.startsWith('http') && !keyOrUrl.includes('backblazeb2.com')) return keyOrUrl;
+  let key = keyOrUrl;
+  if (keyOrUrl.startsWith('http')) {
+    try {
+      const url = new URL(keyOrUrl);
+      const parts = url.pathname.split('/').filter(Boolean);
+      if (parts[0] === 'file') parts.shift();
+      if (parts[0] === BUCKET_NAME) parts.shift();
+      key = parts.join('/');
+    } catch (_) { return keyOrUrl; }
+  }
+  key = key.replace(/^\/+/, '');
+  try {
+    const command = new GetObjectCommand({ Bucket: BUCKET_NAME, Key: key });
+    return await getSignedUrl(s3, command, { expiresIn: 604800 });
+  } catch (err) {
+    console.error(`[B2] Card presigned URL failed for ${key}:`, err.message);
+    return '';
+  }
+}
 
 module.exports = {
   uploadPhoto,
@@ -172,5 +226,6 @@ module.exports = {
   getPhotoStream,
   uploadCard,
   uploadBackCard,
-  uploadCombinedCard
+  uploadCombinedCard,
+  getCardPresignedUrl,
 };

@@ -28,12 +28,12 @@ const {
   sendCtaUrlMessage,
 } = require('../services/whatsappService');
 const { generateCard, generateBackCard } = require('../services/cardGenerator');
-const { uploadPhoto, uploadCard, uploadBackCard } = require('../services/backblazeService');
+const { uploadPhoto, uploadCard, uploadBackCard, getCardPresignedUrl } = require('../services/backblazeService');
 
 const BTN_MY_CARD = 'btn_my_card';
 
-function generateWtlCode() {
-  return 'WTL-' + crypto.randomBytes(4).toString('hex').toUpperCase();
+function generateBjpCode() {
+  return 'BJP-' + crypto.randomBytes(4).toString('hex').toUpperCase();
 }
 
 function generateReferralId() {
@@ -226,9 +226,9 @@ async function handleTextMessage(from, mobile, db) {
       const name = (genDoc && genDoc.VOTER_NAME) || 'Member';
       await sendReplyButtons(
         from,
-        'Hi *' + name + '*! Welcome to *We The Leaders*.\nTap the button below to receive your Digital Member ID Card instantly.',
+        'Hi *' + name + '*! Welcome to *BJP Tamil Nadu*.\nTap the button below to receive your Digital Member ID Card instantly.',
         [{ id: BTN_MY_CARD, title: 'My Card' }],
-        'We The Leaders',
+        'BJP Tamil Nadu',
         'Lead the Change',
       );
     } else if (pending && pending.status === 'awaiting_photo') {
@@ -239,7 +239,7 @@ async function handleTextMessage(from, mobile, db) {
         from,
         '📸 Upload Your Photo',
         `Hi! We have your details (EPIC: *${pending.epic_no}*).\n\nTap the button below to upload your passport-size photo and generate your *Digital Member ID Card*.\n\n_You can also send your photo directly in this chat._`,
-        'We The Leaders — Lead the Change',
+        'BJP Tamil Nadu — Lead the Change',
         'Upload Photo',
         uploadUrl,
       );
@@ -254,14 +254,14 @@ async function handleTextMessage(from, mobile, db) {
       if (!result.success) {
         await sendTextMessage(
           from,
-          'Welcome to We The Leaders! Visit https://we-the-leader.vercel.app to verify your Voter ID and generate your free Digital Member ID Card.',
+          'Welcome to BJP Tamil Nadu! Visit https://we-the-leader.vercel.app to verify your Voter ID and generate your free Digital Member ID Card.',
         );
       }
     }
   } catch (err) {
     console.error('[Webhook] handleTextMessage error (' + mobile + '):', err.message);
     try {
-      await sendTextMessage(from, 'Welcome to We The Leaders! Visit https://we-the-leader.vercel.app to get your Digital Member ID Card.');
+      await sendTextMessage(from, 'Welcome to BJP Tamil Nadu! Visit https://we-the-leader.vercel.app to get your Digital Member ID Card.');
     } catch (e2) { /* ignore */ }
   }
 }
@@ -345,7 +345,7 @@ async function handleImageMessage(from, mobile, imageInfo, db) {
       return;
     }
 
-    const wtlCode   = generateWtlCode();
+    const bjpCode   = generateBjpCode();
 
     // Fetch voter from DB1 to get PART_NO (booth number)
     let partNo = '';
@@ -372,7 +372,7 @@ async function handleImageMessage(from, mobile, imageInfo, db) {
       booth:         partNo,
       mobile:        mobile,
       MOBILE_NO:     mobile,
-      wtl_code:      wtlCode,
+      bjp_code:      bjpCode,
     };
 
     // Generate card (Puppeteer) with dedicated error tracking
@@ -405,7 +405,7 @@ async function handleImageMessage(from, mobile, imageInfo, db) {
           level: 'warning',
           tags:  { operation: 'card_generation', source: 'whatsapp', performance: 'slow' },
           extra: {
-            mobile, epicNo, wtlCode,
+            mobile, epicNo, bjpCode,
             durationMs:  cardGenDuration,
             photoSizeKB: Math.round(photoBuffer.length / 1024),
           },
@@ -423,7 +423,7 @@ async function handleImageMessage(from, mobile, imageInfo, db) {
           failure_type: cardError.name || 'unknown',
         },
         extra: {
-          mobile, epicNo, wtlCode,
+          mobile, epicNo, bjpCode,
           voterName:   pending.voter_name,
           photoSizeKB: Math.round(photoBuffer.length / 1024),
           durationMs:  cardGenDuration,
@@ -465,7 +465,7 @@ async function handleImageMessage(from, mobile, imageInfo, db) {
       Sentry.captureException(uploadError, {
         tags: { operation: 'photo_upload', source: 'whatsapp', storage: 'backblaze_b2' },
         extra: {
-          mobile, epicNo, wtlCode,
+          mobile, epicNo, bjpCode,
           photoSizeKB: Math.round(photoBuffer.length / 1024),
           durationMs:  Date.now() - photoUploadStartTime,
           errorType:   'b2_upload_failed',
@@ -479,30 +479,18 @@ async function handleImageMessage(from, mobile, imageInfo, db) {
       return;
     }
 
-    const fs = require('fs');
-    const path = require('path');
-    const isProd = config.nodeEnv === 'production';
-    const tempCardsDir = isProd
-      ? '/var/www/bjptn/dist/cards'
-      : path.join(__dirname, '../../../frontend/dist/cards');
-
-    if (!fs.existsSync(tempCardsDir)) {
-      fs.mkdirSync(tempCardsDir, { recursive: true });
-    }
-
-    const fileName = `${wtlCode}-${epicNo}.png`;
-    const filePath = path.join(tempCardsDir, fileName);
-    fs.writeFileSync(filePath, frontBuffer);
-
-    const frontUrl = `${config.baseUrl}/cards/${fileName}`;
+    // FIX-06: store the card in Backblaze B2 (private, unguessable key) and
+    // serve it via a time-limited presigned URL — no public static file.
+    const cardKey = await uploadCard(frontBuffer, epicNo, mobile);
+    const frontUrl = await getCardPresignedUrl(cardKey);
     const now = new Date();
 
     // Generate referral link for this new member
     const referralId   = generateReferralId();
-    const referralLink = config.baseUrl + '/refer/' + wtlCode + '/' + referralId;
+    const referralLink = config.baseUrl + '/refer/' + bjpCode + '/' + referralId;
 
     // Pull referral attribution stored when registration flow was submitted
-    const referredByWtl = pending.referred_by_wtl || '';
+    const referredByBjp = pending.referred_by_bjp || '';
     const referredByRid = pending.referred_by_referral_id || '';
 
     await db.collection('generated_voters').updateOne(
@@ -510,8 +498,9 @@ async function handleImageMessage(from, mobile, imageInfo, db) {
       {
         $set: {
           EPIC_NO:                 epicNo,
-          wtl_code:                wtlCode,
+          bjp_code:                bjpCode,
           photo_url:               photoUrl,
+          card_b2_key:             cardKey,
           card_url:                frontUrl,
           back_url:                '',
           combined_url:            frontUrl,
@@ -524,7 +513,7 @@ async function handleImageMessage(from, mobile, imageInfo, db) {
           source:                  'whatsapp',
           referral_id:             referralId,
           referral_link:           referralLink,
-          ...(referredByWtl ? { referred_by_wtl: referredByWtl, referred_by_referral_id: referredByRid } : {}),
+          ...(referredByBjp ? { referred_by_bjp: referredByBjp, referred_by_referral_id: referredByRid } : {}),
         },
         $setOnInsert: { created_at: now },
       },
@@ -532,9 +521,9 @@ async function handleImageMessage(from, mobile, imageInfo, db) {
     );
 
     // Increment referrer's referred_members_count if applicable
-    if (referredByWtl) {
+    if (referredByBjp) {
       db.collection('generated_voters').updateOne(
-        { wtl_code: referredByWtl },
+        { bjp_code: referredByBjp },
         { $inc: { referred_members_count: 1 } }
       ).catch(function() {});
     }
@@ -551,23 +540,12 @@ async function handleImageMessage(from, mobile, imageInfo, db) {
       'Name     : ' + (pending.voter_name    || ''),
       'EPIC No  : ' + epicNo,
       'Assembly : ' + (pending.assembly_name || ''),
-      'WTL Code : ' + wtlCode,
+      'BJP Code : ' + bjpCode,
       '',
-      'We The Leaders -- Lead the Change',
+      'BJP Tamil Nadu -- Lead the Change',
     ].join('\n');
 
     await sendImageMessage(from, frontUrl, frontCaption);
-
-    // Clean up local temp card file after 60 seconds
-    setTimeout(() => {
-      fs.unlink(filePath, (err) => {
-        if (err && err.code !== 'ENOENT') {
-          console.error(`[Webhook] Failed to delete temp card: ${filePath}`, err.message);
-        } else {
-          console.log(`[Webhook] Temporary card deleted: ${filePath}`);
-        }
-      });
-    }, 60000);
 
     const welcomeName = pending.voter_name || 'Member';
     await new Promise(function(r) { setTimeout(r, 800); });
@@ -576,12 +554,12 @@ async function handleImageMessage(from, mobile, imageInfo, db) {
     const ctaResult = await sendCtaUrlMessage(
       from,
       '🎉 Registration Complete!',
-      'Welcome to *We The Leaders*, ' + welcomeName + '! 🎊\n\n' +
-      'Your *WTL Code*: ' + wtlCode + '\n\n' +
+      'Welcome to *BJP Tamil Nadu*, ' + welcomeName + '! 🎊\n\n' +
+      'Your *BJP Code*: ' + bjpCode + '\n\n' +
       '👥 *Share your referral link* with friends and family to invite them to join. ' +
       'Every member you refer will be shown in your *My Members* list!\n\n' +
       '🔗 Your personal referral link is ready — tap the button below to open it.',
-      'We The Leaders — Lead the Change',
+      'BJP Tamil Nadu — Lead the Change',
       '🔗 View My Referral Link',
       referralLink,
     );
@@ -590,7 +568,7 @@ async function handleImageMessage(from, mobile, imageInfo, db) {
     if (!ctaResult.success) {
       await sendTextMessage(
         from,
-        'Registration Complete!\n\nWelcome to We The Leaders, ' + welcomeName + '!\n\nYour WTL Code: ' + wtlCode + '\n\n' +
+        'Registration Complete!\n\nWelcome to BJP Tamil Nadu, ' + welcomeName + '!\n\nYour BJP Code: ' + bjpCode + '\n\n' +
         '👥 Share your referral link to invite others:\n' + referralLink,
       );
     }
@@ -618,7 +596,7 @@ async function handleSendCard(from, mobile, db) {
     // Try MOBILE_NO first, fall back to EPIC from pending/stats
     let genDoc = await db.collection('generated_voters').findOne(
       { MOBILE_NO: mobile },
-      { projection: { card_url: 1, back_url: 1, VOTER_NAME: 1, EPIC_NO: 1, wtl_code: 1 } },
+      { projection: { card_url: 1, back_url: 1, VOTER_NAME: 1, EPIC_NO: 1, bjp_code: 1 } },
     );
 
     if (!genDoc || !genDoc.card_url) {
@@ -633,7 +611,7 @@ async function handleSendCard(from, mobile, db) {
       if (epicNo) {
         genDoc = await db.collection('generated_voters').findOne(
           { EPIC_NO: epicNo, MOBILE_NO: mobile },
-          { projection: { card_url: 1, back_url: 1, VOTER_NAME: 1, EPIC_NO: 1, wtl_code: 1 } },
+          { projection: { card_url: 1, back_url: 1, VOTER_NAME: 1, EPIC_NO: 1, bjp_code: 1 } },
         );
       }
     }
@@ -656,20 +634,20 @@ async function handleSendCard(from, mobile, db) {
 
     const name    = (genDoc && genDoc.VOTER_NAME) || '';
     const epicNo  = (genDoc && genDoc.EPIC_NO)    || '';
-    const wtlCode = (genDoc && genDoc.wtl_code)   || '';
+    const bjpCode = (genDoc && genDoc.bjp_code)   || '';
 
     const parts = ['Your Digital Member ID Card -- FRONT'];
     if (name)    parts.push('Name     : ' + name);
     if (epicNo)  parts.push('EPIC No  : ' + epicNo);
-    if (wtlCode) parts.push('WTL Code : ' + wtlCode);
+    if (bjpCode) parts.push('BJP Code : ' + bjpCode);
     parts.push('');
-    parts.push('We The Leaders -- Lead the Change');
+    parts.push('BJP Tamil Nadu -- Lead the Change');
 
     await sendImageMessage(from, cardUrl, parts.join('\n'));
 
     if (backUrl) {
       await new Promise(function(r) { setTimeout(r, 800); });
-      await sendImageMessage(from, backUrl, 'Your Digital Member ID Card -- BACK\n\nWe The Leaders -- Lead the Change');
+      await sendImageMessage(from, backUrl, 'Your Digital Member ID Card -- BACK\n\nBJP Tamil Nadu -- Lead the Change');
     }
   } catch (err) {
     console.error('[Webhook] handleSendCard error (' + mobile + '):', err.message);
@@ -691,7 +669,7 @@ async function handleFlowReply(from, mobile, nfmReply, db) {
   // Referral attribution passed from the flow token or response payload
   // The frontend embeds ref/rid in the flow token as "registration_<from>_<ts>_<ref>_<rid>"
   // or the flow JSON may carry them directly.
-  const refWtl = data.referred_by_wtl || data.referred_by_ptc || data.ref || '';
+  const refBjp = data.referred_by_bjp || data.referred_by_ptc || data.ref || '';
   const refRid = data.referred_by_referral_id || data.rid || '';
 
   if (epicNo) {
@@ -713,8 +691,8 @@ async function handleFlowReply(from, mobile, nfmReply, db) {
       district:      data.district      || '',
       updated_at:    new Date(),
     };
-    if (refWtl) {
-      pendingUpdate.referred_by_wtl           = refWtl;
+    if (refBjp) {
+      pendingUpdate.referred_by_bjp           = refBjp;
       pendingUpdate.referred_by_referral_id   = refRid;
     }
     await db.collection('pending_registrations').updateOne(

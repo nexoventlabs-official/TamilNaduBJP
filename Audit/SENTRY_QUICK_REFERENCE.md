@@ -185,7 +185,7 @@ User:
 Extra:
   - photoSizeKB: 8192
   - durationMs: 15000
-  - wtlCode: WTL-ABC123
+  - bjpCode: BJP-ABC123
 Breadcrumbs:
   1. Card generation started
   2. Photo downloaded (8MB)
@@ -290,7 +290,7 @@ SENTRY_OPTIMIZATION_MEDIUM_PRIORITY.md    ← 📊 WEEKS 2-3 (3-4 hr)
 
 **User Context:**
 - Identifies who had error
-- mobile, epicNo, wtlCode
+- mobile, epicNo, bjpCode
 - Set with Sentry.setUser()
 
 **Breadcrumbs:**

@@ -188,7 +188,7 @@ Focus on adding performance transactions to track operation duration."
 - ✅ WhatsApp API response time
 
 ### Context Tracked
-- ✅ User identification (mobile, epicNo, wtlCode)
+- ✅ User identification (mobile, epicNo, bjpCode)
 - ✅ Operation breadcrumbs (step-by-step trail)
 - ✅ File sizes (photo, card)
 - ✅ Error classification (tags)

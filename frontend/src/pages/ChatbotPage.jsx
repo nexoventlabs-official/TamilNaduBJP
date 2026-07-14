@@ -8,26 +8,26 @@ import { FlipCard3D } from '../components/FlipCard3D'
 import html2canvas from 'html2canvas'
 import '../styles/chatbot.css'
 
-// ── Read referral params from landing URL (?ref=WTL-XXXX&rid=REF-XXXX)
+// ── Read referral params from landing URL (?ref=BJP-XXXX&rid=REF-XXXX)
 const getReferralParams = () => {
   try {
     const p = new URLSearchParams(window.location.search)
     let ref = (p.get('ref') || '').trim().toUpperCase()
     let rid = (p.get('rid') || '').trim().toUpperCase()
     // Validate format before using
-    if (/^(WTL|BJP)-[0-9A-F]{8}$/.test(ref) && /^REF-[0-9A-F]{8}$/.test(rid)) {
+    if (/^(BJP|BJP)-[0-9A-F]{8}$/.test(ref) && /^REF-[0-9A-F]{8}$/.test(rid)) {
       return { ref, rid }
     }
 
     // Check localStorage as fallback
-    const stored = localStorage.getItem('wtl_referral')
+    const stored = localStorage.getItem('bjp_referral')
     if (stored) {
       const data = JSON.parse(stored)
       // Check if it's less than 24 hours old
       if (data && Date.now() - data.timestamp < 24 * 60 * 60 * 1000) {
-        const storedRef = (data.wtlCode || '').trim().toUpperCase()
+        const storedRef = (data.bjpCode || '').trim().toUpperCase()
         const storedRid = (data.referralId || '').trim().toUpperCase()
-        if (/^(WTL|BJP)-[0-9A-F]{8}$/.test(storedRef) && /^REF-[0-9A-F]{8}$/.test(storedRid)) {
+        if (/^(BJP|BJP)-[0-9A-F]{8}$/.test(storedRef) && /^REF-[0-9A-F]{8}$/.test(storedRid)) {
           return { ref: storedRef, rid: storedRid }
         }
       }
@@ -73,7 +73,7 @@ const maskMobile = (m) => m ? m.slice(0, 5) + 'XXXXX' : ''
 
 const getDownloadUrl = (url, epicNo) => {
   if (url && url.includes('/upload/')) {
-    return url.replace('/upload/', `/upload/fl_attachment:${epicNo}_WTL_Card/`)
+    return url.replace('/upload/', `/upload/fl_attachment:${epicNo}_BJP_Card/`)
   }
   return url
 }
@@ -412,7 +412,7 @@ function GeneratedCardMsg({ card, isNew = false }) {  const c = card || {}
     if (hasName && hasAssembly) {
       setFullCardData(c)
     } else if (c.epic_no) {
-      publicApi.getCardData(c.wtl_code || c.epic_no)
+      publicApi.getCardData(c.bjp_code || c.epic_no)
         .then((data) => setFullCardData(data))
         .catch(() => setFullCardData(c))
     }
@@ -972,7 +972,7 @@ function AppreciationLetterMsg({ name, date, refCode, autoDownload }) {
   )
 }
 
-function SelectWingMsg({ wtlCode, epicNo, isLatest }) {
+function SelectWingMsg({ bjpCode, epicNo, isLatest }) {
   const [selectedWing, setSelectedWing] = useState('')
   const [submitted, setSubmitted] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -1005,11 +1005,11 @@ function SelectWingMsg({ wtlCode, epicNo, isLatest }) {
   ]
 
   useEffect(() => {
-    if (!wtlCode) {
+    if (!bjpCode) {
       setChecking(false)
       return
     }
-    chat.getRequestStatus(wtlCode)
+    chat.getRequestStatus(bjpCode)
       .then(res => {
         if (res.success && res.volunteer) {
           setExistingRequest(res.volunteer)
@@ -1022,13 +1022,13 @@ function SelectWingMsg({ wtlCode, epicNo, isLatest }) {
       .finally(() => {
         setChecking(false)
       })
-  }, [wtlCode])
+  }, [bjpCode])
 
   const handleSubmit = async () => {
     if (!selectedWing) return
     setLoading(true)
     try {
-      const res = await chat.requestVolunteer(wtlCode, epicNo, selectedWing)
+      const res = await chat.requestVolunteer(bjpCode, epicNo, selectedWing)
       setSubmitted(true)
       setStatusText(res.message || '✅ Organizer request submitted! Admin will review it shortly.')
     } catch (err) {
@@ -1219,7 +1219,7 @@ function SelectWingMsg({ wtlCode, epicNo, isLatest }) {
   )
 }
 
-function BoothAgentSetupMsg({ wtlCode, epicNo, isLatest }) {
+function BoothAgentSetupMsg({ bjpCode, epicNo, isLatest }) {
   const [districtsData, setDistrictsData] = useState(null)
   const [district, setDistrict] = useState('')
   const [assembly, setAssembly] = useState(null)
@@ -1231,11 +1231,11 @@ function BoothAgentSetupMsg({ wtlCode, epicNo, isLatest }) {
   const [existingRequest, setExistingRequest] = useState(null)
 
   useEffect(() => {
-    if (!wtlCode) {
+    if (!bjpCode) {
       setChecking(false)
       return
     }
-    chat.getRequestStatus(wtlCode)
+    chat.getRequestStatus(bjpCode)
       .then(res => {
         if (res.success && res.boothAgent) {
           setExistingRequest(res.boothAgent)
@@ -1248,7 +1248,7 @@ function BoothAgentSetupMsg({ wtlCode, epicNo, isLatest }) {
       .finally(() => {
         setChecking(false)
       })
-  }, [wtlCode])
+  }, [bjpCode])
 
   useEffect(() => {
     if (step === 'already_submitted') return
@@ -1279,7 +1279,7 @@ function BoothAgentSetupMsg({ wtlCode, epicNo, isLatest }) {
     if (!booth) return
     setLoading(true)
     try {
-      const res = await chat.requestBoothAgent(wtlCode, epicNo, booth, assembly.name, district)
+      const res = await chat.requestBoothAgent(bjpCode, epicNo, booth, assembly.name, district)
       setStep('submitted')
     } catch (err) {
       setErrorMsg(err.message || 'Failed to submit booth agent request.')
@@ -2277,8 +2277,8 @@ function FullLetterPanel({ type, name, date, refCode, epicNo, onBack }) {
     if (!resolvedRefCode && epicNo) {
       publicApi.getCardData(epicNo)
         .then((data) => {
-          if (data && data.wtl_code) {
-            setResolvedRefCode(data.wtl_code)
+          if (data && data.bjp_code) {
+            setResolvedRefCode(data.bjp_code)
           }
         })
         .catch(() => {})
@@ -2706,7 +2706,7 @@ function FullProfilePanel({ epicNo, mobile, referredCount, onBack }) {
                   <i className="bi bi-hash" style={{ color: '#FF9933' }} />
                   <span>Member Code</span>
                 </div>
-                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-chalk)', fontFamily: 'monospace' }}>{profileData.wtl_code || profileData.ptc_code || 'N/A'}</span>
+                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-chalk)', fontFamily: 'monospace' }}>{profileData.bjp_code || profileData.ptc_code || 'N/A'}</span>
               </div>
 
               <div style={{ 
@@ -2818,7 +2818,7 @@ function FullProfilePanel({ epicNo, mobile, referredCount, onBack }) {
   );
 }
 
-function FullMyMembersPanel({ wtlCode, onBack }) {
+function FullMyMembersPanel({ bjpCode, onBack }) {
   const [root, setRoot] = useState(null)
   const [tree, setTree] = useState([])
   const [loading, setLoading] = useState(true)
@@ -2826,12 +2826,12 @@ function FullMyMembersPanel({ wtlCode, onBack }) {
   const [selectedMember, setSelectedMember] = useState(null)
 
   useEffect(() => {
-    if (!wtlCode) {
+    if (!bjpCode) {
       setError('No referral code available.')
       setLoading(false)
       return
     }
-    chat.getMyMembers(wtlCode)
+    chat.getMyMembers(bjpCode)
       .then((data) => {
         setRoot(data.root || null)
         setTree(data.tree || [])
@@ -2842,7 +2842,7 @@ function FullMyMembersPanel({ wtlCode, onBack }) {
       .finally(() => {
         setLoading(false)
       })
-  }, [wtlCode])
+  }, [bjpCode])
 
   const directCount = tree.length
   const indirectCount = tree.reduce((acc, curr) => acc + (curr.referrals?.length || 0), 0)
@@ -2853,7 +2853,7 @@ function FullMyMembersPanel({ wtlCode, onBack }) {
     const nodeWidth = isRoot ? '200px' : '170px'
     
     return (
-      <div key={member.wtl_code} className={`tree-node level-${level}`} style={{
+      <div key={member.bjp_code} className={`tree-node level-${level}`} style={{
         display: 'flex',
         alignItems: 'center',
         position: 'relative',
@@ -2915,7 +2915,7 @@ function FullMyMembersPanel({ wtlCode, onBack }) {
           {/* Details */}
           <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, textAlign: 'left' }}>
             <span style={{ fontSize: 11, fontWeight: 'bold', color: 'var(--color-chalk)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{member.name}</span>
-            <span style={{ fontSize: 9, color: 'var(--color-signal-mint)', fontFamily: 'monospace', fontWeight: 600 }}>{member.wtl_code}</span>
+            <span style={{ fontSize: 9, color: 'var(--color-signal-mint)', fontFamily: 'monospace', fontWeight: 600 }}>{member.bjp_code}</span>
           </div>
 
           <i className="bi bi-chevron-right" style={{ color: 'var(--color-ash)', fontSize: 10, flexShrink: 0 }} />
@@ -3026,7 +3026,7 @@ function FullMyMembersPanel({ wtlCode, onBack }) {
                   {tree.map(parent => {
                     const hasChildren = parent.referrals && parent.referrals.length > 0
                     return (
-                      <div key={parent.wtl_code} style={{
+                      <div key={parent.bjp_code} style={{
                         display: 'flex',
                         alignItems: 'center',
                         position: 'relative',
@@ -3076,7 +3076,7 @@ function FullMyMembersPanel({ wtlCode, onBack }) {
                             )}
 
                             {parent.referrals.map(child => (
-                              <div key={child.wtl_code} style={{ display: 'flex', alignItems: 'center', gap: '16px', position: 'relative' }}>
+                              <div key={child.bjp_code} style={{ display: 'flex', alignItems: 'center', gap: '16px', position: 'relative' }}>
                                 {renderNode(child, 3)}
                               </div>
                             ))}
@@ -3142,7 +3142,7 @@ function FullMyMembersPanel({ wtlCode, onBack }) {
                   assembly_name: selectedMember.assembly_name,
                   district: selectedMember.district,
                   part_no: selectedMember.part_no,
-                  wtl_code: selectedMember.wtl_code,
+                  bjp_code: selectedMember.bjp_code,
                   photo_url: selectedMember.photo_url
                 }}
                 width={300}
@@ -3170,7 +3170,7 @@ function FullMyMembersPanel({ wtlCode, onBack }) {
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
                 <span style={{ color: '#555555' }}>BJP Code</span>
-                <span style={{ color: '#FF9933', fontFamily: 'monospace', fontWeight: 700 }}>{selectedMember.wtl_code}</span>
+                <span style={{ color: '#FF9933', fontFamily: 'monospace', fontWeight: 700 }}>{selectedMember.bjp_code}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
                 <span style={{ color: '#555555' }}>Assembly (Booth)</span>
@@ -3384,7 +3384,7 @@ function FullCardPanel({ card, onBack }) {
     if (hasName && hasAssembly) {
       setFullCardData(c)
     } else if (c.epic_no) {
-      publicApi.getCardData(c.wtl_code || c.epic_no)
+      publicApi.getCardData(c.bjp_code || c.epic_no)
         .then((data) => setFullCardData(data))
         .catch(() => setFullCardData(c))
     }
@@ -3582,7 +3582,7 @@ function BestPerformersPanel({ onBack }) {
 
                 return (
                   <div 
-                    key={p.wtl_code}
+                    key={p.bjp_code}
                     onClick={() => setSelectedMember(p)}
                     style={{
                       display: 'flex',
@@ -3627,7 +3627,7 @@ function BestPerformersPanel({ onBack }) {
 
                     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, textAlign: 'left' }}>
                       <span style={{ fontSize: 14, fontWeight: 'bold', color: 'var(--color-chalk)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</span>
-                      <span style={{ fontSize: 11, color: 'var(--color-ash)', fontFamily: 'monospace' }}>BJP Code: <span style={{ color: 'var(--color-signal-mint)', fontWeight: 600 }}>{p.wtl_code}</span></span>
+                      <span style={{ fontSize: 11, color: 'var(--color-ash)', fontFamily: 'monospace' }}>BJP Code: <span style={{ color: 'var(--color-signal-mint)', fontWeight: 600 }}>{p.bjp_code}</span></span>
                     </div>
 
                     <div style={{ textAlign: 'right', flexShrink: 0 }}>
@@ -3750,7 +3750,7 @@ function BestPerformersPanel({ onBack }) {
                         <i className="bi bi-hash" style={{ color: '#FF9933' }} />
                         <span>Member Code</span>
                       </div>
-                      <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-chalk)', fontFamily: 'monospace' }}>{selectedMember.wtl_code}</span>
+                      <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-chalk)', fontFamily: 'monospace' }}>{selectedMember.bjp_code}</span>
                     </div>
 
                     <div style={{ 
@@ -4018,7 +4018,7 @@ export default function ChatbotPage() {
           const todayDate = res.appreciation_earned_at 
             ? new Date(res.appreciation_earned_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
             : new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-          const mName = cardRef.current?.name || profileRef.current?.name || 'Member';
+          const mName = cardRef.current?.voter_name || cardRef.current?.name || profileRef.current?.voter_name || profileRef.current?.name || 'Member';
           
           setTimeout(() => {
             addMsg('bot', 'text', { text: '🏆 *Congratulations!* You have successfully invited 5 members to join our party.' });
@@ -4027,7 +4027,7 @@ export default function ChatbotPage() {
             addMsg('bot', 'text', { text: 'We are pleased to present you with this official Letter of Appreciation from the BJP State President:' });
           }, 1500);
           setTimeout(() => {
-            addMsg('bot', 'appreciation_letter', { name: mName, date: todayDate, autoDownload: true });
+            addMsg('bot', 'appreciation_letter', { name: mName, date: todayDate, autoDownload: false });
           }, 2500);
         }
 
@@ -4085,7 +4085,7 @@ export default function ChatbotPage() {
   }
 
   const handleSidebarOpen = () => {
-    const sCode = cardRef.current?.wtl_code || cardRef.current?.ptc_code || profileRef.current?.wtl_code || profileRef.current?.ptc_code
+    const sCode = cardRef.current?.bjp_code || cardRef.current?.ptc_code || profileRef.current?.bjp_code || profileRef.current?.ptc_code
     const volNotif = (volunteerStatus === 'confirmed' || volunteerStatus === 'rejected') &&
       localStorage.getItem(`ack_vol_status_${sCode}`) !== volunteerStatus
     const baNotif = (boothAgentStatus === 'confirmed' || boothAgentStatus === 'rejected') &&
@@ -4098,7 +4098,7 @@ export default function ChatbotPage() {
   }
 
   const handleAcknowledgeStatus = (type, val) => {
-    const code = cardRef.current?.wtl_code || cardRef.current?.ptc_code || profileRef.current?.wtl_code || profileRef.current?.ptc_code
+    const code = cardRef.current?.bjp_code || cardRef.current?.ptc_code || profileRef.current?.bjp_code || profileRef.current?.ptc_code
     if (code) {
       if (type === 'volunteer') {
         localStorage.setItem(`ack_vol_status_${code}`, val)
@@ -4110,12 +4110,12 @@ export default function ChatbotPage() {
   }
 
   const handleLocalBodyInterestSubmit = async (interestValue) => {
-    const wtlCode = cardRef.current?.wtl_code || cardRef.current?.ptc_code || profileRef.current?.wtl_code || profileRef.current?.ptc_code
-    if (!wtlCode) return
+    const bjpCode = cardRef.current?.bjp_code || cardRef.current?.ptc_code || profileRef.current?.bjp_code || profileRef.current?.ptc_code
+    if (!bjpCode) return
     setBookingError('')
     setIsBooking(true)
     try {
-      const res = await chat.saveLocalBodyInterest(wtlCode, interestValue)
+      const res = await chat.saveLocalBodyInterest(bjpCode, interestValue)
       setIsBooking(false)
       if (res.success) {
         setLocalBodyInterest(interestValue)
@@ -4130,12 +4130,12 @@ export default function ChatbotPage() {
   }
 
   const handleMeetingInterestSubmit = async (interestValue) => {
-    const wtlCode = cardRef.current?.wtl_code || cardRef.current?.ptc_code || profileRef.current?.wtl_code || profileRef.current?.ptc_code
-    if (!wtlCode) return
+    const bjpCode = cardRef.current?.bjp_code || cardRef.current?.ptc_code || profileRef.current?.bjp_code || profileRef.current?.ptc_code
+    if (!bjpCode) return
     setBookingError('')
     setIsBooking(true)
     try {
-      const res = await chat.saveMeetingInterest(wtlCode, interestValue)
+      const res = await chat.saveMeetingInterest(bjpCode, interestValue)
       setIsBooking(false)
       if (res.success) {
         setMeetingInterest(interestValue)
@@ -4218,9 +4218,9 @@ export default function ChatbotPage() {
         addMsg('bot', 'text', { text: '👋 Welcome back to *BJP Tamil Nadu!*' })
       }
 
-      const wtlCode = cache.card.wtl_code || cache.card.ptc_code
-      if (wtlCode) {
-        fetchMemberStatus(wtlCode)
+      const bjpCode = cache.card.bjp_code || cache.card.ptc_code
+      if (bjpCode) {
+        fetchMemberStatus(bjpCode)
       }
       setTimeout(() => {
         addMsg('bot', 'generated_card', { card: cache.card })
@@ -4262,7 +4262,7 @@ export default function ChatbotPage() {
           back_url:      res.back_url || '',
           combined_url:  res.combined_url || res.card_url || '',
           photo_url:     res.photo_url || '',
-          wtl_code:      res.wtl_code || '',
+          bjp_code:      res.bjp_code || '',
           referral_link: res.referral_link || '',
         }
         cardRef.current = card
@@ -4270,8 +4270,8 @@ export default function ChatbotPage() {
         if (res.referred_count !== undefined) {
           setReferredCount(res.referred_count)
         }
-        if (card.wtl_code) {
-          fetchMemberStatus(card.wtl_code)
+        if (card.bjp_code) {
+          fetchMemberStatus(card.bjp_code)
         }
         await botSay('✅ You are already a registered member! Here is your Digital Member ID Card:', 300)
         addMsg('bot', 'generated_card', { card })
@@ -4311,13 +4311,13 @@ export default function ChatbotPage() {
           back_url:    res.back_url    || '',
           combined_url: res.combined_url || '',
           photo_url:   res.photo_url   || '',
-          wtl_code:    res.wtl_code    || res.ptc_code    || '',
+          bjp_code:    res.bjp_code    || res.ptc_code    || '',
           referral_link: res.referral_link || '',
         }
         cardRef.current = card
         saveCache(card, {})
-        if (card.wtl_code) {
-          fetchMemberStatus(card.wtl_code)
+        if (card.bjp_code) {
+          fetchMemberStatus(card.bjp_code)
         }
         await botSay('✅ You are already a registered member! Here is your Digital Member ID Card:', 300)
         addMsg('bot', 'generated_card', { card })
@@ -4345,7 +4345,7 @@ export default function ChatbotPage() {
           back_url:    data.back_url    || '',
           combined_url: data.combined_url || '',
           photo_url:   data.photo_url   || '',
-          wtl_code:    data.wtl_code    || data.ptc_code    || '',
+          bjp_code:    data.bjp_code    || data.ptc_code    || '',
           referral_link: data.referral_link || '',
         }
         cardRef.current = card
@@ -4409,7 +4409,7 @@ export default function ChatbotPage() {
         back_url:      res.back_url,
         combined_url:  res.combined_url,
         epic_no:       res.epic_no || epicRef.current,
-        wtl_code:      res.wtl_code || res.ptc_code,
+        bjp_code:      res.bjp_code || res.ptc_code,
         referral_link: res.referral_link || '',
         name:          voterRef.current?.name || voterRef.current?.VOTER_NAME || res.voter_name,
         assembly_name: voterRef.current?.assembly_name || voterRef.current?.assembly || voterRef.current?.ASSEMBLY_NAME,
@@ -4419,13 +4419,13 @@ export default function ChatbotPage() {
       }
       cardRef.current = card
       saveCache(card, profileRef.current || {})
-      if (card.wtl_code) {
-        fetchMemberStatus(card.wtl_code)
+      if (card.bjp_code) {
+        fetchMemberStatus(card.bjp_code)
       }
 
       // Clear referral storage since card is successfully generated under this referral
       try {
-        localStorage.removeItem('wtl_referral')
+        localStorage.removeItem('bjp_referral')
       } catch {}
 
       await botSay('🎉 Your Digital Member ID Card is ready!', 200)
@@ -4441,7 +4441,7 @@ export default function ChatbotPage() {
       const regDate = card.created_at || card.generated_at
         ? new Date(card.created_at || card.generated_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
         : new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-      addMsg('bot', 'welcome_letter', { name: card.name, date: regDate, ref: card.wtl_code || card.ptc_code, autoDownload: true })
+      addMsg('bot', 'welcome_letter', { name: card.voter_name || card.name, date: regDate, ref: card.bjp_code || card.ptc_code, autoDownload: false })
 
       if (card.referral_link) {
         await sleep(1200)
@@ -4458,12 +4458,12 @@ export default function ChatbotPage() {
   const handleBoothNoSubmit = async () => {
     const boothNo = inputValue.trim()
     if (!boothNo) return
-    const wtlCode = cardRef.current?.wtl_code || cardRef.current?.ptc_code || profileRef.current?.wtl_code || profileRef.current?.ptc_code
+    const bjpCode = cardRef.current?.bjp_code || cardRef.current?.ptc_code || profileRef.current?.bjp_code || profileRef.current?.ptc_code
     addMsg('user', 'text', { text: `Booth No: ${boothNo}` })
     setInputValue('')
     setIsTyping(true)
     try {
-      const res = await chat.requestBoothAgent(wtlCode, epicRef.current, boothNo)
+      const res = await chat.requestBoothAgent(bjpCode, epicRef.current, boothNo)
       setIsTyping(false)
       await botSay(res.message || '✅ Booth Agent request submitted! Admin will review it shortly.', 200)
     } catch (err) {
@@ -4521,13 +4521,13 @@ export default function ChatbotPage() {
       return
     }
     setActiveView('chat')
-    const wtlCode = cardRef.current?.wtl_code || cardRef.current?.ptc_code || profileRef.current?.wtl_code || profileRef.current?.ptc_code
+    const bjpCode = cardRef.current?.bjp_code || cardRef.current?.ptc_code || profileRef.current?.bjp_code || profileRef.current?.ptc_code
 
     switch (action) {
 
 
       case 'referral': {
-        if (!wtlCode) { await botSay('ℹ️ Referral link unavailable.', 200); return }
+        if (!bjpCode) { await botSay('ℹ️ Referral link unavailable.', 200); return }
         // Use cached link from card if available — avoids a session-auth round-trip
         const cachedLink = cardRef.current?.referral_link
         if (cachedLink) {
@@ -4536,7 +4536,7 @@ export default function ChatbotPage() {
         }
         setIsTyping(true)
         try {
-          const res = await chat.getReferralLink(wtlCode)
+          const res = await chat.getReferralLink(bjpCode)
           setIsTyping(false)
           const link = res.referral_link || res.link || res.url || ''
           // Cache it on the card ref for future sidebar clicks
@@ -4652,9 +4652,9 @@ export default function ChatbotPage() {
       case 'generated_card':
         return <GeneratedCardMsg card={msg.card} isNew={msg.isNew || false} />
       case 'welcome_letter':
-        return <WelcomeLetterMsg name={msg.name} date={msg.date} refCode={msg.ref || cardRef.current?.wtl_code || cardRef.current?.ptc_code || profileRef.current?.wtl_code || profileRef.current?.ptc_code} autoDownload={msg.autoDownload} />
+        return <WelcomeLetterMsg name={msg.name} date={msg.date} refCode={msg.ref || cardRef.current?.bjp_code || cardRef.current?.ptc_code || profileRef.current?.bjp_code || profileRef.current?.ptc_code} autoDownload={msg.autoDownload} />
       case 'appreciation_letter':
-        return <AppreciationLetterMsg name={msg.name} date={msg.date} refCode={msg.ref || cardRef.current?.wtl_code || cardRef.current?.ptc_code || profileRef.current?.wtl_code || profileRef.current?.ptc_code} autoDownload={msg.autoDownload} />
+        return <AppreciationLetterMsg name={msg.name} date={msg.date} refCode={msg.ref || cardRef.current?.bjp_code || cardRef.current?.ptc_code || profileRef.current?.bjp_code || profileRef.current?.ptc_code} autoDownload={msg.autoDownload} />
       case 'profile_card':
         return (
           <div className="profile-card">
@@ -4665,7 +4665,7 @@ export default function ChatbotPage() {
               <h4>{msg.profile?.name || 'Member'}</h4>
               <p>{[msg.profile?.assembly, msg.profile?.district].filter(Boolean).join(', ')}</p>
               {(msg.profile?.epic_no || epicRef.current) && <p>EPIC: {msg.profile?.epic_no || epicRef.current}</p>}
-              {(msg.profile?.wtl_code || msg.profile?.ptc_code) && <p className="wtl">BJP: {msg.profile.wtl_code || msg.profile.ptc_code}</p>}
+              {(msg.profile?.bjp_code || msg.profile?.ptc_code) && <p className="bjp">BJP: {msg.profile.bjp_code || msg.profile.ptc_code}</p>}
             </div>
           </div>
         )
@@ -4738,7 +4738,7 @@ export default function ChatbotPage() {
                       }}>{p.rank}</span>
                       <div style={{ display: 'flex', flexDirection: 'column' }}>
                         <span style={{ fontSize: 13, fontWeight: '500' }}>{p.name}</span>
-                        <span style={{ fontSize: 10, opacity: 0.6 }}>BJP Code: {p.wtl_code}</span>
+                        <span style={{ fontSize: 10, opacity: 0.6 }}>BJP Code: {p.bjp_code}</span>
                       </div>
                     </div>
                     <span className="badge-status badge-generated" style={{ fontSize: 12, fontWeight: 'bold' }}>
@@ -4755,7 +4755,7 @@ export default function ChatbotPage() {
         const isLatest = messages[messages.length - 1]?.id === msg.id
         return (
           <SelectWingMsg
-            wtlCode={msg.wtlCode}
+            bjpCode={msg.bjpCode}
             epicNo={msg.epicNo}
             isLatest={isLatest}
           />
@@ -4765,7 +4765,7 @@ export default function ChatbotPage() {
         const isLatest = messages[messages.length - 1]?.id === msg.id
         return (
           <BoothAgentSetupMsg
-            wtlCode={msg.wtlCode}
+            bjpCode={msg.bjpCode}
             epicNo={msg.epicNo}
             isLatest={isLatest}
           />
@@ -4781,7 +4781,7 @@ export default function ChatbotPage() {
   const isWide   = ['voter_card', 'generated_card', 'booth_info', 'referral_link', 'members_list', 'profile_card'].includes
   const isDone   = chatState === S.DONE
 
-  const code = cardRef.current?.wtl_code || cardRef.current?.ptc_code || profileRef.current?.wtl_code || profileRef.current?.ptc_code
+  const code = cardRef.current?.bjp_code || cardRef.current?.ptc_code || profileRef.current?.bjp_code || profileRef.current?.ptc_code
   const hasPendingNotification = 
     (referredCount >= 5 && meetingInterest === null)
 
@@ -4793,7 +4793,7 @@ export default function ChatbotPage() {
 
   // Cache-busting comment v1.0.5 to force new hash
   return (
-    <div className="chatbot-app wtl-theme">
+    <div className="chatbot-app bjp-theme">
       {/* ── Main Layout ── */}
       <div className="main-content-layout single-layout">
         
@@ -4960,7 +4960,7 @@ export default function ChatbotPage() {
                     ? new Date(cardRef.current?.created_at || profileRef.current?.created_at || cardRef.current?.generated_at || profileRef.current?.generated_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
                     : new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
               }
-              refCode={cardRef.current?.wtl_code || cardRef.current?.ptc_code || profileRef.current?.wtl_code || profileRef.current?.ptc_code}
+              refCode={cardRef.current?.bjp_code || cardRef.current?.ptc_code || profileRef.current?.bjp_code || profileRef.current?.ptc_code}
               epicNo={epicRef.current || cardRef.current?.epic_no || profileRef.current?.epic_no}
               onBack={() => setActiveView('chat')} 
             />
@@ -4973,7 +4973,7 @@ export default function ChatbotPage() {
                   ? new Date(appreciationEarnedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
                   : new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
               }
-              refCode={cardRef.current?.wtl_code || cardRef.current?.ptc_code || profileRef.current?.wtl_code || profileRef.current?.ptc_code}
+              refCode={cardRef.current?.bjp_code || cardRef.current?.ptc_code || profileRef.current?.bjp_code || profileRef.current?.ptc_code}
               epicNo={epicRef.current || cardRef.current?.epic_no || profileRef.current?.epic_no}
               onBack={() => setActiveView('chat')} 
             />
@@ -4987,7 +4987,7 @@ export default function ChatbotPage() {
           ) : activeView === 'volunteer' ? (
             <FullFormPanel title="Be a BJP Organizer" icon="hand-thumbs-up-fill" onBack={() => setActiveView('chat')}>
               <SelectWingMsg
-                wtlCode={cardRef.current?.wtl_code || cardRef.current?.ptc_code || profileRef.current?.wtl_code || profileRef.current?.ptc_code}
+                bjpCode={cardRef.current?.bjp_code || cardRef.current?.ptc_code || profileRef.current?.bjp_code || profileRef.current?.ptc_code}
                 epicNo={epicRef.current}
                 isLatest={true}
               />
@@ -4995,7 +4995,7 @@ export default function ChatbotPage() {
           ) : activeView === 'booth_agent' ? (
             <FullFormPanel title="Be a Booth Agent" icon="building-fill-check" onBack={() => setActiveView('chat')}>
               <BoothAgentSetupMsg
-                wtlCode={cardRef.current?.wtl_code || cardRef.current?.ptc_code || profileRef.current?.wtl_code || profileRef.current?.ptc_code}
+                bjpCode={cardRef.current?.bjp_code || cardRef.current?.ptc_code || profileRef.current?.bjp_code || profileRef.current?.ptc_code}
                 epicNo={epicRef.current}
                 isLatest={true}
               />
@@ -5008,7 +5008,7 @@ export default function ChatbotPage() {
             />
           ) : activeView === 'my_members' ? (
             <FullMyMembersPanel 
-              wtlCode={cardRef.current?.wtl_code || cardRef.current?.ptc_code || profileRef.current?.wtl_code || profileRef.current?.ptc_code}
+              bjpCode={cardRef.current?.bjp_code || cardRef.current?.ptc_code || profileRef.current?.bjp_code || profileRef.current?.ptc_code}
               onBack={() => setActiveView('chat')} 
             />
           ) : (

@@ -6,7 +6,7 @@
  *  - OTPs stored as SHA-256 hash (never plaintext)
  *  - OTP purpose enforced — login OTP cannot verify pin-reset flow
  *  - OTP deleted from DB immediately after successful first use
- *  - Existing wtl_code preserved on card re-generation
+ *  - Existing bjp_code preserved on card re-generation
  *  - File type validated by magic bytes (file-type library)
  *  - booth_no validated: digits only, max 6 chars
  *  - EPIC validated before any DB query in profile/booth routes
@@ -21,17 +21,16 @@ const multer   = require('multer');
 const crypto   = require('crypto');
 const Sentry   = require('@sentry/node');
 
-const { validateMobile, validateEpic, validatePin, validateOtp } = require('../utils/validators');
-const { hashPin, verifyPin } = require('../utils/security');
+const { validateMobile, validateEpic, validateOtp } = require('../utils/validators');
 const { sendOtp } = require('../services/smsService');
-const { uploadPhoto, uploadCard, uploadBackCard, uploadCombinedCard, getPhotoPresignedUrl } = require('../services/backblazeService');
+const { uploadPhoto, uploadCard, uploadBackCard, uploadCombinedCard, getPhotoPresignedUrl, getCardPresignedUrl } = require('../services/backblazeService');
 const { generateCard, generateBackCard, generateCombinedCard } = require('../services/cardGenerator');
 const {
   chatOtpLimiter,
   chatVerifyOtpLimiter,
-  chatVerifyPinLimiter,
   chatGenerateCardLimiter,
   chatValidateEpicLimiter,
+  chatCheckMobileLimiter,
 } = require('../middleware/rateLimiter');
 const { getDb, findVoterByEpic } = require('../db');
 const { trackMongoOperation } = require('../utils/dbErrorHandler');
@@ -100,7 +99,7 @@ function normaliseVoter(doc) {
 // ── Helpers ───────────────────────────────────────────────────────
 function nowUTC() { return new Date(); }
 
-function generateWtlCode() {
+function generateBjpCode() {
   return 'BJP-' + crypto.randomBytes(4).toString('hex').toUpperCase();
 }
 
@@ -141,7 +140,7 @@ router.post('/logout', (req, res) => {
         console.error('Logout error:', err.message);
         return res.status(500).json({ success: false, message: 'Failed to log out' });
       }
-      res.clearCookie('wtl.session');
+      res.clearCookie('bjp.session');
       return res.json({ success: true, message: 'Logged out successfully' });
     });
   } else {
@@ -239,19 +238,21 @@ router.post('/verify-otp', chatVerifyOtpLimiter, async (req, res) => {
       { sort: { generated_at: -1 } }
     );
 
-    if ((stat && stat.card_url) || (genDoc && genDoc.card_url)) {
+    if ((stat && stat.card_url) || (genDoc && (genDoc.card_url || genDoc.card_b2_key))) {
       const s = stat || {};
       const g = genDoc || {};
       const name = (g.VOTER_NAME || `${g.FM_NAME_EN || ''} ${g.LASTNAME_EN || ''}`.trim() || '').trim();
+      // FIX-06: regenerate a fresh presigned card URL from the B2 key
+      const cardUrl = g.card_b2_key ? await getCardPresignedUrl(g.card_b2_key) : (s.card_url || g.card_url || '');
       return res.json({
         success:    true,
         has_card:   true,
         epic_no:    s.epic_no  || g.EPIC_NO   || '',
-        card_url:   s.card_url || g.card_url  || '',
+        card_url:   cardUrl,
         back_url:   s.back_url || g.back_url  || '',
         voter_name: name,
         photo_url:  await getPhotoPresignedUrl(g.photo_url || ''),
-        wtl_code:   g.wtl_code  || '',
+        bjp_code:   g.bjp_code  || '',
       });
     }
 
@@ -265,7 +266,7 @@ router.post('/verify-otp', chatVerifyOtpLimiter, async (req, res) => {
 // ────────────────────────────────────────────────────────────────
 //  POST /check-mobile
 // ────────────────────────────────────────────────────────────────
-router.post('/check-mobile', async (req, res) => {
+router.post('/check-mobile', chatCheckMobileLimiter, async (req, res) => {
   try {
     const { valid, value: mobile } = validateMobile((req.body.mobile || '').trim());
     if (!valid) return res.status(400).json({ success: false, message: 'Invalid mobile number' });
@@ -288,24 +289,26 @@ router.post('/check-mobile', async (req, res) => {
 
     const hasCard = Boolean(genDoc || (stat && stat.epic_no));
 
-    // Always establish the verified session mobile on check-mobile success
-    req.session.verified_mobile = mobile;
-    req.session.cookie.maxAge   = 86400 * 1000;
+    // NOTE (FIX-02): do NOT create a session here. This endpoint only reports
+    // registration status. A session is established only after OTP verification
+    // in /verify-otp. Setting the session here would bypass OTP entirely.
 
     if (hasCard) {
       const g = genDoc || {};
       const name = g.VOTER_NAME || `${g.FM_NAME_EN || ''} ${g.LASTNAME_EN || ''}`.trim();
+      // FIX-06: regenerate a fresh presigned card URL from the B2 key
+      const cardUrl = g.card_b2_key ? await getCardPresignedUrl(g.card_b2_key) : (g.card_url || '');
       return res.json({
         success:       true,
         has_card:      true,
         has_pin:       false,
         epic_no:       g.EPIC_NO || (stat && stat.epic_no) || '',
         voter_name:    name,
-        card_url:      g.card_url || '',
+        card_url:      cardUrl,
         back_url:      g.back_url || '',
-        combined_url:  g.combined_url || g.card_url || '',
+        combined_url:  cardUrl || g.combined_url || '',
         photo_url:     await getPhotoPresignedUrl(g.photo_url || ''),
-        wtl_code:      g.wtl_code || '',
+        bjp_code:      g.bjp_code || '',
         referral_link: g.referral_link || '',
         referred_count: g.referred_members_count || 0,
       });
@@ -332,21 +335,38 @@ router.get('/districts-data', async (req, res) => {
 });
 
 // ────────────────────────────────────────────────────────────────
-//  GET /request-status/:wtlCode
+//  GET /request-status/:bjpCode
 // ────────────────────────────────────────────────────────────────
-router.get('/request-status/:wtlCode', async (req, res) => {
+router.get('/request-status/:bjpCode', async (req, res) => {
   try {
     if (!req.session?.verified_mobile) {
       return res.status(401).json({ success: false, message: 'Authentication required.' });
     }
 
-    const wtlCode = String(req.params.wtlCode || '').trim();
+    const bjpCode = String(req.params.bjpCode || '').trim();
     const db = getDb();
-    
+
+    // ── Ownership check (FIX-04: IDOR) ────────────────────────────
+    // Verify this BJP code belongs to the caller's own mobile before
+    // returning any status. Otherwise a valid session could enumerate
+    // other members' request statuses.
+    const owner = await db.collection('generated_voters').findOne(
+      { bjp_code: bjpCode },
+      { projection: { MOBILE_NO: 1, mobile: 1 } }
+    );
+    if (!owner) {
+      return res.status(404).json({ success: false, message: 'Not found.' });
+    }
+    const recordMobile  = String(owner.MOBILE_NO || owner.mobile || '').replace(/^91/, '');
+    const sessionMobile = String(req.session.verified_mobile || '').replace(/^91/, '');
+    if (!recordMobile || recordMobile !== sessionMobile) {
+      return res.status(403).json({ success: false, message: 'Access denied.' });
+    }
+
     // Find the volunteer request
-    const volunteer = await db.collection('volunteer_requests').findOne({ wtl_code: wtlCode });
+    const volunteer = await db.collection('volunteer_requests').findOne({ bjp_code: bjpCode });
     // Find the booth agent request
-    const boothAgent = await db.collection('booth_agent_requests').findOne({ wtl_code: wtlCode });
+    const boothAgent = await db.collection('booth_agent_requests').findOne({ bjp_code: bjpCode });
 
     return res.json({
       success: true,
@@ -369,258 +389,7 @@ router.get('/request-status/:wtlCode', async (req, res) => {
   }
 });
 
-// ────────────────────────────────────────────────────────────────
-//  POST /verify-pin  — rate-limited (brute-force guard)
-// ────────────────────────────────────────────────────────────────
-router.post('/verify-pin', chatVerifyPinLimiter, async (req, res) => {
-  try {
-    const { valid: vm, value: mobile } = validateMobile((req.body.mobile || '').trim());
-    if (!vm) return res.status(400).json({ success: false, message: mobile });
-
-    const { valid: vp, value: pin } = validatePin((req.body.pin || '').trim());
-    if (!vp) return res.status(400).json({ success: false, message: pin });
-
-    const db   = getDb();
-    const stat = await db.collection('generation_stats').findOne({ auth_mobile: mobile });
-
-    if (!stat || !stat.secret_pin) {
-      return res.status(404).json({ success: false, message: 'No PIN found for this mobile.' });
-    }
-    if (!verifyPin(pin, stat.secret_pin)) {
-      return res.status(400).json({ success: false, message: 'Invalid PIN. Please try again.' });
-    }
-
-    const genDoc = await db.collection('generated_voters').findOne({
-      $or: [
-        { MOBILE_NO: mobile },
-        { mobile: mobile },
-        { MOBILE_NO: Number(mobile) },
-        { MOBILE_NO: "91" + mobile }
-      ]
-    });
-    const name   = genDoc ? `${genDoc.FM_NAME_EN || ''} ${genDoc.LASTNAME_EN || ''}`.trim() : '';
-
-    // Set verified session upon PIN verification
-    req.session.verified_mobile = mobile;
-    req.session.cookie.maxAge   = 86400 * 1000;
-
-    return res.json({
-      success:    true,
-      has_card:   true,
-      epic_no:    stat.epic_no || '',
-      card_url:   stat.card_url || '',
-      voter_name: name,
-      photo_url:  await getPhotoPresignedUrl(genDoc?.photo_url || ''),
-      referral_link: genDoc?.referral_link || '',
-    });
-  } catch (err) {
-    console.error('verify-pin error:', err.message);
-    return res.status(500).json({ success: false, message: 'Server error' });
-  }
-});
-
-// ────────────────────────────────────────────────────────────────
-//  POST /forgot-pin
-// ────────────────────────────────────────────────────────────────
-router.post('/forgot-pin', chatOtpLimiter, async (req, res) => {
-  try {
-    const { valid, value: mobile } = validateMobile((req.body.mobile || '').trim());
-    if (!valid) return res.status(400).json({ success: false, message: mobile });
-
-    const db      = getDb();
-    const hasAcct = (await db.collection('generation_stats').findOne({ auth_mobile: mobile })) ||
-                    (await db.collection('generated_voters').findOne({
-                      $or: [
-                        { MOBILE_NO: mobile },
-                        { mobile: mobile },
-                        { MOBILE_NO: Number(mobile) },
-                        { MOBILE_NO: "91" + mobile }
-                      ]
-                    }));
-
-    if (!hasAcct) {
-      return res.status(404).json({ success: false, message: 'No account found for this mobile.' });
-    }
-
-    // 60-second cooldown
-    const existing = await db.collection('otp_sessions').findOne(
-      { mobile }, { projection: { created_at: 1 } }
-    );
-    if (existing?.created_at) {
-      const elapsed = (Date.now() - new Date(existing.created_at).getTime()) / 1000;
-      if (elapsed < 60) {
-        const wait = Math.ceil(60 - elapsed);
-        return res.status(429).json({ success: false, message: `Please wait ${wait}s.` });
-      }
-    }
-
-    const otp    = genOtp();
-    const result = await sendOtp(mobile, otp);
-    if (!result.success) {
-      return res.status(500).json({ success: false, message: 'Could not send OTP. Please try again.' });
-    }
-
-    // Store hashed OTP with purpose 'pin_reset'
-    await db.collection('otp_sessions').updateOne(
-      { mobile },
-      { $set: { otp_hash: hashOtp(otp, mobile), created_at: nowUTC(), verified: false, purpose: 'pin_reset' } },
-      { upsert: true }
-    );
-
-    return res.json({ success: true });
-  } catch (err) {
-    console.error('forgot-pin error:', err.message);
-    return res.status(500).json({ success: false, message: 'Server error' });
-  }
-});
-
-// ────────────────────────────────────────────────────────────────
-//  POST /verify-forgot-otp  — rate-limited, purpose-enforced
-// ────────────────────────────────────────────────────────────────
-router.post('/verify-forgot-otp', chatVerifyOtpLimiter, async (req, res) => {
-  try {
-    const { valid: vm, value: mobile } = validateMobile((req.body.mobile || '').trim());
-    if (!vm) return res.status(400).json({ success: false, message: mobile });
-
-    const { valid: vo, value: otp } = validateOtp((req.body.otp || '').trim());
-    if (!vo) return res.status(400).json({ success: false, message: otp });
-
-    const db  = getDb();
-    const doc = await db.collection('otp_sessions').findOne({ mobile });
-
-    // Enforce purpose: pin_reset OTP only
-    if (!doc || doc.purpose !== 'pin_reset') {
-      return res.status(400).json({ success: false, message: 'Invalid OTP' });
-    }
-
-    if (!verifyOtpHash(otp, mobile, doc.otp_hash || '')) {
-      return res.status(400).json({ success: false, message: 'Invalid OTP' });
-    }
-
-    const elapsed = (Date.now() - new Date(doc.created_at).getTime()) / 1000;
-    if (elapsed > 300) {
-      return res.status(400).json({ success: false, message: 'OTP expired.' });
-    }
-
-    // Mark OTP as verified but keep for reset-pin step
-    await db.collection('otp_sessions').updateOne({ mobile }, { $set: { verified: true } });
-    return res.json({ success: true });
-  } catch (err) {
-    console.error('verify-forgot-otp error:', err.message);
-    return res.status(500).json({ success: false, message: 'Server error' });
-  }
-});
-
-// ────────────────────────────────────────────────────────────────
-//  POST /reset-pin  — rate-limited
-// ────────────────────────────────────────────────────────────────
-router.post('/reset-pin', chatVerifyOtpLimiter, async (req, res) => {
-  try {
-    const { valid: vm, value: mobile } = validateMobile((req.body.mobile || '').trim());
-    if (!vm) return res.status(400).json({ success: false, message: mobile });
-
-    const { valid: vo, value: otp } = validateOtp((req.body.otp || '').trim());
-    if (!vo) return res.status(400).json({ success: false, message: otp });
-
-    const db  = getDb();
-    const doc = await db.collection('otp_sessions').findOne({ mobile });
-
-    // Must be a verified pin_reset OTP
-    if (!doc || doc.purpose !== 'pin_reset' || !doc.verified) {
-      return res.status(400).json({ success: false, message: 'Invalid or unverified OTP' });
-    }
-
-    if (!verifyOtpHash(otp, mobile, doc.otp_hash || '')) {
-      return res.status(400).json({ success: false, message: 'Invalid OTP' });
-    }
-
-    const elapsed = (Date.now() - new Date(doc.created_at).getTime()) / 1000;
-    if (elapsed > 300) {
-      return res.status(400).json({ success: false, message: 'OTP expired.' });
-    }
-
-    const { valid: vp, value: newPin } = validatePin((req.body.new_pin || '').trim());
-    if (!vp) return res.status(400).json({ success: false, message: newPin });
-
-    const hashed = hashPin(newPin);
-    await db.collection('generation_stats').updateOne({ auth_mobile: mobile }, { $set: { secret_pin: hashed } });
-    await db.collection('generated_voters').updateMany({
-      $or: [
-        { MOBILE_NO: mobile },
-        { mobile: mobile },
-        { MOBILE_NO: Number(mobile) },
-        { MOBILE_NO: "91" + mobile }
-      ]
-    },  { $set: { secret_pin: hashed } });
-    // Delete OTP session after successful pin reset
-    await db.collection('otp_sessions').deleteOne({ mobile });
-
-    const stat   = await db.collection('generation_stats').findOne({ auth_mobile: mobile });
-    const genDoc = await db.collection('generated_voters').findOne({
-      $or: [
-        { MOBILE_NO: mobile },
-        { mobile: mobile },
-        { MOBILE_NO: Number(mobile) },
-        { MOBILE_NO: "91" + mobile }
-      ]
-    });
-    const name   = genDoc ? `${genDoc.FM_NAME_EN || ''} ${genDoc.LASTNAME_EN || ''}`.trim() : '';
-
-    return res.json({
-      success:    true,
-      has_card:   true,
-      epic_no:    (stat || {}).epic_no  || '',
-      card_url:   (stat || {}).card_url || '',
-      voter_name: name,
-      photo_url:  await getPhotoPresignedUrl(genDoc?.photo_url || ''),
-    });
-  } catch (err) {
-    console.error('reset-pin error:', err.message);
-    return res.status(500).json({ success: false, message: 'Server error' });
-  }
-});
-
-// ────────────────────────────────────────────────────────────────
-//  POST /set-pin
-// ────────────────────────────────────────────────────────────────
-router.post('/set-pin', async (req, res) => {
-  try {
-    const { valid: vm, value: mobile } = validateMobile((req.body.mobile || '').trim());
-    if (!vm) return res.status(400).json({ success: false, message: mobile });
-
-    const { valid: vp, value: pin } = validatePin((req.body.pin || '').trim());
-    if (!vp) return res.status(400).json({ success: false, message: pin });
-
-    const rawEpic = String(req.body.epic_no || '').trim().toUpperCase();
-    const epicNo  = rawEpic ? validateEpic(rawEpic).value : '';
-
-    const hashed = hashPin(pin);
-    const db     = getDb();
-
-    if (epicNo) {
-      await db.collection('generation_stats').updateOne(
-        { epic_no: epicNo },
-        { $set: { secret_pin: hashed, auth_mobile: mobile }, $setOnInsert: { epic_no: epicNo } },
-        { upsert: true }
-      );
-    } else {
-      await db.collection('generation_stats').updateOne({ auth_mobile: mobile }, { $set: { secret_pin: hashed } });
-    }
-    await db.collection('generated_voters').updateMany({
-      $or: [
-        { MOBILE_NO: mobile },
-        { mobile: mobile },
-        { MOBILE_NO: Number(mobile) },
-        { MOBILE_NO: "91" + mobile }
-      ]
-    }, { $set: { secret_pin: hashed } });
-
-    return res.json({ success: true });
-  } catch (err) {
-    console.error('set-pin error:', err.message);
-    return res.status(500).json({ success: false, message: 'Server error' });
-  }
-});
+// (4-digit PIN login/reset removed - authentication is OTP-based)
 
 // ────────────────────────────────────────────────────────────────
 //  POST /validate-epic
@@ -669,13 +438,13 @@ router.post('/validate-epic', chatValidateEpicLimiter, async (req, res) => {
           { MOBILE_NO: "91" + mobile }
         ]
       },
-      { projection: { card_url: 1, back_url: 1, combined_url: 1, photo_url: 1, wtl_code: 1, VOTER_NAME: 1, ASSEMBLY_NAME: 1, DISTRICT_NAME: 1, PART_NO: 1, referral_link: 1 } },
+      { projection: { card_url: 1, back_url: 1, combined_url: 1, photo_url: 1, bjp_code: 1, VOTER_NAME: 1, ASSEMBLY_NAME: 1, DISTRICT_NAME: 1, PART_NO: 1, referral_link: 1 } },
     );
     if (existing?.photo_url) {
       const Sentry = require('@sentry/node');
       Sentry.captureMessage(`Already registered voter requested card again: EPIC ${epicNo}`, {
         level: 'info',
-        extra: { epicNo, wtlCode: existing.wtl_code, mobile }
+        extra: { epicNo, bjpCode: existing.bjp_code, mobile }
       });
       return res.status(409).json({
         success:     false,
@@ -685,7 +454,7 @@ router.post('/validate-epic', chatValidateEpicLimiter, async (req, res) => {
         back_url:    existing.back_url    || '',
         combined_url: existing.combined_url || '',
         photo_url:   await getPhotoPresignedUrl(existing.photo_url   || ''),
-        wtl_code:    existing.wtl_code    || '',
+        bjp_code:    existing.bjp_code    || '',
         voter_name:  existing.VOTER_NAME  || '',
         epic_no:     epicNo,
         assembly_name: existing.ASSEMBLY_NAME || '',
@@ -719,7 +488,7 @@ router.post('/validate-epic', chatValidateEpicLimiter, async (req, res) => {
 // ────────────────────────────────────────────────────────────────
 //  POST /generate-card  (photo upload)
 //  SECURITY: distributed lock prevents duplicate generation;
-//            existing wtl_code preserved on re-generation;
+//            existing bjp_code preserved on re-generation;
 //            magic-byte file validation.
 // ────────────────────────────────────────────────────────────────
 router.post('/generate-card', chatGenerateCardLimiter, upload.single('photo'), async (req, res) => {
@@ -759,7 +528,7 @@ router.post('/generate-card', chatGenerateCardLimiter, upload.single('photo'), a
         { MOBILE_NO: "91" + mobile }
       ],
       photo_url: { $exists: true, $ne: '' }
-    }, { projection: { card_url: 1, back_url: 1, combined_url: 1, photo_url: 1, wtl_code: 1, referral_link: 1, VOTER_NAME: 1, EPIC_NO: 1, ASSEMBLY_NAME: 1, DISTRICT_NAME: 1, PART_NO: 1 } });
+    }, { projection: { card_url: 1, back_url: 1, combined_url: 1, photo_url: 1, bjp_code: 1, referral_link: 1, VOTER_NAME: 1, EPIC_NO: 1, ASSEMBLY_NAME: 1, DISTRICT_NAME: 1, PART_NO: 1 } });
     if (existingCard?.photo_url) {
       if (existingCard.EPIC_NO !== epicNo) {
         return res.status(400).json({
@@ -775,7 +544,7 @@ router.post('/generate-card', chatGenerateCardLimiter, upload.single('photo'), a
         back_url:           existingCard.back_url      || '',
         combined_url:       existingCard.combined_url  || '',
         photo_url:          await getPhotoPresignedUrl(existingCard.photo_url     || ''),
-        wtl_code:           existingCard.wtl_code      || '',
+        bjp_code:           existingCard.bjp_code      || '',
         referral_link:      existingCard.referral_link || '',
         voter_name:         existingCard.VOTER_NAME    || '',
         epic_no:            existingCard.EPIC_NO       || epicNo,
@@ -821,7 +590,7 @@ router.post('/generate-card', chatGenerateCardLimiter, upload.single('photo'), a
     }
 
     try {
-      // Preserve existing wtl_code to protect referral links
+      // Preserve existing bjp_code to protect referral links
       const existingGen = await db.collection('generated_voters').findOne({
         EPIC_NO: epicNo,
         $or: [
@@ -830,31 +599,31 @@ router.post('/generate-card', chatGenerateCardLimiter, upload.single('photo'), a
           { MOBILE_NO: Number(mobile) },
           { MOBILE_NO: "91" + mobile }
         ]
-      }, { projection: { wtl_code: 1, referral_id: 1, referral_link: 1 } });
-      const wtlCode   = existingGen?.wtl_code || generateWtlCode();
+      }, { projection: { bjp_code: 1, referral_id: 1, referral_link: 1 } });
+      const bjpCode   = existingGen?.bjp_code || generateBjpCode();
       const config    = require('../config');
 
       // ── Referral attribution ───────────────────────────────────
-      // Accept ref=<wtlCode>&rid=<referralId> from the request body
+      // Accept ref=<bjpCode>&rid=<referralId> from the request body
       // (frontend passes them when the user landed via a referral link)
       const rawRef    = String(req.body.ref  || '').trim().toUpperCase();
       const rawRid    = String(req.body.rid  || '').trim().toUpperCase();
       // Validate format — avoid injecting arbitrary values into DB
-      const refWtlOk  = /^BJP-[0-9A-F]{8}$/.test(rawRef);
+      const refBjpOk  = /^BJP-[0-9A-F]{8}$/.test(rawRef);
       const refRidOk  = /^REF-[0-9A-F]{8}$/.test(rawRid);
-      const refWtl    = refWtlOk ? rawRef : '';
+      const refBjp    = refBjpOk ? rawRef : '';
       const refRid    = refRidOk ? rawRid : '';
 
       // Verify the referral actually exists (prevent spoofed codes)
-      let verifiedRefWtl = '';
+      let verifiedRefBjp = '';
       let verifiedRefRid = '';
-      if (refWtl && refRid) {
+      if (refBjp && refRid) {
         const referrer = await db.collection('generated_voters').findOne(
-          { wtl_code: refWtl, referral_id: refRid },
+          { bjp_code: refBjp, referral_id: refRid },
           { projection: { _id: 1 } }
         );
         if (referrer) {
-          verifiedRefWtl = refWtl;
+          verifiedRefBjp = refBjp;
           verifiedRefRid = refRid;
         }
       }
@@ -863,8 +632,8 @@ router.post('/generate-card', chatGenerateCardLimiter, upload.single('photo'), a
       // Preserve existing referral_id if card is being re-generated
       const referralId   = existingGen?.referral_id   || ('REF-' + crypto.randomBytes(4).toString('hex').toUpperCase());
       const referralBase = config.baseUrl;
-      const referralLink = `${referralBase}/refer/${wtlCode}/${referralId}`;
-      const verifyUrl = `${config.baseUrl}/verify/${wtlCode || epicNo}`;
+      const referralLink = `${referralBase}/refer/${bjpCode}/${referralId}`;
+      const verifyUrl = `${config.baseUrl}/verify/${bjpCode || epicNo}`;
 
 
       const voterData = {
@@ -875,7 +644,7 @@ router.post('/generate-card', chatGenerateCardLimiter, upload.single('photo'), a
         part_no:       voter.part_no,
         PART_NO:       voter.part_no,
         booth:         voter.part_no,
-        wtl_code:      wtlCode,
+        bjp_code:      bjpCode,
         verify_url:    verifyUrl,
         VOTER_NAME:    voter.name,
         ASSEMBLY_NAME: voter.assembly_name,
@@ -894,7 +663,7 @@ router.post('/generate-card', chatGenerateCardLimiter, upload.single('photo'), a
         Sentry.captureException(e, {
           tags:  { operation: 'photo_upload', source: 'web', storage: 'backblaze_b2' },
           extra: {
-            epicNo, mobile, wtlCode,
+            epicNo, mobile, bjpCode,
             photoSizeKB: Math.round(photoBuffer.length / 1024),
             errorType:   'b2_upload_failed',
           },
@@ -914,7 +683,7 @@ router.post('/generate-card', chatGenerateCardLimiter, upload.single('photo'), a
         {
           $set: {
             EPIC_NO:        epicNo,
-            wtl_code:       wtlCode,
+            bjp_code:       bjpCode,
             photo_url:      photoUrl,
             card_url:       cardUrl,
             back_url:       backUrl,
@@ -929,7 +698,7 @@ router.post('/generate-card', chatGenerateCardLimiter, upload.single('photo'), a
             referral_link:  referralLink,
             source:         'web',
             MOBILE_NO:      mobile,
-            ...(verifiedRefWtl   ? { referred_by_wtl:          verifiedRefWtl   } : {}),
+            ...(verifiedRefBjp   ? { referred_by_bjp:          verifiedRefBjp   } : {}),
             ...(verifiedRefRid   ? { referred_by_referral_id:  verifiedRefRid   } : {}),
           },
           $setOnInsert: { created_at: now },
@@ -938,9 +707,9 @@ router.post('/generate-card', chatGenerateCardLimiter, upload.single('photo'), a
       );
 
       // Increment referrer's count (fire-and-forget, non-blocking)
-      if (verifiedRefWtl) {
+      if (verifiedRefBjp) {
         db.collection('generated_voters').updateOne(
-          { wtl_code: verifiedRefWtl },
+          { bjp_code: verifiedRefBjp },
           { $inc: { referred_members_count: 1 } }
         ).catch(() => {});
       }
@@ -971,7 +740,7 @@ router.post('/generate-card', chatGenerateCardLimiter, upload.single('photo'), a
         assembly_name: voter.assembly_name,
         district:      voter.district,
         part_no:       voter.part_no,
-        wtl_code:      wtlCode,
+        bjp_code:      bjpCode,
         referral_id:   referralId,
         referral_link: referralLink,
         created_at:    now,
@@ -1044,9 +813,9 @@ router.get('/profile/:epicNo', async (req, res) => {
       : rawMob;
 
     let appreciation_earned_at = genDoc.appreciation_earned_at || null;
-    if ((genDoc.referred_members_count || 0) >= 5 && !appreciation_earned_at && genDoc.wtl_code) {
+    if ((genDoc.referred_members_count || 0) >= 5 && !appreciation_earned_at && genDoc.bjp_code) {
       const referrals = await db.collection('generated_voters')
-        .find({ referred_by_wtl: genDoc.wtl_code })
+        .find({ referred_by_bjp: genDoc.bjp_code })
         .sort({ created_at: 1 })
         .skip(4)
         .limit(1)
@@ -1066,7 +835,7 @@ router.get('/profile/:epicNo', async (req, res) => {
       epic_no:            epicNo,
       assembly,
       district,
-      wtl_code:           genDoc.wtl_code   || genDoc.ptc_code || '',
+      bjp_code:           genDoc.bjp_code   || genDoc.ptc_code || '',
       card_url:           stat.card_url     || genDoc.card_url     || '',
       back_url:           stat.back_url     || genDoc.back_url     || '',
       combined_url:       stat.combined_url || genDoc.combined_url || '',
@@ -1131,23 +900,23 @@ router.get('/booth/:epicNo', async (req, res) => {
 });
 
 // ────────────────────────────────────────────────────────────────
-//  GET /referral-link/:wtlCode  — requires verified session
+//  GET /referral-link/:bjpCode  — requires verified session
 // ────────────────────────────────────────────────────────────────
-router.get('/referral-link/:wtlCode', async (req, res) => {
+router.get('/referral-link/:bjpCode', async (req, res) => {
   try {
     // Must have a verified mobile session
     if (!req.session?.verified_mobile) {
       return res.status(401).json({ success: false, message: 'Authentication required.' });
     }
 
-    const wtlCode = String(req.params.wtlCode || '').trim();
-    if (!wtlCode || !/^BJP-[0-9A-F]{8}$/.test(wtlCode)) {
+    const bjpCode = String(req.params.bjpCode || '').trim();
+    if (!bjpCode || !/^BJP-[0-9A-F]{8}$/.test(bjpCode)) {
       return res.status(400).json({ success: false, message: 'Invalid BJP code format' });
     }
 
     const db  = getDb();
     const doc = await db.collection('generated_voters').findOne(
-      { wtl_code: wtlCode },
+      { bjp_code: bjpCode },
       { projection: { referral_id: 1, referral_link: 1, MOBILE_NO: 1 } }
     );
 
@@ -1160,11 +929,11 @@ router.get('/referral-link/:wtlCode', async (req, res) => {
 
     const rid  = doc.referral_id || ('REF-' + crypto.randomBytes(4).toString('hex').toUpperCase());
     const referralBase = config.baseUrl;
-    const link = `${referralBase}/refer/${wtlCode}/${rid}`;
+    const link = `${referralBase}/refer/${bjpCode}/${rid}`;
 
     if (!doc.referral_id || doc.referral_link !== link) {
       await db.collection('generated_voters').updateOne(
-        { wtl_code: wtlCode },
+        { bjp_code: bjpCode },
         { $set: { referral_id: rid, referral_link: link } }
       );
     }
@@ -1177,25 +946,25 @@ router.get('/referral-link/:wtlCode', async (req, res) => {
 });
 
 // ────────────────────────────────────────────────────────────────
-//  GET /my-members/:wtlCode  — requires verified session
+//  GET /my-members/:bjpCode  — requires verified session
 // ────────────────────────────────────────────────────────────────
-router.get('/my-members/:wtlCode', async (req, res) => {
+router.get('/my-members/:bjpCode', async (req, res) => {
   try {
     // Must have a verified mobile session
     if (!req.session?.verified_mobile) {
       return res.status(401).json({ success: false, message: 'Authentication required.' });
     }
 
-    const wtlCode = String(req.params.wtlCode || '').trim();
-    if (!wtlCode || !/^BJP-[0-9A-F]{8}$/.test(wtlCode)) {
+    const bjpCode = String(req.params.bjpCode || '').trim();
+    if (!bjpCode || !/^BJP-[0-9A-F]{8}$/.test(bjpCode)) {
       return res.status(400).json({ success: false, message: 'Invalid BJP code format' });
     }
 
     const db = getDb();
 
-    // Verify the session mobile owns this WTL code
+    // Verify the session mobile owns this BJP code
     const owner = await db.collection('generated_voters').findOne(
-      { wtl_code: wtlCode }, { projection: { MOBILE_NO: 1 } }
+      { bjp_code: bjpCode }, { projection: { MOBILE_NO: 1 } }
     );
     if (!owner) return res.status(404).json({ success: false, message: 'Member not found' });
     if (owner.MOBILE_NO && owner.MOBILE_NO !== req.session.verified_mobile) {
@@ -1204,15 +973,15 @@ router.get('/my-members/:wtlCode', async (req, res) => {
 
     // 1. Fetch Root Member
     const rootDoc = await db.collection('generated_voters').findOne(
-      { wtl_code: wtlCode },
-      { projection: { VOTER_NAME: 1, FM_NAME_EN: 1, LASTNAME_EN: 1, EPIC_NO: 1, wtl_code: 1, photo_url: 1, ASSEMBLY_NAME: 1, DISTRICT_NAME: 1, PART_NO: 1 } }
+      { bjp_code: bjpCode },
+      { projection: { VOTER_NAME: 1, FM_NAME_EN: 1, LASTNAME_EN: 1, EPIC_NO: 1, bjp_code: 1, photo_url: 1, ASSEMBLY_NAME: 1, DISTRICT_NAME: 1, PART_NO: 1 } }
     );
     if (!rootDoc) return res.status(404).json({ success: false, message: 'Member details not found' });
 
     const root = {
       name:          rootDoc.VOTER_NAME || `${rootDoc.FM_NAME_EN || ''} ${rootDoc.LASTNAME_EN || ''}`.trim() || 'A Member',
       epic_no:       rootDoc.EPIC_NO || '',
-      wtl_code:      rootDoc.wtl_code || '',
+      bjp_code:      rootDoc.bjp_code || '',
       photo_url:     await getPhotoPresignedUrl(rootDoc.photo_url || ''),
       assembly_name: rootDoc.ASSEMBLY_NAME || '',
       district:      rootDoc.DISTRICT_NAME || '',
@@ -1222,34 +991,34 @@ router.get('/my-members/:wtlCode', async (req, res) => {
     // 2. Fetch Layer 2 Members
     const layer2Docs = await db.collection('generated_voters')
       .find(
-        { referred_by_wtl: wtlCode },
-        { projection: { VOTER_NAME: 1, FM_NAME_EN: 1, LASTNAME_EN: 1, EPIC_NO: 1, wtl_code: 1, photo_url: 1, ASSEMBLY_NAME: 1, DISTRICT_NAME: 1, PART_NO: 1, generated_at: 1 } }
+        { referred_by_bjp: bjpCode },
+        { projection: { VOTER_NAME: 1, FM_NAME_EN: 1, LASTNAME_EN: 1, EPIC_NO: 1, bjp_code: 1, photo_url: 1, ASSEMBLY_NAME: 1, DISTRICT_NAME: 1, PART_NO: 1, generated_at: 1 } }
       )
       .sort({ generated_at: -1 })
       .toArray();
 
-    const layer2Wtls = layer2Docs.map(m => m.wtl_code).filter(Boolean);
+    const layer2Bjps = layer2Docs.map(m => m.bjp_code).filter(Boolean);
 
     // 3. Fetch Layer 3 Members
     let layer3Docs = [];
-    if (layer2Wtls.length > 0) {
+    if (layer2Bjps.length > 0) {
       layer3Docs = await db.collection('generated_voters')
         .find(
-          { referred_by_wtl: { $in: layer2Wtls } },
-          { projection: { VOTER_NAME: 1, FM_NAME_EN: 1, LASTNAME_EN: 1, EPIC_NO: 1, wtl_code: 1, photo_url: 1, ASSEMBLY_NAME: 1, DISTRICT_NAME: 1, PART_NO: 1, referred_by_wtl: 1, generated_at: 1 } }
+          { referred_by_bjp: { $in: layer2Bjps } },
+          { projection: { VOTER_NAME: 1, FM_NAME_EN: 1, LASTNAME_EN: 1, EPIC_NO: 1, bjp_code: 1, photo_url: 1, ASSEMBLY_NAME: 1, DISTRICT_NAME: 1, PART_NO: 1, referred_by_bjp: 1, generated_at: 1 } }
         )
         .toArray();
     }
 
-    // Map Layer 3 members by their referrer's WTL code (with presigned photos)
+    // Map Layer 3 members by their referrer's BJP code (with presigned photos)
     const layer3Map = {};
     await Promise.all(layer3Docs.map(async (m3) => {
-      const parentWtl = m3.referred_by_wtl;
-      if (!layer3Map[parentWtl]) layer3Map[parentWtl] = [];
-      layer3Map[parentWtl].push({
+      const parentBjp = m3.referred_by_bjp;
+      if (!layer3Map[parentBjp]) layer3Map[parentBjp] = [];
+      layer3Map[parentBjp].push({
         name:          m3.VOTER_NAME || `${m3.FM_NAME_EN || ''} ${m3.LASTNAME_EN || ''}`.trim() || 'A Member',
         epic_no:       m3.EPIC_NO || '',
-        wtl_code:      m3.wtl_code || '',
+        bjp_code:      m3.bjp_code || '',
         photo_url:     await getPhotoPresignedUrl(m3.photo_url || ''),
         assembly_name: m3.ASSEMBLY_NAME || '',
         district:      m3.DISTRICT_NAME || '',
@@ -1260,11 +1029,11 @@ router.get('/my-members/:wtlCode', async (req, res) => {
 
     // Build the tree (with presigned photos for layer 2)
     const tree = await Promise.all(layer2Docs.map(async (m2) => {
-      const w2 = m2.wtl_code;
+      const w2 = m2.bjp_code;
       return {
         name:          m2.VOTER_NAME || `${m2.FM_NAME_EN || ''} ${m2.LASTNAME_EN || ''}`.trim() || 'A Member',
         epic_no:       m2.EPIC_NO || '',
-        wtl_code:      w2 || '',
+        bjp_code:      w2 || '',
         photo_url:     await getPhotoPresignedUrl(m2.photo_url || ''),
         assembly_name: m2.ASSEMBLY_NAME || '',
         district:      m2.DISTRICT_NAME || '',
@@ -1291,14 +1060,14 @@ router.post('/request-volunteer', async (req, res) => {
       return res.status(401).json({ success: false, message: 'Authentication required.' });
     }
 
-    const wtlCode = String(req.body.wtl_code || '').trim();
+    const bjpCode = String(req.body.bjp_code || '').trim();
     const epicNo  = String(req.body.epic_no  || '').trim().toUpperCase();
-    if (!wtlCode) return res.status(400).json({ success: false, message: 'WTL code required' });
+    if (!bjpCode) return res.status(400).json({ success: false, message: 'BJP code required' });
 
     const db  = getDb();
-    const gen = await db.collection('generated_voters').findOne({ wtl_code: wtlCode }) || {};
+    const gen = await db.collection('generated_voters').findOne({ bjp_code: bjpCode }) || {};
 
-    // Verify session mobile owns this WTL code
+    // Verify session mobile owns this BJP code
     if (gen.MOBILE_NO && gen.MOBILE_NO !== req.session.verified_mobile) {
       return res.status(403).json({ success: false, message: 'Access denied.' });
     }
@@ -1307,7 +1076,7 @@ router.post('/request-volunteer', async (req, res) => {
 
     try {
       await db.collection('volunteer_requests').insertOne({
-        wtl_code:     wtlCode,
+        bjp_code:     bjpCode,
         epic_no:      epicNo || gen.EPIC_NO || '',
         name,
         mobile:       gen.MOBILE_NO    || '',
@@ -1319,8 +1088,8 @@ router.post('/request-volunteer', async (req, res) => {
       });
     } catch (e) {
       if (e.code === 11000) {
-        // Already submitted (unique index on wtl_code)
-        const existing = await db.collection('volunteer_requests').findOne({ wtl_code: wtlCode });
+        // Already submitted (unique index on bjp_code)
+        const existing = await db.collection('volunteer_requests').findOne({ bjp_code: bjpCode });
         return res.status(400).json({ success: false, message: `Already submitted. Status: ${existing?.status || 'pending'}` });
       }
       throw e;
@@ -1344,19 +1113,19 @@ router.post('/request-booth-agent', async (req, res) => {
       return res.status(401).json({ success: false, message: 'Authentication required.' });
     }
 
-    const wtlCode = String(req.body.wtl_code || '').trim();
+    const bjpCode = String(req.body.bjp_code || '').trim();
     const epicNo  = String(req.body.epic_no  || '').trim().toUpperCase();
     const boothNo = String(req.body.booth_no || '').trim().slice(0, 6);
 
-    if (!wtlCode) return res.status(400).json({ success: false, message: 'WTL code required' });
+    if (!bjpCode) return res.status(400).json({ success: false, message: 'BJP code required' });
     if (!boothNo || !/^\d{1,6}$/.test(boothNo)) {
       return res.status(400).json({ success: false, message: 'Invalid booth number. Must be 1–6 digits.' });
     }
 
     const db  = getDb();
-    const gen = await db.collection('generated_voters').findOne({ wtl_code: wtlCode }) || {};
+    const gen = await db.collection('generated_voters').findOne({ bjp_code: bjpCode }) || {};
 
-    // Verify session mobile owns this WTL code
+    // Verify session mobile owns this BJP code
     if (gen.MOBILE_NO && gen.MOBILE_NO !== req.session.verified_mobile) {
       return res.status(403).json({ success: false, message: 'Access denied.' });
     }
@@ -1365,7 +1134,7 @@ router.post('/request-booth-agent', async (req, res) => {
 
     try {
       await db.collection('booth_agent_requests').insertOne({
-        wtl_code:     wtlCode,
+        bjp_code:     bjpCode,
         epic_no:      epicNo || gen.EPIC_NO || '',
         name,
         mobile:       gen.MOBILE_NO    || '',
@@ -1377,7 +1146,7 @@ router.post('/request-booth-agent', async (req, res) => {
       });
     } catch (e) {
       if (e.code === 11000) {
-        const existing = await db.collection('booth_agent_requests').findOne({ wtl_code: wtlCode });
+        const existing = await db.collection('booth_agent_requests').findOne({ bjp_code: bjpCode });
         return res.status(400).json({ success: false, message: `Already submitted. Status: ${existing?.status || 'pending'}` });
       }
       throw e;
@@ -1407,7 +1176,7 @@ router.get('/best-performers', async (req, res) => {
           FM_NAME_EN: 1, 
           LASTNAME_EN: 1, 
           referred_members_count: 1, 
-          wtl_code: 1, 
+          bjp_code: 1, 
           photo_url: 1,
           EPIC_NO: 1,
           ASSEMBLY_NAME: 1,
@@ -1424,7 +1193,7 @@ router.get('/best-performers', async (req, res) => {
       name:                 p.VOTER_NAME || `${p.FM_NAME_EN || ''} ${p.LASTNAME_EN || ''}`.trim() || 'BJP Member',
       referred_count:       p.referred_members_count || 0,
       referrals:            p.referred_members_count || 0,
-      wtl_code:             p.wtl_code || '',
+      bjp_code:             p.bjp_code || '',
       photo_url:            await getPhotoPresignedUrl(p.photo_url || ''),
       epic_no:              p.EPIC_NO || '',
       assembly_name:        p.ASSEMBLY_NAME || '',
@@ -1447,24 +1216,24 @@ router.get('/card-status/:jobId', (req, res) => {
 });
 
 // ────────────────────────────────────────────────────────────────
-//  GET /member-status/:wtlCode
+//  GET /member-status/:bjpCode
 // ────────────────────────────────────────────────────────────────
-router.get('/member-status/:wtlCode', async (req, res) => {
+router.get('/member-status/:bjpCode', async (req, res) => {
   try {
-    const wtlCode = req.params.wtlCode;
+    const bjpCode = req.params.bjpCode;
     const db = getDb();
-    const voter = await db.collection('generated_voters').findOne({ wtl_code: wtlCode });
+    const voter = await db.collection('generated_voters').findOne({ bjp_code: bjpCode });
     if (!voter) {
       return res.status(404).json({ success: false, message: 'Member not found' });
     }
-    const appointment = await db.collection('appointments').findOne({ wtl_code: wtlCode });
-    const volReq = await db.collection('volunteer_requests').findOne({ wtl_code: wtlCode });
-    const baReq = await db.collection('booth_agent_requests').findOne({ wtl_code: wtlCode });
+    const appointment = await db.collection('appointments').findOne({ bjp_code: bjpCode });
+    const volReq = await db.collection('volunteer_requests').findOne({ bjp_code: bjpCode });
+    const baReq = await db.collection('booth_agent_requests').findOne({ bjp_code: bjpCode });
 
     let appreciation_earned_at = voter.appreciation_earned_at || null;
     if ((voter.referred_members_count || 0) >= 5 && !appreciation_earned_at) {
       const referrals = await db.collection('generated_voters')
-        .find({ referred_by_wtl: wtlCode })
+        .find({ referred_by_bjp: bjpCode })
         .sort({ created_at: 1 })
         .skip(4)
         .limit(1)
@@ -1500,8 +1269,8 @@ router.get('/member-status/:wtlCode', async (req, res) => {
 // ────────────────────────────────────────────────────────────────
 router.post('/local-body-interest', async (req, res) => {
   try {
-    const { wtl_code, interest } = req.body;
-    if (!wtl_code || !interest) {
+    const { bjp_code, interest } = req.body;
+    if (!bjp_code || !interest) {
       return res.status(400).json({ success: false, message: 'Missing required parameters' });
     }
     if (interest !== 'interested' && interest !== 'not_interested') {
@@ -1509,7 +1278,7 @@ router.post('/local-body-interest', async (req, res) => {
     }
     const db = getDb();
     const result = await db.collection('generated_voters').updateOne(
-      { wtl_code },
+      { bjp_code },
       { $set: { local_body_interest: interest } }
     );
     if (result.matchedCount === 0) {
@@ -1527,8 +1296,8 @@ router.post('/local-body-interest', async (req, res) => {
 // ────────────────────────────────────────────────────────────────
 router.post('/save-meeting-interest', async (req, res) => {
   try {
-    const { wtl_code, interest } = req.body;
-    if (!wtl_code || !interest) {
+    const { bjp_code, interest } = req.body;
+    if (!bjp_code || !interest) {
       return res.status(400).json({ success: false, message: 'Missing required parameters' });
     }
     if (interest !== 'interested' && interest !== 'not_interested') {
@@ -1536,7 +1305,7 @@ router.post('/save-meeting-interest', async (req, res) => {
     }
     const db = getDb();
     await db.collection('appointments').updateOne(
-      { wtl_code },
+      { bjp_code },
       { $set: { interest, created_at: new Date() } },
       { upsert: true }
     );

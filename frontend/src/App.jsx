@@ -27,8 +27,8 @@ export default function App() {
       <Route path="/" element={<ChatbotPage />} />
       <Route path="/card/:epicNo" element={<CardPage />} />
       <Route path="/verify/:epicNo" element={<VerifyPage />} />
-      <Route path="/refer/:wtlCode/:referralId" element={<ReferralPage />} />
-      <Route path="/my-members/:wtlCode" element={<MyMembersPage />} />
+      <Route path="/refer/:bjpCode/:referralId" element={<ReferralPage />} />
+      <Route path="/my-members/:bjpCode" element={<MyMembersPage />} />
       <Route path="/best-performers" element={<BestPerformersPage />} />
       <Route path="/admin/login" element={<LoginPage />} />
       <Route path="/admin" element={<AdminLayout />}>
@@ -37,7 +37,7 @@ export default function App() {
         <Route path="voters" element={<VotersPage />} />
         <Route path="voters/:epicNo" element={<VoterDetailPage />} />
         <Route path="generated-voters" element={<GeneratedVotersPage />} />
-        <Route path="generated-voters/:wtlCode" element={<GeneratedVoterDetailPage />} />
+        <Route path="generated-voters/:bjpCode" element={<GeneratedVoterDetailPage />} />
         <Route path="volunteer-requests" element={<VolunteerRequestsPage />} />
         <Route path="confirmed-volunteers" element={<ConfirmedVolunteersPage />} />
         <Route path="booth-agent-requests" element={<BoothAgentRequestsPage />} />

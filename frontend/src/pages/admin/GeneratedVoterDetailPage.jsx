@@ -5,7 +5,7 @@ import { CardPreviewIframe } from '../../components/CardPreviewIframe'
 import '../../styles/admin.css'
 
 export default function GeneratedVoterDetailPage() {
-  const { wtlCode } = useParams()
+  const { bjpCode } = useParams()
   const navigate = useNavigate()
   const [data, setData] = useState(null)
   const [referred, setReferred] = useState([])
@@ -16,7 +16,7 @@ export default function GeneratedVoterDetailPage() {
 
   useEffect(() => {
     setLoading(true)
-    admin.getGeneratedVoterDetail(wtlCode)
+    admin.getGeneratedVoterDetail(bjpCode)
       .then((res) => {
         if (res && res.success === true) {
           setData({
@@ -32,7 +32,7 @@ export default function GeneratedVoterDetailPage() {
       })
       .catch((err) => setError(err.message || 'Error loading detail.'))
       .finally(() => setLoading(false))
-  }, [wtlCode])
+  }, [bjpCode])
 
   const handleAction = async (type, action) => {
     setActionLoading((prev) => ({ ...prev, [type]: action }))
@@ -40,17 +40,17 @@ export default function GeneratedVoterDetailPage() {
       let res
       if (type === 'volunteer') {
         res = action === 'confirm'
-          ? await admin.confirmVolunteer(wtlCode)
-          : await admin.rejectVolunteer(wtlCode)
+          ? await admin.confirmVolunteer(bjpCode)
+          : await admin.rejectVolunteer(bjpCode)
       } else {
         res = action === 'confirm'
-          ? await admin.confirmBoothAgent(wtlCode)
-          : await admin.rejectBoothAgent(wtlCode)
+          ? await admin.confirmBoothAgent(bjpCode)
+          : await admin.rejectBoothAgent(bjpCode)
       }
 
       if (res && res.success === true) {
         // Refresh details on success
-        const updated = await admin.getGeneratedVoterDetail(wtlCode)
+        const updated = await admin.getGeneratedVoterDetail(bjpCode)
         if (updated && updated.success === true) {
           setData({
             ...updated.voter,
@@ -157,7 +157,7 @@ export default function GeneratedVoterDetailPage() {
               fontWeight: '700',
               border: '1px solid rgba(242, 101, 34, 0.2)'
             }}>
-              {wtlCode}
+              {bjpCode}
             </span>
           </div>
           <p style={{ color: 'var(--text-secondary)', margin: '0 0 16px 0', fontSize: 14 }}>
@@ -178,7 +178,7 @@ export default function GeneratedVoterDetailPage() {
         {/* Action verify button */}
         <div style={{ zIndex: 2 }}>
           {v.epic_no && (
-            <a href={`/verify/${v.wtl_code || v.epic_no}`} target="_blank" rel="noreferrer" className="btn-action btn-view" style={{
+            <a href={`/verify/${v.bjp_code || v.epic_no}`} target="_blank" rel="noreferrer" className="btn-action btn-view" style={{
               padding: '10px 20px',
               borderRadius: 'var(--radius-buttons)',
               fontWeight: '600',
@@ -212,7 +212,7 @@ export default function GeneratedVoterDetailPage() {
                   { label: 'Full Name', value: v.name || v.VOTER_NAME || '—', icon: 'bi-person' },
                   { label: 'EPIC Number', value: v.epic_no || '—', icon: 'bi-card-text' },
                   { label: 'Mobile Number', value: v.mobile || '—', icon: 'bi-telephone' },
-                  { label: 'BJP Code', value: v.wtl_code || wtlCode, icon: 'bi-qr-code' },
+                  { label: 'BJP Code', value: v.bjp_code || bjpCode, icon: 'bi-qr-code' },
                   { label: 'Registered Assembly', value: v.assembly_name ? `${v.assembly_name} (${v.assembly})` : (v.assembly || '—'), icon: 'bi-geo-alt' },
                   { label: 'Registered Booth (Part No)', value: v.part_no || '—', icon: 'bi-building' },
                   { label: 'District', value: v.district || '—', icon: 'bi-map' },
@@ -422,7 +422,7 @@ export default function GeneratedVoterDetailPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
           
           {/* Card preview */}
-          {(v.card_url || v.wtl_code || v.ptc_code) && (
+          {(v.card_url || v.bjp_code || v.ptc_code) && (
             <div className="admin-card" style={{ margin: 0 }}>
               <div className="admin-card-header" style={{ borderBottom: '1px solid var(--border-dim)', padding: '16px 20px' }}>
                 <h6 className="admin-card-title"><i className="bi bi-card-image" style={{ color: '#f26522' }} /> Member Identity Card</h6>
@@ -464,7 +464,7 @@ export default function GeneratedVoterDetailPage() {
                           <td style={{ fontWeight: 600 }}>{ref.name || ref.Name || '—'}</td>
                           <td>
                             {ref.epic_no ? (
-                              <Link to={`/admin/generated-voters/${ref.wtl_code}`} style={{ color: 'var(--admin-badge-blue)', fontSize: 12, textDecoration: 'none' }}>
+                              <Link to={`/admin/generated-voters/${ref.bjp_code}`} style={{ color: 'var(--admin-badge-blue)', fontSize: 12, textDecoration: 'none' }}>
                                 {ref.epic_no}
                               </Link>
                             ) : '—'}

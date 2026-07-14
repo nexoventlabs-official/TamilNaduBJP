@@ -33,7 +33,7 @@ services:
       - key: MONGO_URI
         sync: false # Mark as secret — set in dashboard
       - key: MONGO_DB
-        value: wetheleaders
+        value: bjptamilnadu
       - key: MONGO_VOTER_URL
         sync: false
       - key: MONGO_VOTER_DB_NAME

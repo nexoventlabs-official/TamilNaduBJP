@@ -98,7 +98,7 @@ async function clearCloudinary() {
 
 async function main() {
   console.log('═══════════════════════════════════════════');
-  console.log('  WTL: Database & Cloudinary Cleanup');
+  console.log('  BJP: Database & Cloudinary Cleanup');
   console.log('═══════════════════════════════════════════\n');
 
   await clearDatabase();

@@ -4,6 +4,19 @@ This report details the findings from the capacity-measurement and stress-testin
 
 ---
 
+## 0. Hardware & Architecture Update (July 2026)
+
+> **The result tables in Sections 4–7 were measured on the LEGACY droplet (1 vCPU / 2 GB RAM).**
+> The production stack has since changed. Treat the legacy tables as a lower bound and
+> see **Section 4.0 — Re-estimated capacity (current hardware)** for numbers that reflect today's setup.
+
+Current production environment:
+- **Droplet:** DigitalOcean `ubuntu-s-4vcpu-8gb-240gb-intel-sgp1` — **4 vCPU, 8 GB RAM, 240 GB SSD (Singapore)**. No swap configured.
+- **Voter DB (DB1):** now runs **locally on the droplet** (`USE_LOCAL_VOTER_DB=true`), not the old remote cluster. Lookups are no longer network-bound but share the droplet's CPU/RAM with Node + Puppeteer + Mongo.
+- **Redis:** a managed Redis instance is now wired in for the EPIC/voter cache, cross-instance rate limiting, and sessions (replaces the in-memory `_epicCache` Map and MongoDB session store).
+
+---
+
 ## 1. Recon (Phase 0)
 
 Before executing any tests, the codebase configurations and integration boundaries were audited:
@@ -23,7 +36,7 @@ Before executing any tests, the codebase configurations and integration boundari
 3. **MongoDB Connection Pools (`backend/src/db.js`)**:
    - **DB2 (Atlas App DB)**: `maxPoolSize = 50`.
    - **DB1 (Voter Roll DB)**: `maxPoolSize = 10`.
-   - **EPIC Lookup Implementation**: Executes parallel `findOne` queries across all 234 sharded assembly collections (`ass_1` to `ass_234`) using `Promise.race` racing a `firstMatchPromise`, `Promise.all` and a hard timeout of `8000ms`. Cache is handled via an in-memory Map `_epicCache` with a 1-hour TTL.
+   - **EPIC Lookup Implementation**: Executes parallel `findOne` queries across all 234 sharded assembly collections (`ass_1` to `ass_234`) using `Promise.race` racing a `firstMatchPromise`, `Promise.all` and a hard timeout of `8000ms`. Cache is now handled by **Redis** (`epic:<EPIC>` key, 1-hour TTL) with a **bounded in-memory fallback** (max 50k entries) used only when Redis is unavailable — replacing the previous unbounded in-memory Map.
 
 4. **SMS API Mock (`backend/src/services/smsService.js`)**:
    - Mock path triggers if `SMS_API_KEY` is unset. It logs the OTP to the console and returns success without calling 2Factor.in.
@@ -61,14 +74,36 @@ Before executing any tests, the codebase configurations and integration boundari
 ## 3. Methodology & Test Harness (Phase 2 & 3)
 
 - **Tooling**: Built using **Autocannon** (Node-native, high-performance concurrency tester) and direct Node benchmarking scripts.
-- **Environment**: DigitalOcean Droplet (1 vCPU, 2GB RAM, SSD) running Node.js v22.23.1 and MongoDB local instance (DB2) + Remote read-only MongoDB cluster (DB1).
+- **Environment (legacy runs, Sections 4–7)**: DigitalOcean Droplet (**1 vCPU, 2 GB RAM**, SSD) running Node.js v22.23.1, MongoDB local (DB2) + remote read-only MongoDB cluster (DB1).
+- **Environment (current)**: DigitalOcean Droplet (**4 vCPU, 8 GB RAM**, 240 GB SSD, Singapore), Node.js v22.23.1, MongoDB local for **both** DB1 (voter roll, read-only) and DB2 (app), plus managed Redis. No swap.
 - **Mocks**: Cloudinary network uploads stubbed; SMS OTP mocked.
 
 ---
 
 ## 4. Test Results
 
-### 4.1 EPIC Lookup Subsystem (Phase 3.1)
+### 4.0 Re-estimated Capacity — Current Hardware (4 vCPU / 8 GB + Redis)
+
+> Engineering re-estimates for the current droplet, derived from the code paths, the
+> 4× CPU / 4× RAM increase over the legacy box, the now-local voter DB, and the Redis
+> cache. **Not yet re-measured under load** — a controlled load test is recommended to
+> confirm (see Section 8). Measured data point: a cold EPIC lookup (234 collections,
+> local DB) ≈ **166 ms**; the same lookup served from Redis ≈ **56 ms**.
+
+| Flow | Concurrent "at a time" | Sustained throughput | Governing limit |
+|------|------------------------|----------------------|-----------------|
+| **Web registration** (client-rendered card) | **~150–250** | hundreds–~1,000/min | Voter DB pool (`maxPoolSize 10`) on cold lookups; B2 upload |
+| **WhatsApp card gen** (server Puppeteer) | **~4–8** safe | **~30–60 cards/min** | `--single-process` Chromium (CPU) + 8 GB RAM ceiling, no swap |
+| **EPIC validation** (read, Redis-cached) | **~300+** warm / ~100–150 cold | thousands/min warm | Redis (warm) / voter DB pool (cold) |
+
+Key shifts vs the legacy 1 vCPU / 2 GB box:
+- **Puppeteer ceiling roughly 2–3× higher** (4 cores + 8 GB), but `--single-process` still serializes CPU work and there is **no swap**, so an unbounded burst can still OOM-crash the droplet. A render queue is still required.
+- **EPIC cache is now shared + bounded** (Redis), so repeated lookups no longer grow memory or risk the old unbounded-Map OOM.
+- **Rate limits now hold across instances** (Redis store), so horizontal scaling won't weaken them.
+
+---
+
+### 4.1 EPIC Lookup Subsystem (Phase 3.1) — *legacy 1 vCPU / 2 GB*
 *Queries `/api/validate-epic` with unique EPICs to force cache misses.*
 
 | Concurrency | Success % | p50 | p95 | p99 | Errors / Failure Types |
@@ -145,17 +180,27 @@ Before executing any tests, the codebase configurations and integration boundari
 - **Issue**: The Voter DB connection pool is capped at `10` connections (`voterConn.openUri` option). Since a single EPIC lookup queries all 234 collections in parallel, concurrent requests quickly saturate the pool. This leads to connection queue pile-ups and query timeouts (>8000ms), causing the API to return falsy `404 (Not Found)` errors.
 
 ### 7.2 Puppeteer Browser Singleton Lockup
-- **Breaking Point**: Concurrency **20**.
-- **Issue**: Running the full backend Puppeteer card generation (used by WhatsApp webhooks) at concurrency levels over 10 results in high queue serialization (latencies >20s). Exceeding 20 concurrent renders spawns too many Chromium browser processes, causing CPU load to spike and freezing the droplet due to RAM exhaustion (OOM).
+- **Breaking Point (legacy 1 vCPU / 2 GB)**: Concurrency **20** → OOM crash.
+- **Re-estimated (current 4 vCPU / 8 GB)**: Comfortable at **~4–8** concurrent renders; latency degrades past ~8 and OOM risk rises somewhere around **~15–25** simultaneous pages (8 GB, **no swap**). `--single-process` still serializes CPU work regardless of core count, so more cores raise the memory ceiling more than the throughput ceiling.
+- **Issue**: The single shared browser has no concurrency cap, so a burst of WhatsApp photos opens that many heavy pages at once. Without a render queue, a large enough burst still risks OOM.
 
 ### 7.3 Recovery Behavior
-- **Result**: **FAILED**
-- **Observation**: Overloading the Puppeteer rendering engine crashes the server kernel. The droplet stays completely wedged and does not recover, requiring a manual reboot from the cloud console.
+- **Result (legacy)**: **FAILED** — Puppeteer overload crashed the kernel; the droplet wedged and needed a manual reboot.
+- **Current**: More headroom (8 GB), but with **no swap** a hard OOM can still wedge the box. Adding 2–4 GB swap + a render queue is the durable fix.
 
 ---
 
 ## 8. Gaps & Recommendations
 
-- **Do NOT execute Puppeteer on the backend for high-traffic web flows**: The client-side canvas rendering optimization is critical to sustaining registrations.
-- **Scale Voter DB connection pool**: Raise `voterConn`'s `maxPoolSize` from `10` to `50` to match the App DB's pool size.
-- **Implement a rendering queue for WhatsApp**: For webhook generation, a Redis/bullMQ-based queue is required to serialize card generation and protect Puppeteer from spawning more than 4 concurrent browser pages on a single-core instance.
+**Done since the legacy audit:**
+- ✅ **EPIC/voter cache moved to Redis** (bounded in-memory fallback) — removes the unbounded-Map OOM risk.
+- ✅ **Rate limiting moved to Redis** — limits now hold across multiple instances.
+- ✅ **Sessions moved to Redis** — lower DB load, ready for horizontal scaling.
+
+**Still recommended:**
+- **Do NOT execute Puppeteer on the backend for high-traffic web flows**: client-side canvas rendering remains critical to sustaining registrations.
+- **Add a rendering queue for WhatsApp**: serialize card generation and cap concurrent Chromium pages at ~4 (e.g. a small in-process semaphore or a Redis/BullMQ queue). This is the single biggest crash-prevention win.
+- **Scale Voter DB connection pool**: raise `voterConn`'s `maxPoolSize` from `10` to `50` to smooth cold-lookup bursts.
+- **Add 2–4 GB swap** on the droplet as cheap OOM insurance (currently none).
+- **Drop `--single-process`** in `cardGenerator.js` once a queue caps concurrency, to use the 4 cores for real parallel rendering.
+- **Run a fresh controlled load test** on the current hardware to replace the re-estimates in Section 4.0 with measured numbers.

@@ -5,10 +5,12 @@
 const express = require('express');
 const router  = express.Router();
 const axios   = require('axios');
+const bcrypt  = require('bcryptjs');
 
 const { requireAdminAuth } = require('../middleware/auth');
 const { adminLoginLimiter } = require('../middleware/rateLimiter');
 const { LoginAttemptTracker } = require('../utils/security');
+const { writeAuditLog } = require('../utils/auditLog');
 const { sanitizeSearch } = require('../utils/validators');
 const { getPhotoPresignedUrl } = require('../services/backblazeService');
 const config = require('../config');
@@ -57,7 +59,8 @@ router.post('/api/login', adminLoginLimiter, async (req, res) => {
     return res.status(400).json({ success: false, message: 'Username and password required.' });
   }
 
-  if (username === config.admin.username && password === config.admin.password) {
+  const passwordValid = await bcrypt.compare(password, config.admin.passwordHash || '');
+  if (username === config.admin.username && passwordValid) {
     loginTracker.reset(ip);
     req.session.adminLoggedIn = true;
     req.session.adminUsername = username;
@@ -151,7 +154,7 @@ router.get('/api/stats', async (req, res) => {
         .find({ referred_members_count: { $gt: 0 } })
         .sort({ referred_members_count: -1 })
         .limit(5)
-        .project({ VOTER_NAME: 1, FM_NAME_EN: 1, LASTNAME_EN: 1, wtl_code: 1, MOBILE_NO: 1, DISTRICT_NAME: 1, ASSEMBLY_NAME: 1, referred_members_count: 1, photo_url: 1 })
+        .project({ VOTER_NAME: 1, FM_NAME_EN: 1, LASTNAME_EN: 1, bjp_code: 1, MOBILE_NO: 1, DISTRICT_NAME: 1, ASSEMBLY_NAME: 1, referred_members_count: 1, photo_url: 1 })
         .toArray()
     ]);
 
@@ -171,7 +174,7 @@ router.get('/api/stats', async (req, res) => {
       db_connected:              true,
       top_referrals: topReferrals.map(r => ({
         name: r.VOTER_NAME || `${r.FM_NAME_EN || ''} ${r.LASTNAME_EN || ''}`.trim() || 'Unknown',
-        code: r.wtl_code || '',
+        code: r.bjp_code || '',
         mobile: r.MOBILE_NO || '',
         district: r.DISTRICT_NAME || '',
         assembly: r.ASSEMBLY_NAME || '',
@@ -399,7 +402,7 @@ router.get('/api/voters/:epicNo', async (req, res) => {
     voter.last_generated = stat.last_generated ? String(stat.last_generated).slice(0, 19).replace('T', ' ') : '';
     voter.photo_url      = await getPhotoPresignedUrl(stat.photo_url  || genDoc.photo_url  || '');
     voter.card_url       = stat.card_url   || genDoc.card_url   || '';
-    voter.wtl_code       = genDoc.wtl_code || '';
+    voter.bjp_code       = genDoc.bjp_code || '';
     const mob            = stat.auth_mobile || '';
     voter.auth_mobile_masked = mob.length >= 4 ? `****${mob.slice(-4)}` : '';
 
@@ -431,7 +434,7 @@ router.get('/api/generated-voters', async (req, res) => {
         { EPIC_NO:    { $regex: escaped, $options: 'i' } },
         { FM_NAME_EN: { $regex: escaped, $options: 'i' } },
         { LASTNAME_EN:{ $regex: escaped, $options: 'i' } },
-        { wtl_code:   { $regex: escaped, $options: 'i' } },
+        { bjp_code:   { $regex: escaped, $options: 'i' } },
         { MOBILE_NO:  { $regex: escaped, $options: 'i' } },
       ];
     }
@@ -464,24 +467,24 @@ router.get('/api/generated-voters', async (req, res) => {
 });
 
 // ────────────────────────────────────────────────────────────────
-//  GET /admin/api/generated-voters/:wtlCode
+//  GET /admin/api/generated-voters/:bjpCode
 // ────────────────────────────────────────────────────────────────
-router.get('/api/generated-voters/:wtlCode', async (req, res) => {
+router.get('/api/generated-voters/:bjpCode', async (req, res) => {
   try {
     const db  = getDb();
-    const doc = await db.collection('generated_voters').findOne({ wtl_code: req.params.wtlCode });
+    const doc = await db.collection('generated_voters').findOne({ bjp_code: req.params.bjpCode });
 
     if (!doc) return res.status(404).json({ success: false, message: 'Not found.' });
 
     const voter    = genDocToDict(doc);
     voter.photo_url = await getPhotoPresignedUrl(voter.photo_url || '');
     const referred = await db.collection('generated_voters')
-      .find({ referred_by_wtl: req.params.wtlCode }).sort({ generated_at: -1 }).toArray();
+      .find({ referred_by_bjp: req.params.bjpCode }).sort({ generated_at: -1 }).toArray();
     const referredFormatted = referred.map(genDocToDict);
     await presignPhotoUrls(referredFormatted);
-    const volReq  = await db.collection('volunteer_requests').findOne({ wtl_code: req.params.wtlCode }) || null;
-    const baReq   = await db.collection('booth_agent_requests').findOne({ wtl_code: req.params.wtlCode }) || null;
-    const meetReq = await db.collection('appointments').findOne({ wtl_code: req.params.wtlCode }) || null;
+    const volReq  = await db.collection('volunteer_requests').findOne({ bjp_code: req.params.bjpCode }) || null;
+    const baReq   = await db.collection('booth_agent_requests').findOne({ bjp_code: req.params.bjpCode }) || null;
+    const meetReq = await db.collection('appointments').findOne({ bjp_code: req.params.bjpCode }) || null;
 
     return res.json({
       success: true,
@@ -508,13 +511,13 @@ router.get('/api/volunteer-requests', async (req, res) => {
     const { items, total, totalPages } = await paginatedList(db, 'volunteer_requests', filt, { requested_at: -1 }, page, perPage);
 
     // Enriched with voter details (name fallbacks + photo url)
-    const wtlCodes = items.map(x => x.wtl_code).filter(Boolean);
+    const bjpCodes = items.map(x => x.bjp_code).filter(Boolean);
     const voters = await db.collection('generated_voters')
-      .find({ wtl_code: { $in: wtlCodes } })
+      .find({ bjp_code: { $in: bjpCodes } })
       .toArray();
 
     const voterMap = new Map(voters.map(v => [
-      v.wtl_code,
+      v.bjp_code,
       {
         name: v.VOTER_NAME || `${v.FM_NAME_EN || ''} ${v.LASTNAME_EN || ''}`.trim(),
         photo_url: v.photo_url || ''
@@ -522,7 +525,7 @@ router.get('/api/volunteer-requests', async (req, res) => {
     ]));
 
     const enrichedItems = items.map(item => {
-      const profile = voterMap.get(item.wtl_code) || {};
+      const profile = voterMap.get(item.bjp_code) || {};
       return {
         ...item,
         name: item.name || profile.name || '—',
@@ -539,19 +542,19 @@ router.get('/api/volunteer-requests', async (req, res) => {
 });
 
 // ────────────────────────────────────────────────────────────────
-//  POST /admin/api/volunteer-requests/:wtlCode/confirm
+//  POST /admin/api/volunteer-requests/:bjpCode/confirm
 // ────────────────────────────────────────────────────────────────
-router.post('/api/volunteer-requests/:wtlCode/confirm', async (req, res) => {
+router.post('/api/volunteer-requests/:bjpCode/confirm', async (req, res) => {
   try {
     const db = getDb();
     // Verify the member exists before confirming
     const member = await db.collection('generated_voters').findOne(
-      { wtl_code: req.params.wtlCode }
+      { bjp_code: req.params.bjpCode }
     );
     if (!member) return res.status(404).json({ success: false, message: 'Member not found.' });
 
     await db.collection('volunteer_requests').updateOne(
-      { wtl_code: req.params.wtlCode },
+      { bjp_code: req.params.bjpCode },
       {
         $set: {
           status: 'confirmed',
@@ -566,6 +569,16 @@ router.post('/api/volunteer-requests/:wtlCode/confirm', async (req, res) => {
       },
       { upsert: true }
     );
+
+    await writeAuditLog({
+      adminUsername: req.session.adminUsername,
+      action:        'volunteer_confirmed',
+      targetBjpCode: req.params.bjpCode,
+      targetMobile:  member.MOBILE_NO,
+      newState:      { status: 'confirmed', wing: req.body.wing || 'General Wing' },
+      ip:            req.ip,
+    });
+
     return res.json({ success: true });
   } catch (err) {
     console.error('confirm-volunteer error:', err.message);
@@ -574,15 +587,29 @@ router.post('/api/volunteer-requests/:wtlCode/confirm', async (req, res) => {
 });
 
 // ────────────────────────────────────────────────────────────────
-//  POST /admin/api/volunteer-requests/:wtlCode/reject
+//  POST /admin/api/volunteer-requests/:bjpCode/reject
 // ────────────────────────────────────────────────────────────────
-router.post('/api/volunteer-requests/:wtlCode/reject', async (req, res) => {
+router.post('/api/volunteer-requests/:bjpCode/reject', async (req, res) => {
   try {
     const db = getDb();
+    const prev = await db.collection('volunteer_requests').findOne({ bjp_code: req.params.bjpCode });
     const r  = await db.collection('volunteer_requests').updateOne(
-      { wtl_code: req.params.wtlCode, status: 'pending' },
+      { bjp_code: req.params.bjpCode, status: 'pending' },
       { $set: { status: 'rejected', reviewed_at: new Date(), reviewed_by: config.admin.username } }
     );
+
+    if (r.modifiedCount) {
+      await writeAuditLog({
+        adminUsername: req.session.adminUsername,
+        action:        'volunteer_rejected',
+        targetBjpCode: req.params.bjpCode,
+        targetMobile:  prev?.mobile,
+        previousState: { status: prev?.status || 'pending' },
+        newState:      { status: 'rejected' },
+        ip:            req.ip,
+      });
+    }
+
     return res.json({ success: Boolean(r.modifiedCount) });
   } catch (err) {
     console.error('reject-volunteer error:', err.message);
@@ -601,13 +628,13 @@ router.get('/api/confirmed-volunteers', async (req, res) => {
     const { items, total, totalPages } = await paginatedList(db, 'volunteer_requests', filt, { reviewed_at: -1 }, page, perPage);
 
     // Enriched with voter details (name fallbacks + photo url)
-    const wtlCodes = items.map(x => x.wtl_code).filter(Boolean);
+    const bjpCodes = items.map(x => x.bjp_code).filter(Boolean);
     const voters = await db.collection('generated_voters')
-      .find({ wtl_code: { $in: wtlCodes } })
+      .find({ bjp_code: { $in: bjpCodes } })
       .toArray();
 
     const voterMap = new Map(voters.map(v => [
-      v.wtl_code,
+      v.bjp_code,
       {
         name: v.VOTER_NAME || `${v.FM_NAME_EN || ''} ${v.LASTNAME_EN || ''}`.trim(),
         photo_url: v.photo_url || '',
@@ -618,7 +645,7 @@ router.get('/api/confirmed-volunteers', async (req, res) => {
     ]));
 
     const enrichedItems = items.map(item => {
-      const profile = voterMap.get(item.wtl_code) || {};
+      const profile = voterMap.get(item.bjp_code) || {};
       return {
         ...item,
         name: item.name || profile.name || '—',
@@ -649,13 +676,13 @@ router.get('/api/booth-agent-requests', async (req, res) => {
     const { items, total, totalPages } = await paginatedList(db, 'booth_agent_requests', filt, { requested_at: -1 }, page, perPage);
 
     // Enriched with voter details (name fallbacks + photo url)
-    const wtlCodes = items.map(x => x.wtl_code).filter(Boolean);
+    const bjpCodes = items.map(x => x.bjp_code).filter(Boolean);
     const voters = await db.collection('generated_voters')
-      .find({ wtl_code: { $in: wtlCodes } })
+      .find({ bjp_code: { $in: bjpCodes } })
       .toArray();
 
     const voterMap = new Map(voters.map(v => [
-      v.wtl_code,
+      v.bjp_code,
       {
         name: v.VOTER_NAME || `${v.FM_NAME_EN || ''} ${v.LASTNAME_EN || ''}`.trim(),
         photo_url: v.photo_url || ''
@@ -663,7 +690,7 @@ router.get('/api/booth-agent-requests', async (req, res) => {
     ]));
 
     const enrichedItems = items.map(item => {
-      const profile = voterMap.get(item.wtl_code) || {};
+      const profile = voterMap.get(item.bjp_code) || {};
       return {
         ...item,
         name: item.name || profile.name || '—',
@@ -680,19 +707,19 @@ router.get('/api/booth-agent-requests', async (req, res) => {
 });
 
 // ────────────────────────────────────────────────────────────────
-//  POST /admin/api/booth-agent-requests/:wtlCode/confirm
+//  POST /admin/api/booth-agent-requests/:bjpCode/confirm
 // ────────────────────────────────────────────────────────────────
-router.post('/api/booth-agent-requests/:wtlCode/confirm', async (req, res) => {
+router.post('/api/booth-agent-requests/:bjpCode/confirm', async (req, res) => {
   try {
     const db = getDb();
     // Verify the member exists before confirming
     const member = await db.collection('generated_voters').findOne(
-      { wtl_code: req.params.wtlCode }
+      { bjp_code: req.params.bjpCode }
     );
     if (!member) return res.status(404).json({ success: false, message: 'Member not found.' });
 
     await db.collection('booth_agent_requests').updateOne(
-      { wtl_code: req.params.wtlCode },
+      { bjp_code: req.params.bjpCode },
       {
         $set: {
           status: 'confirmed',
@@ -709,6 +736,16 @@ router.post('/api/booth-agent-requests/:wtlCode/confirm', async (req, res) => {
       },
       { upsert: true }
     );
+
+    await writeAuditLog({
+      adminUsername: req.session.adminUsername,
+      action:        'booth_agent_confirmed',
+      targetBjpCode: req.params.bjpCode,
+      targetMobile:  member.MOBILE_NO,
+      newState:      { status: 'confirmed', booth_no: req.body.booth_no || member.part_no || '' },
+      ip:            req.ip,
+    });
+
     return res.json({ success: true });
   } catch (err) {
     console.error('confirm-booth-agent error:', err.message);
@@ -717,18 +754,51 @@ router.post('/api/booth-agent-requests/:wtlCode/confirm', async (req, res) => {
 });
 
 // ────────────────────────────────────────────────────────────────
-//  POST /admin/api/booth-agent-requests/:wtlCode/reject
+//  POST /admin/api/booth-agent-requests/:bjpCode/reject
 // ────────────────────────────────────────────────────────────────
-router.post('/api/booth-agent-requests/:wtlCode/reject', async (req, res) => {
+router.post('/api/booth-agent-requests/:bjpCode/reject', async (req, res) => {
   try {
     const db = getDb();
+    const prev = await db.collection('booth_agent_requests').findOne({ bjp_code: req.params.bjpCode });
     const r  = await db.collection('booth_agent_requests').updateOne(
-      { wtl_code: req.params.wtlCode, status: 'pending' },
+      { bjp_code: req.params.bjpCode, status: 'pending' },
       { $set: { status: 'rejected', reviewed_at: new Date(), reviewed_by: config.admin.username } }
     );
+
+    if (r.modifiedCount) {
+      await writeAuditLog({
+        adminUsername: req.session.adminUsername,
+        action:        'booth_agent_rejected',
+        targetBjpCode: req.params.bjpCode,
+        targetMobile:  prev?.mobile,
+        previousState: { status: prev?.status || 'pending' },
+        newState:      { status: 'rejected' },
+        ip:            req.ip,
+      });
+    }
+
     return res.json({ success: Boolean(r.modifiedCount) });
   } catch (err) {
     console.error('reject-booth-agent error:', err.message);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// ────────────────────────────────────────────────────────────────
+//  GET /admin/api/audit-log  — recent admin actions (FIX-09)
+// ────────────────────────────────────────────────────────────────
+router.get('/api/audit-log', async (req, res) => {
+  try {
+    const db = getDb();
+    const limit = Math.min(parseInt(req.query.limit, 10) || 50, 200);
+    const logs = await db.collection('admin_audit_log')
+      .find({})
+      .sort({ timestamp: -1 })
+      .limit(limit)
+      .toArray();
+    return res.json({ success: true, logs });
+  } catch (err) {
+    console.error('audit-log error:', err.message);
     return res.status(500).json({ success: false, message: 'Server error' });
   }
 });
@@ -744,13 +814,13 @@ router.get('/api/confirmed-booth-agents', async (req, res) => {
     const { items, total, totalPages } = await paginatedList(db, 'booth_agent_requests', filt, { reviewed_at: -1 }, page, perPage);
 
     // Enriched with voter details (name fallbacks + photo url)
-    const wtlCodes = items.map(x => x.wtl_code).filter(Boolean);
+    const bjpCodes = items.map(x => x.bjp_code).filter(Boolean);
     const voters = await db.collection('generated_voters')
-      .find({ wtl_code: { $in: wtlCodes } })
+      .find({ bjp_code: { $in: bjpCodes } })
       .toArray();
 
     const voterMap = new Map(voters.map(v => [
-      v.wtl_code,
+      v.bjp_code,
       {
         name: v.VOTER_NAME || `${v.FM_NAME_EN || ''} ${v.LASTNAME_EN || ''}`.trim(),
         photo_url: v.photo_url || '',
@@ -761,7 +831,7 @@ router.get('/api/confirmed-booth-agents', async (req, res) => {
     ]));
 
     const enrichedItems = items.map(item => {
-      const profile = voterMap.get(item.wtl_code) || {};
+      const profile = voterMap.get(item.bjp_code) || {};
       return {
         ...item,
         name: item.name || profile.name || '—',
@@ -829,7 +899,7 @@ function docToVoter(doc) {
 function genDocToDict(doc) {
   if (!doc) return null;
   const base = docToVoter(doc) || {};
-  base.wtl_code               = doc.wtl_code || '';
+  base.bjp_code               = doc.bjp_code || '';
   base.photo_url              = doc.photo_url || '';
   base.card_url               = doc.card_url  || '';
   base.back_url               = doc.back_url  || '';
@@ -837,7 +907,7 @@ function genDocToDict(doc) {
   base.secret_pin             = doc.secret_pin   ? '[set]' : '';
   base.referral_id            = doc.referral_id  || '';
   base.referral_link          = doc.referral_link || '';
-  base.referred_by_wtl        = doc.referred_by_wtl || '';
+  base.referred_by_bjp        = doc.referred_by_bjp || '';
   base.referred_members_count = doc.referred_members_count || 0;
   base.source                 = doc.source       || '';
   base.generated_at           = doc.generated_at ? (doc.generated_at instanceof Date ? doc.generated_at.toISOString() : new Date(doc.generated_at).toISOString()) : '';
@@ -885,7 +955,7 @@ function buildListParams(req) {
     const escaped = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     filt.$or = [
       { name:     { $regex: escaped, $options: 'i' } },
-      { wtl_code: { $regex: escaped, $options: 'i' } },
+      { bjp_code: { $regex: escaped, $options: 'i' } },
       { epic_no:  { $regex: escaped, $options: 'i' } },
       { mobile:   { $regex: escaped, $options: 'i' } },
     ];
@@ -982,7 +1052,7 @@ router.get('/api/reports', async (req, res) => {
         headers = ['Name', 'Member Code', 'Mobile', 'District', 'Assembly', 'Booth Number', 'Registered At'];
         data = docs.map(d => ({
           'Name': d.VOTER_NAME || `${d.FM_NAME_EN || ''} ${d.LASTNAME_EN || ''}`.trim() || 'Unknown',
-          'Member Code': d.wtl_code || '',
+          'Member Code': d.bjp_code || '',
           'Mobile': d.MOBILE_NO || '',
           'District': d.DISTRICT_NAME || '',
           'Assembly': d.ASSEMBLY_NAME || '',
@@ -1016,7 +1086,7 @@ router.get('/api/reports', async (req, res) => {
         headers = ['Name', 'Member Code', 'Mobile', 'District', 'Assembly', 'Booth Number', 'Registered At'];
         data = docs.map(d => ({
           'Name': d.VOTER_NAME || `${d.FM_NAME_EN || ''} ${d.LASTNAME_EN || ''}`.trim() || 'Unknown',
-          'Member Code': d.wtl_code || '',
+          'Member Code': d.bjp_code || '',
           'Mobile': d.MOBILE_NO || '',
           'District': d.DISTRICT_NAME || '',
           'Assembly': d.ASSEMBLY_NAME || '',
@@ -1054,7 +1124,7 @@ router.get('/api/reports', async (req, res) => {
         headers = ['Name', 'Member Code', 'Mobile', 'District', 'Assembly', 'Booth Number', 'Registered At'];
         data = docs.map(d => ({
           'Name': d.VOTER_NAME || `${d.FM_NAME_EN || ''} ${d.LASTNAME_EN || ''}`.trim() || 'Unknown',
-          'Member Code': d.wtl_code || '',
+          'Member Code': d.bjp_code || '',
           'Mobile': d.MOBILE_NO || '',
           'District': d.DISTRICT_NAME || '',
           'Assembly': d.ASSEMBLY_NAME || '',
@@ -1095,7 +1165,7 @@ router.get('/api/reports', async (req, res) => {
         headers = ['Name', 'Member Code', 'Mobile', 'District', 'Assembly', 'Booth Number', 'Registered At'];
         data = docs.map(d => ({
           'Name': d.VOTER_NAME || `${d.FM_NAME_EN || ''} ${d.LASTNAME_EN || ''}`.trim() || 'Unknown',
-          'Member Code': d.wtl_code || '',
+          'Member Code': d.bjp_code || '',
           'Mobile': d.MOBILE_NO || '',
           'District': d.DISTRICT_NAME || '',
           'Assembly': d.ASSEMBLY_NAME || '',
@@ -1143,7 +1213,7 @@ router.get('/api/reports', async (req, res) => {
       headers = ['Name', 'Member Code', 'Mobile', 'Referred Count', 'District', 'Assembly', 'Booth Number'];
       data = docs.map(d => ({
         'Name': d.VOTER_NAME || `${d.FM_NAME_EN || ''} ${d.LASTNAME_EN || ''}`.trim() || 'Unknown',
-        'Member Code': d.wtl_code || '',
+        'Member Code': d.bjp_code || '',
         'Mobile': d.MOBILE_NO || '',
         'Referred Count': d.referred_members_count || 0,
         'District': d.DISTRICT_NAME || '',
@@ -1193,7 +1263,7 @@ router.get('/api/local-body', async (req, res) => {
         { VOTER_NAME: { $regex: escaped, $options: 'i' } },
         { FM_NAME_EN: { $regex: escaped, $options: 'i' } },
         { LASTNAME_EN: { $regex: escaped, $options: 'i' } },
-        { wtl_code:    { $regex: escaped, $options: 'i' } },
+        { bjp_code:    { $regex: escaped, $options: 'i' } },
         { EPIC_NO:     { $regex: escaped, $options: 'i' } },
         { MOBILE_NO:   { $regex: escaped, $options: 'i' } },
       ];
@@ -1220,7 +1290,7 @@ router.get('/api/local-body', async (req, res) => {
       epic_no: v.EPIC_NO || '',
       mobile: v.MOBILE_NO || '',
       assembly: v.ASSEMBLY_NAME || '',
-      wtl_code: v.wtl_code || '',
+      bjp_code: v.bjp_code || '',
       photo_url: v.photo_url || '',
       generated_at: v.generated_at,
       local_body_interest: v.local_body_interest || 'not_answered'
@@ -1254,14 +1324,14 @@ router.get('/api/meet-requests', async (req, res) => {
           { VOTER_NAME: { $regex: escaped, $options: 'i' } },
           { FM_NAME_EN: { $regex: escaped, $options: 'i' } },
           { LASTNAME_EN: { $regex: escaped, $options: 'i' } },
-          { wtl_code:    { $regex: escaped, $options: 'i' } },
+          { bjp_code:    { $regex: escaped, $options: 'i' } },
           { EPIC_NO:     { $regex: escaped, $options: 'i' } },
           { MOBILE_NO:   { $regex: escaped, $options: 'i' } },
         ]
       };
-      const matchingVoters = await db.collection('generated_voters').find(searchQ, { projection: { wtl_code: 1 } }).toArray();
-      searchCodes = matchingVoters.map(mv => mv.wtl_code).filter(Boolean);
-      query.wtl_code = { $in: searchCodes };
+      const matchingVoters = await db.collection('generated_voters').find(searchQ, { projection: { bjp_code: 1 } }).toArray();
+      searchCodes = matchingVoters.map(mv => mv.bjp_code).filter(Boolean);
+      query.bjp_code = { $in: searchCodes };
     }
 
     const total = await db.collection('appointments').countDocuments(query);
@@ -1272,20 +1342,20 @@ router.get('/api/meet-requests', async (req, res) => {
       .limit(perPage)
       .toArray();
 
-    const wtlCodes = appointments.map(a => a.wtl_code).filter(Boolean);
+    const bjpCodes = appointments.map(a => a.bjp_code).filter(Boolean);
     const voters = await db.collection('generated_voters')
-      .find({ wtl_code: { $in: wtlCodes } })
+      .find({ bjp_code: { $in: bjpCodes } })
       .toArray();
 
     const voterMap = new Map(voters.map(v => [
-      v.wtl_code,
+      v.bjp_code,
       v
     ]));
 
     const formatted = appointments.map(a => {
-      const v = voterMap.get(a.wtl_code) || {};
+      const v = voterMap.get(a.bjp_code) || {};
       return {
-        wtl_code: a.wtl_code,
+        bjp_code: a.bjp_code,
         created_at: a.created_at,
         interest: a.interest || 'interested',
         name: v.VOTER_NAME || `${v.FM_NAME_EN || ''} ${v.LASTNAME_EN || ''}`.trim() || 'Unknown',

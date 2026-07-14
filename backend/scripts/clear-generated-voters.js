@@ -11,7 +11,7 @@ const { MongoClient } = require('mongodb');
 const cloudinary = require('cloudinary').v2;
 
 const MONGO_URI   = process.env.MONGO_URI;
-const MONGO_DB    = process.env.MONGO_DB || 'wetheleaders';
+const MONGO_DB    = process.env.MONGO_DB || 'bjptamilnadu';
 const CONFIRM     = process.argv.includes('--confirm');
 
 // Cloudinary config

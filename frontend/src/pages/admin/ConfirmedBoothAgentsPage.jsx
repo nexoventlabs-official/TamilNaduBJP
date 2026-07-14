@@ -101,7 +101,7 @@ export default function ConfirmedBoothAgentsPage() {
                 </thead>
                 <tbody>
                   {agents.map((a, i) => {
-                    const codeVal = a.wtl_code || a.ptc_code
+                    const codeVal = a.bjp_code || a.ptc_code
                     return (
                       <tr 
                         key={codeVal || a.epic_no || i}

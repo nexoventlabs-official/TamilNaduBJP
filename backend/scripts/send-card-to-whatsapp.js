@@ -58,7 +58,7 @@ async function sendWAImage(imageUrl, caption) {
   // 1. Connect DB
   console.log('\n[1/8] Connecting to database...');
   const conn = await mongoose.createConnection(process.env.MONGO_URI, {
-    dbName: process.env.MONGO_DB || 'wetheleaders',
+    dbName: process.env.MONGO_DB || 'bjptamilnadu',
     serverSelectionTimeoutMS: 10000,
   }).asPromise();
   const db = conn.db;
@@ -99,7 +99,7 @@ async function sendWAImage(imageUrl, caption) {
     assembly_name: doc.ASSEMBLY_NAME || '',
     district:      doc.DISTRICT_NAME || doc.DISTRICT || '',
     mobile:        doc.MOBILE_NO || '',
-    wtl_code:      doc.wtl_code || doc.ptc_code || '',
+    bjp_code:      doc.bjp_code || doc.ptc_code || '',
   };
   const frontBuffer = await generateCard(voterData, photoBuffer);
   console.log(`      ✅ Front card generated (${Math.round(frontBuffer.length / 1024)} KB)`);
@@ -135,9 +135,9 @@ async function sendWAImage(imageUrl, caption) {
     `👤 Name     : ${doc.VOTER_NAME}`,
     `🗳️  EPIC No  : ${epicNo}`,
     `🏛️  Assembly : ${doc.ASSEMBLY_NAME}`,
-    `🔖 WTL Code : ${doc.wtl_code || doc.ptc_code || 'N/A'}`,
+    `🔖 BJP Code : ${doc.bjp_code || doc.ptc_code || 'N/A'}`,
     '',
-    'We The Leaders — Lead the Change',
+    'BJP Tamil Nadu — Lead the Change',
   ].join('\n');
 
   const frontMsgId = await sendWAImage(frontUrl, frontCaption);
@@ -147,7 +147,7 @@ async function sendWAImage(imageUrl, caption) {
   await new Promise(r => setTimeout(r, 1000));
 
   // Back card
-  const backCaption = '🪪 *Your Digital Member ID Card — BACK*\n\nWe The Leaders — Lead the Change';
+  const backCaption = '🪪 *Your Digital Member ID Card — BACK*\n\nBJP Tamil Nadu — Lead the Change';
   const backMsgId   = await sendWAImage(backUrl, backCaption);
   console.log(`      ✅ Back card sent   | msg ID: ${backMsgId}`);
 

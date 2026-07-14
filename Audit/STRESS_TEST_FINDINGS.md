@@ -4,6 +4,19 @@ This report details the findings from the capacity-measurement and stress-testin
 
 ---
 
+## 0. Hardware & Architecture Update (July 2026)
+
+> **The result tables in this report were measured on the LEGACY droplet (1 vCPU / 2 GB RAM).**
+> Production has since moved to a larger box with a local voter DB and Redis. See the root
+> `STRESS_TEST_FINDINGS.md` Section 4.0 for re-estimated capacity on current hardware.
+
+Current production environment:
+- **Droplet:** DigitalOcean `ubuntu-s-4vcpu-8gb-240gb-intel-sgp1` — **4 vCPU, 8 GB RAM, 240 GB SSD (Singapore)**. No swap.
+- **Voter DB (DB1):** now **local on the droplet** (`USE_LOCAL_VOTER_DB=true`), not the old remote cluster.
+- **Redis:** managed Redis now backs the EPIC/voter cache, rate limiting, and sessions.
+
+---
+
 ## 1. Recon (Phase 0)
 
 Before executing any tests, the codebase configurations and integration boundaries were audited:
@@ -23,7 +36,7 @@ Before executing any tests, the codebase configurations and integration boundari
 3. **MongoDB Connection Pools (`backend/src/db.js`)**:
    - **DB2 (Atlas App DB)**: `maxPoolSize = 50`.
    - **DB1 (Voter Roll DB)**: `maxPoolSize = 10`.
-   - **EPIC Lookup Implementation**: Executes parallel `findOne` queries across all 234 sharded assembly collections (`ass_1` to `ass_234`) using `Promise.race` racing a `firstMatchPromise`, `Promise.all` and a hard timeout of `8000ms`. Cache is handled via an in-memory Map `_epicCache` with a 1-hour TTL.
+   - **EPIC Lookup Implementation**: Executes parallel `findOne` queries across all 234 sharded assembly collections (`ass_1` to `ass_234`) using `Promise.race` racing a `firstMatchPromise`, `Promise.all` and a hard timeout of `8000ms`. Cache is now handled by **Redis** (`epic:<EPIC>` key, 1-hour TTL) with a **bounded in-memory fallback** (max 50k entries), replacing the previous unbounded in-memory Map.
 
 4. **SMS API Mock (`backend/src/services/smsService.js`)**:
    - Mock path triggers if `SMS_API_KEY` is unset. It logs the OTP to the console and returns success without calling 2Factor.in.
@@ -46,7 +59,7 @@ Before executing any tests, the codebase configurations and integration boundari
    - Parse Request → Multer buffer check → Verify session/mobile → MongoDB App DB check → MongoDB Voter DB query (234 parallel queries) → Cloudinary upload (mocked) → MongoDB App DB write → Release Lock.
 
 9. **Test Client socket limits**:
-   - Load tests executed directly on the remote staging droplet (`142.93.10.77`) to eliminate network latency bottlenecks. Local socket limits (`ulimit -n`) raised to `65536`.
+   - Load tests executed directly on the remote staging droplet (`129.212.233.215`) to eliminate network latency bottlenecks. Local socket limits (`ulimit -n`) raised to `65536`.
 
 ---
 
@@ -61,7 +74,8 @@ Before executing any tests, the codebase configurations and integration boundari
 ## 3. Methodology & Test Harness (Phase 2 & 3)
 
 - **Tooling**: Built using **Autocannon** (Node-native, high-performance concurrency tester) and direct Node benchmarking scripts.
-- **Environment**: DigitalOcean Droplet (1 vCPU, 2GB RAM, SSD) running Node.js v22.23.1 and MongoDB local instance (DB2) + Remote read-only MongoDB cluster (DB1).
+- **Environment (legacy runs, tables below)**: DigitalOcean Droplet (**1 vCPU, 2 GB RAM**, SSD), Node.js v22.23.1, MongoDB local (DB2) + remote read-only cluster (DB1).
+- **Environment (current)**: DigitalOcean Droplet (**4 vCPU, 8 GB RAM**, 240 GB SSD, Singapore), MongoDB local for both DB1 and DB2, plus managed Redis. No swap.
 - **Mocks**: Cloudinary network uploads stubbed; SMS OTP mocked.
 
 ---
@@ -158,4 +172,4 @@ Before executing any tests, the codebase configurations and integration boundari
 
 - **Do NOT execute Puppeteer on the backend for high-traffic web flows**: The client-side canvas rendering optimization is critical to sustaining registrations.
 - **Scale Voter DB connection pool**: Raise `voterConn`'s `maxPoolSize` from `10` to `50` to match the App DB's pool size.
-- **Implement a rendering queue for WhatsApp**: For webhook generation, a Redis/bullMQ-based queue is required to serialize card generation and protect Puppeteer from spawning more than 4 concurrent browser pages on a single-core instance.
+- **Implement a rendering queue for WhatsApp**: For webhook generation, a Redis/BullMQ-based queue (or a small in-process semaphore) is required to serialize card generation and cap concurrent Chromium pages at ~4, even on the current 4 vCPU / 8 GB droplet (no swap).

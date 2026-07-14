@@ -10,7 +10,7 @@
   "screens": [
     {
       "id": "EPIC_ENTRY",
-      "title": "WTL Member Registration",
+      "title": "BJP Member Registration",
       "terminal": false,
       "data": {
         "error_message": { "type": "string",  "__example__": "" },
@@ -19,7 +19,7 @@
       "layout": {
         "type": "SingleColumnLayout",
         "children": [
-          { "type": "TextHeading",    "text": "We The Leaders" },
+          { "type": "TextHeading",    "text": "BJP Tamil Nadu" },
           { "type": "TextSubheading", "text": "Digital Member ID Card" },
           {
             "type": "TextBody",

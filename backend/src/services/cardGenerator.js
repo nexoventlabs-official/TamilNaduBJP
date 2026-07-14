@@ -1,7 +1,7 @@
 /**
- * Card Generation Engine — We The Leaders
+ * Card Generation Engine — BJP Tamil Nadu
  * ==========================================
- * Front card : wtl_final_11.html (1576 × 998 px) — rendered website card template
+ * Front card : bjp_card_design.html (1576 × 998 px) — rendered website card template
  * Back card  : black_original1.png (1152 × 768 px) — used as-is (no QR, no T&C)
  * Combined   : front + back side-by-side
  *
@@ -16,16 +16,24 @@ const QRCode    = require('qrcode');
 const sharp = require('sharp');
 
 // ── Asset paths ─────────────────────────────────────────────────
+// Prefer the backend's own copy in backend/public (self-contained),
+// then fall back to the frontend source, then the built dist.
 const ASSETS_DIR = path.join(__dirname, '..', 'assets');
-let FRONT_TEMPLATE_PATH = path.join(__dirname, '..', '..', '..', 'frontend', 'public', 'bjp_card_design.html');
-let BACK_TEMPLATE_PATH  = path.join(__dirname, '..', '..', '..', 'frontend', 'public', 'bjp_back_card.html');
+const BACKEND_PUBLIC  = path.join(__dirname, '..', '..', 'public');
+const FRONTEND_PUBLIC = path.join(__dirname, '..', '..', '..', 'frontend', 'public');
+const DIST_DIR        = path.join(__dirname, '..', '..', '..', 'dist');
 
-if (!fs.existsSync(FRONT_TEMPLATE_PATH)) {
-  FRONT_TEMPLATE_PATH = path.join(__dirname, '..', '..', '..', 'dist', 'bjp_card_design.html');
+function resolveTemplate(fileName) {
+  for (const dir of [BACKEND_PUBLIC, FRONTEND_PUBLIC, DIST_DIR]) {
+    const p = path.join(dir, fileName);
+    if (fs.existsSync(p)) return p;
+  }
+  // Default to the backend path even if missing, so error messages are clear
+  return path.join(BACKEND_PUBLIC, fileName);
 }
-if (!fs.existsSync(BACK_TEMPLATE_PATH)) {
-  BACK_TEMPLATE_PATH = path.join(__dirname, '..', '..', '..', 'dist', 'bjp_back_card.html');
-}
+
+let FRONT_TEMPLATE_PATH = resolveTemplate('bjp_card_design.html');
+let BACK_TEMPLATE_PATH  = resolveTemplate('bjp_back_card.html');
 
 function assetPath(name) {
   return path.join(ASSETS_DIR, name);
@@ -106,10 +114,53 @@ function toTitle(s) {
   return String(s || '').split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
 }
 
+// ── Concurrency control + timeouts (FIX-07) ───────────────────────
+// Cap simultaneous Puppeteer page renders to protect RAM (8 GB, no swap).
+// Tune via MAX_CARD_CONCURRENCY. Screenshots and overall generation are
+// bounded by timeouts so a hung render can never leak a zombie page.
+const MAX_CONCURRENT_GENERATIONS = Math.max(1, parseInt(process.env.MAX_CARD_CONCURRENCY || '4', 10));
+const SCREENSHOT_TIMEOUT_MS      = 15000;
+const CARD_GENERATION_TIMEOUT_MS = 30000;
+
+let _activeGenerations = 0;
+const _waitQueue = [];
+
+function _acquireSlot() {
+  return new Promise((resolve) => {
+    if (_activeGenerations < MAX_CONCURRENT_GENERATIONS) {
+      _activeGenerations++;
+      resolve();
+    } else {
+      _waitQueue.push(resolve);
+    }
+  });
+}
+
+function _releaseSlot() {
+  if (_waitQueue.length > 0) {
+    const next = _waitQueue.shift();
+    next(); // hand the slot directly to the next waiter
+  } else {
+    _activeGenerations = Math.max(0, _activeGenerations - 1);
+  }
+}
+
+async function _withTimeout(promise, ms, label) {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+  });
+  try {
+    return await Promise.race([promise, timeout]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────
-//  FRONT CARD  —  wtl_final_11.html rendered as screenshot
+//  FRONT CARD  —  bjp_card_design.html rendered as screenshot
 // ─────────────────────────────────────────────────────────────────
-async function generateCard(voter, photoBuffer = null) {
+async function _generateCard(voter, photoBuffer = null) {
   const templatePath = FRONT_TEMPLATE_PATH;
   if (!fs.existsSync(templatePath)) {
     throw new Error(`Front template not found: ${templatePath}`);
@@ -122,18 +173,18 @@ async function generateCard(voter, photoBuffer = null) {
   const assembly = (clean(voter.assembly_name || voter.ASSEMBLY_NAME || '').trim().toUpperCase()) || '-';
   const booth    = clean(voter.part_no || voter.PART_NO || voter.booth || voter.booth_no || '') || '-';
   const district = (clean(voter.district || voter.DISTRICT || voter.DISTRICT_NAME || '').trim().toUpperCase()) || '-';
-  const wtlCode  = clean(voter.wtl_code || voter.ptc_code || '');
-  const memberId = wtlCode || `BJP-${epicNo.slice(-6)}`;
+  const bjpCode  = clean(voter.bjp_code || voter.ptc_code || '');
+  const memberId = bjpCode || `BJP-${epicNo.slice(-6)}`;
 
   // Generate QR code pointing to the referral URL for this member
   let qrData = voter.referral_link || '';
   const baseUrl = process.env.BASE_URL || 'https://tnbjp.org';
   if (qrData) {
     qrData = qrData.replace(/https?:\/\/[^\/]+/, baseUrl);
-  } else if (wtlCode && voter.referral_id) {
-    qrData = `${baseUrl}/refer/${wtlCode}/${voter.referral_id}`;
+  } else if (bjpCode && voter.referral_id) {
+    qrData = `${baseUrl}/refer/${bjpCode}/${voter.referral_id}`;
   } else {
-    qrData = `${baseUrl}/verify/${wtlCode || epicNo}`;
+    qrData = `${baseUrl}/verify/${bjpCode || epicNo}`;
   }
   const qrDataUrl = await QRCode.toDataURL(qrData, {
     errorCorrectionLevel: 'H',
@@ -234,17 +285,21 @@ async function generateCard(voter, photoBuffer = null) {
       throw new Error('Could not locate #card element in front template');
     }
 
-    const screenshotBuffer = await cardHandle.screenshot({ type: 'png' });
+    const screenshotBuffer = await _withTimeout(
+      cardHandle.screenshot({ type: 'png' }),
+      SCREENSHOT_TIMEOUT_MS,
+      'Front card screenshot',
+    );
     return screenshotBuffer;
   } finally {
-    await page.close();
+    await page.close().catch(() => {}); // always close, even on timeout/error
   }
 }
 
 // ─────────────────────────────────────────────────────────────────
 //  BACK CARD  —  bjp_back_card.html rendered via Puppeteer
 // ─────────────────────────────────────────────────────────────────
-async function generateBackCard(voter) {
+async function _generateBackCard(voter) {
   if (!fs.existsSync(BACK_TEMPLATE_PATH)) {
     throw new Error(`Back template not found: ${BACK_TEMPLATE_PATH}`);
   }
@@ -271,9 +326,13 @@ async function generateBackCard(voter) {
     const cardHandle = await page.$('.back-card');
     if (!cardHandle) throw new Error('Could not locate .back-card element in back template');
 
-    return await cardHandle.screenshot({ type: 'png' });
+    return await _withTimeout(
+      cardHandle.screenshot({ type: 'png' }),
+      SCREENSHOT_TIMEOUT_MS,
+      'Back card screenshot',
+    );
   } finally {
-    await page.close();
+    await page.close().catch(() => {});
   }
 }
 
@@ -307,6 +366,33 @@ async function generateCombinedCard(frontBuffer, backBuffer) {
     ])
     .jpeg({ quality: 85 })
     .toBuffer();
+}
+
+// ── Public entry points — semaphore-guarded + timeout-bounded (FIX-07) ─
+async function generateCard(voter, photoBuffer = null) {
+  await _acquireSlot();
+  try {
+    return await _withTimeout(
+      _generateCard(voter, photoBuffer),
+      CARD_GENERATION_TIMEOUT_MS,
+      'Card generation',
+    );
+  } finally {
+    _releaseSlot();
+  }
+}
+
+async function generateBackCard(voter) {
+  await _acquireSlot();
+  try {
+    return await _withTimeout(
+      _generateBackCard(voter),
+      CARD_GENERATION_TIMEOUT_MS,
+      'Back card generation',
+    );
+  } finally {
+    _releaseSlot();
+  }
 }
 
 module.exports = { generateCard, generateBackCard, generateCombinedCard };
