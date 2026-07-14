@@ -4028,6 +4028,8 @@ export default function ChatbotPage() {
   const [messages, setMessages]     = useState([])
   const [inputValue, setInputValue] = useState('')
   const [isTyping, setIsTyping]     = useState(false)
+  const [sendHint, setSendHint]     = useState('')   // small validation bubble near the send button
+  const sendHintTimer = useRef(null)
   const [activeView, setActiveView] = useState('chat')
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [isFlipped, setIsFlipped]   = useState(false)
@@ -4725,12 +4727,43 @@ export default function ChatbotPage() {
     } else if (chatState === S.AWAIT_MOBILE) {
       val = val.replace(/\D/g, '')
     }
+    if (sendHint) setSendHint('')   // clear the hint as soon as the user types
     setInputValue(val)
+  }
+
+  // Small transient bubble shown near the send button on invalid submit.
+  const flashSendHint = (msg) => {
+    setSendHint(msg)
+    if (sendHintTimer.current) clearTimeout(sendHintTimer.current)
+    sendHintTimer.current = setTimeout(() => setSendHint(''), 3000)
+  }
+
+  // Returns a validation message if the current field is invalid, else ''.
+  const getFieldHint = () => {
+    const val = inputValue.trim()
+    if (chatState === S.AWAIT_MOBILE) {
+      return /^\d{10}$/.test(val) ? '' : 'Please enter a 10-digit mobile number'
+    }
+    if (chatState === S.AWAIT_EPIC) {
+      return /^[A-Z]{3}\d{7}$/.test(val) ? '' : 'Please enter a valid EPIC number (e.g. ABC1234567)'
+    }
+    if (chatState === S.AWAIT_BOOTH_NO) {
+      return val ? '' : 'Please enter your booth number'
+    }
+    return ''
   }
 
   const handleSubmit = async (e) => {
     e?.preventDefault()
-    if (!inputValue.trim() || isTyping) return
+    if (isTyping) return
+
+    // Validate first — if invalid, show a small bubble instead of proceeding.
+    const hint = getFieldHint()
+    if (hint) {
+      flashSendHint(hint)
+      return
+    }
+
     switch (chatState) {
       case S.AWAIT_MOBILE:   await handleMobileSubmit(); break
       case S.AWAIT_EPIC:     await handleEpicSubmit(); break
@@ -5293,7 +5326,12 @@ export default function ChatbotPage() {
                   </button>
                 </div>
               ) : inputCfg ? (
-                <form className="chat-form" onSubmit={handleSubmit}>
+                <form className="chat-form" onSubmit={handleSubmit} style={{ position: 'relative' }}>
+                  {sendHint && (
+                    <div className="send-hint-bubble" role="status">
+                      {sendHint}
+                    </div>
+                  )}
                   <div className="chat-input-wrapper">
                     <input
                       className="chat-input"
@@ -5312,12 +5350,11 @@ export default function ChatbotPage() {
                   </div>
                   <button
                     type="submit"
-                    className={`chat-send-btn${getIsSendDisabled() ? ' locked' : ''}`}
-                    disabled={getIsSendDisabled()}
-                    aria-label={getIsSendDisabled() ? 'Locked — complete the field to continue' : 'Send'}
-                    title={getIsSendDisabled() ? 'Enter a valid value to unlock' : 'Send'}
+                    className={`chat-send-btn${getIsSendDisabled() ? ' not-ready' : ''}`}
+                    aria-label="Send"
+                    title="Send"
                   >
-                    <i className={`bi ${getIsSendDisabled() ? 'bi-lock-fill' : 'bi-send-fill'}`} />
+                    <i className="bi bi-send-fill" />
                   </button>
                 </form>
               ) : null}

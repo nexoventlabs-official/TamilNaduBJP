@@ -614,6 +614,18 @@ router.post('/generate-card', chatGenerateCardLimiter, upload.single('photo'), a
     }
     const voter = normaliseVoter(rawVoter);
 
+    // FIX-10: persist the verified-mobile session NOW, before any DB writes.
+    // Previously the session was set after all DB writes and saved lazily on
+    // response — if the session store (Redis) hiccupped, the member record was
+    // written but the session was lost, orphaning the user (card exists but
+    // they can't proceed / can't re-register). Forcing an explicit save here
+    // means a store failure returns an error before we write anything.
+    req.session.verified_mobile = mobile;
+    req.session.cookie.maxAge   = 86400 * 1000;
+    await new Promise((resolve, reject) =>
+      req.session.save((err) => (err ? reject(err) : resolve()))
+    );
+
     const photoBuffer = req.file ? req.file.buffer : null;
 
     // ── Distributed lock — prevent duplicate concurrent generation ─
@@ -724,6 +736,15 @@ router.post('/generate-card', chatGenerateCardLimiter, upload.single('photo'), a
               errorType:   'b2_upload_failed',
             },
           });
+          // FIX-03: do NOT continue with an empty photo_url — that would write a
+          // permanently-broken member record (no photo) and lock the mobile
+          // number so the user can never re-register. Return a retryable error
+          // instead. The generation lock is released by the outer `finally`.
+          return res.status(503).json({
+            success: false,
+            message: 'Photo upload failed. Please try again in a moment.',
+            retry:   true,
+          });
         }
       }
 
@@ -782,9 +803,7 @@ router.post('/generate-card', chatGenerateCardLimiter, upload.single('photo'), a
         { upsert: true }
       );
 
-      // Set verified session when card is successfully generated
-      req.session.verified_mobile = mobile;
-      req.session.cookie.maxAge   = 86400 * 1000;
+      // (FIX-10) Session was already established + saved before the DB writes.
 
       return res.json({
         success:       true,

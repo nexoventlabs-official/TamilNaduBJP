@@ -1021,8 +1021,33 @@ router.get('/api/reports', async (req, res) => {
     const endDate = req.query.endDate || '';
     const format = req.query.format || 'json';
 
+    // FIX-07: member-detail drilldowns used to load EVERY matching record into
+    // RAM via .toArray() (a Chennai district = tens of thousands of docs, 50MB+
+    // per click, tripping PM2 max_memory_restart). Now:
+    //   • JSON preview  → paginated (PAGE_SIZE per page) + total count
+    //   • CSV export    → streamed via cursor (never fully in RAM)
+    // Aggregate (group-count) branches stay as-is — they're already bounded.
+    const PAGE_SIZE = 500;
+    const page = Math.max(1, parseInt(req.query.page || '1', 10));
+    const isExport = (format === 'excel' || format === 'csv');
+
+    // Shared row shape for member-detail reports
+    const MEMBER_HEADERS = ['Name', 'Member Code', 'Mobile', 'District', 'Assembly', 'Booth Number', 'Registered At'];
+    const memberMapper = (d) => ({
+      'Name': d.VOTER_NAME || `${d.FM_NAME_EN || ''} ${d.LASTNAME_EN || ''}`.trim() || 'Unknown',
+      'Member Code': d.bjp_code || '',
+      'Mobile': d.MOBILE_NO || '',
+      'District': d.DISTRICT_NAME || '',
+      'Assembly': d.ASSEMBLY_NAME || '',
+      'Booth Number': d.PART_NO || '',
+      'Registered At': d.generated_at ? new Date(d.generated_at).toLocaleString() : ''
+    });
+
     let data = [];
     let headers = [];
+    // When set, this describes a member-detail query to paginate/stream below.
+    // { match, sort, headers, mapper }
+    let detail = null;
 
     // Common Date Range matching helper
     const buildDateMatch = () => {
@@ -1045,20 +1070,7 @@ router.get('/api/reports', async (req, res) => {
       const match = buildDateMatch();
       if (districtFilter) {
         match.DISTRICT_NAME = new RegExp(`^${districtFilter.trim()}$`, 'i');
-        const docs = await db.collection('generated_voters')
-          .find(match)
-          .sort({ generated_at: -1 })
-          .toArray();
-        headers = ['Name', 'Member Code', 'Mobile', 'District', 'Assembly', 'Booth Number', 'Registered At'];
-        data = docs.map(d => ({
-          'Name': d.VOTER_NAME || `${d.FM_NAME_EN || ''} ${d.LASTNAME_EN || ''}`.trim() || 'Unknown',
-          'Member Code': d.bjp_code || '',
-          'Mobile': d.MOBILE_NO || '',
-          'District': d.DISTRICT_NAME || '',
-          'Assembly': d.ASSEMBLY_NAME || '',
-          'Booth Number': d.PART_NO || '',
-          'Registered At': d.generated_at ? new Date(d.generated_at).toLocaleString() : ''
-        }));
+        detail = { match, sort: { generated_at: -1 }, headers: MEMBER_HEADERS, mapper: memberMapper };
       } else {
         const agg = [
           ...(Object.keys(match).length ? [{ $match: match }] : []),
@@ -1079,20 +1091,7 @@ router.get('/api/reports', async (req, res) => {
       }
       if (assemblyFilter) {
         match.ASSEMBLY_NAME = new RegExp(`^${assemblyFilter.trim()}$`, 'i');
-        const docs = await db.collection('generated_voters')
-          .find(match)
-          .sort({ generated_at: -1 })
-          .toArray();
-        headers = ['Name', 'Member Code', 'Mobile', 'District', 'Assembly', 'Booth Number', 'Registered At'];
-        data = docs.map(d => ({
-          'Name': d.VOTER_NAME || `${d.FM_NAME_EN || ''} ${d.LASTNAME_EN || ''}`.trim() || 'Unknown',
-          'Member Code': d.bjp_code || '',
-          'Mobile': d.MOBILE_NO || '',
-          'District': d.DISTRICT_NAME || '',
-          'Assembly': d.ASSEMBLY_NAME || '',
-          'Booth Number': d.PART_NO || '',
-          'Registered At': d.generated_at ? new Date(d.generated_at).toLocaleString() : ''
-        }));
+        detail = { match, sort: { generated_at: -1 }, headers: MEMBER_HEADERS, mapper: memberMapper };
       } else {
         const agg = [
           ...(Object.keys(match).length ? [{ $match: match }] : []),
@@ -1117,20 +1116,7 @@ router.get('/api/reports', async (req, res) => {
       }
       if (boothFilter && boothFilter !== 'all') {
         match.PART_NO = { $in: [boothFilter, Number(boothFilter)] };
-        const docs = await db.collection('generated_voters')
-          .find(match)
-          .sort({ generated_at: -1 })
-          .toArray();
-        headers = ['Name', 'Member Code', 'Mobile', 'District', 'Assembly', 'Booth Number', 'Registered At'];
-        data = docs.map(d => ({
-          'Name': d.VOTER_NAME || `${d.FM_NAME_EN || ''} ${d.LASTNAME_EN || ''}`.trim() || 'Unknown',
-          'Member Code': d.bjp_code || '',
-          'Mobile': d.MOBILE_NO || '',
-          'District': d.DISTRICT_NAME || '',
-          'Assembly': d.ASSEMBLY_NAME || '',
-          'Booth Number': d.PART_NO || '',
-          'Registered At': d.generated_at ? new Date(d.generated_at).toLocaleString() : ''
-        }));
+        detail = { match, sort: { generated_at: -1 }, headers: MEMBER_HEADERS, mapper: memberMapper };
       } else {
         const agg = [
           ...(Object.keys(match).length ? [{ $match: match }] : []),
@@ -1158,20 +1144,7 @@ router.get('/api/reports', async (req, res) => {
         match.PART_NO = { $in: [boothFilter, Number(boothFilter)] };
       }
       if (startDate || endDate || districtFilter || assemblyFilter || (boothFilter && boothFilter !== 'all')) {
-        const docs = await db.collection('generated_voters')
-          .find(match)
-          .sort({ generated_at: -1 })
-          .toArray();
-        headers = ['Name', 'Member Code', 'Mobile', 'District', 'Assembly', 'Booth Number', 'Registered At'];
-        data = docs.map(d => ({
-          'Name': d.VOTER_NAME || `${d.FM_NAME_EN || ''} ${d.LASTNAME_EN || ''}`.trim() || 'Unknown',
-          'Member Code': d.bjp_code || '',
-          'Mobile': d.MOBILE_NO || '',
-          'District': d.DISTRICT_NAME || '',
-          'Assembly': d.ASSEMBLY_NAME || '',
-          'Booth Number': d.PART_NO || '',
-          'Registered At': d.generated_at ? new Date(d.generated_at).toLocaleString() : ''
-        }));
+        detail = { match, sort: { generated_at: -1 }, headers: MEMBER_HEADERS, mapper: memberMapper };
       } else {
         const agg = [
           ...(Object.keys(match).length ? [{ $match: match }] : []),
@@ -1206,30 +1179,66 @@ router.get('/api/reports', async (req, res) => {
       if (boothFilter && boothFilter !== 'all') {
         match.PART_NO = { $in: [boothFilter, Number(boothFilter)] };
       }
-      const docs = await db.collection('generated_voters')
-        .find(match)
-        .sort({ referred_members_count: -1 })
-        .toArray();
-      headers = ['Name', 'Member Code', 'Mobile', 'Referred Count', 'District', 'Assembly', 'Booth Number'];
-      data = docs.map(d => ({
-        'Name': d.VOTER_NAME || `${d.FM_NAME_EN || ''} ${d.LASTNAME_EN || ''}`.trim() || 'Unknown',
-        'Member Code': d.bjp_code || '',
-        'Mobile': d.MOBILE_NO || '',
-        'Referred Count': d.referred_members_count || 0,
-        'District': d.DISTRICT_NAME || '',
-        'Assembly': d.ASSEMBLY_NAME || '',
-        'Booth Number': d.PART_NO || ''
-      }));
+      detail = {
+        match,
+        sort: { referred_members_count: -1 },
+        headers: ['Name', 'Member Code', 'Mobile', 'Referred Count', 'District', 'Assembly', 'Booth Number'],
+        mapper: (d) => ({
+          'Name': d.VOTER_NAME || `${d.FM_NAME_EN || ''} ${d.LASTNAME_EN || ''}`.trim() || 'Unknown',
+          'Member Code': d.bjp_code || '',
+          'Mobile': d.MOBILE_NO || '',
+          'Referred Count': d.referred_members_count || 0,
+          'District': d.DISTRICT_NAME || '',
+          'Assembly': d.ASSEMBLY_NAME || '',
+          'Booth Number': d.PART_NO || ''
+        }),
+      };
     }
 
-    if (format === 'excel' || format === 'csv') {
-      const csvHeader = headers.map(h => `"${h.replace(/"/g, '""')}"`).join(',');
-      const csvRows = data.map(row => 
-        headers.map(h => {
-          const val = String(row[h] !== undefined && row[h] !== null ? row[h] : '');
-          return `"${val.replace(/"/g, '""')}"`;
-        }).join(',')
-      );
+    // ── CSV cell helper ──────────────────────────────────────────
+    const csvCell = (v) => `"${String(v !== undefined && v !== null ? v : '').replace(/"/g, '""')}"`;
+
+    // ── Member-detail path: paginate JSON / stream CSV (FIX-07) ──────
+    if (detail) {
+      const coll = db.collection('generated_voters');
+
+      if (isExport) {
+        // Stream every matching row via a cursor — never load all into RAM.
+        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+        res.setHeader('Content-Disposition', `attachment; filename=report_${type}_${Date.now()}.csv`);
+        res.write('\uFEFF' + detail.headers.map(csvCell).join(',') + '\n');
+        const cursor = coll.find(detail.match).sort(detail.sort).batchSize(1000);
+        try {
+          for await (const doc of cursor) {
+            const row = detail.mapper(doc);
+            res.write(detail.headers.map(h => csvCell(row[h])).join(',') + '\n');
+          }
+        } finally {
+          await cursor.close().catch(() => {});
+        }
+        return res.end();
+      }
+
+      const skip = (page - 1) * PAGE_SIZE;
+      const [docs, total] = await Promise.all([
+        coll.find(detail.match).sort(detail.sort).skip(skip).limit(PAGE_SIZE).toArray(),
+        coll.countDocuments(detail.match),
+      ]);
+      return res.json({
+        success: true,
+        headers: detail.headers,
+        data: docs.map(detail.mapper),
+        total_records: total,
+        current_page: page,
+        total_pages: Math.max(1, Math.ceil(total / PAGE_SIZE)),
+        page_size: PAGE_SIZE,
+      });
+    }
+
+    // ── Aggregate (group-count) path: bounded, small result sets ────
+    if (isExport) {
+      const csvHeader = headers.map(csvCell).join(',');
+      const csvRows = data.map(row => headers.map(h => csvCell(row[h])).join(','));
       const csvContent = '\uFEFF' + [csvHeader, ...csvRows].join('\n');
 
       res.setHeader('Content-Type', 'text/csv; charset=utf-8');

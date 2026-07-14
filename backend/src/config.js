@@ -21,6 +21,20 @@ if (!process.env.B2_KEY_ID || !process.env.B2_APP_KEY || !process.env.B2_BUCKET_
   throw new Error('B2_KEY_ID, B2_APP_KEY, and B2_BUCKET_NAME must be set in .env — photo uploads require them');
 }
 
+// FIX-14: surface a missing SMS key loudly at startup.
+// NOTE: this is a WARNING (not a hard throw) on purpose — the web flow has no
+// OTP step yet, so SMS is not required to run today, and a throw would crash
+// the live site. Once OTP login goes live (registration depends on SMS
+// delivery), promote this to a hard throw so a missing/rotated key fails the
+// deploy immediately instead of silently blocking every registration.
+if (!process.env.SMS_API_KEY) {
+  if (nodeEnv === 'production') {
+    console.warn('[Startup] ⚠️  SMS_API_KEY is NOT set — OTP delivery will fail. Web still runs (no OTP step yet). Set it before enabling OTP login.');
+  } else {
+    console.warn('[Startup] SMS_API_KEY not set — OTP sends will use the dev mock.');
+  }
+}
+
 const config = {
   port:    process.env.PORT    || 5000,
   nodeEnv,

@@ -13,6 +13,8 @@ export default function ReportsPage() {
   const [reportHeaders, setReportHeaders] = useState([])
   const [reportData, setReportData] = useState([])
   const [errorMsg, setErrorMsg] = useState('')
+  // FIX-07: server-side pagination for member-detail drilldowns
+  const [pageInfo, setPageInfo] = useState(null) // { total_records, current_page, total_pages, page_size }
 
   // Load districts & assemblies data on mount
   useEffect(() => {
@@ -35,6 +37,7 @@ export default function ReportsPage() {
     setReportHeaders([])
     setReportData([])
     setErrorMsg('')
+    setPageInfo(null)
   }, [reportType])
 
   const districts = districtsData ? Object.keys(districtsData).sort() : []
@@ -50,7 +53,7 @@ export default function ReportsPage() {
     }
   }
 
-  const handleGenerate = async () => {
+  const handleGenerate = async (goPage = 1) => {
     setLoading(true)
     setErrorMsg('')
     try {
@@ -60,12 +63,24 @@ export default function ReportsPage() {
         assembly: selectedAssembly,
         booth: selectedBooth,
         startDate,
-        endDate
+        endDate,
+        page: goPage
       }
       const res = await admin.getReports(params)
       if (res.success) {
         setReportHeaders(res.headers || [])
         setReportData(res.data || [])
+        // Detail (member) reports come back paginated; aggregate reports don't.
+        if (typeof res.total_pages === 'number') {
+          setPageInfo({
+            total_records: res.total_records,
+            current_page: res.current_page,
+            total_pages: res.total_pages,
+            page_size: res.page_size,
+          })
+        } else {
+          setPageInfo(null)
+        }
       } else {
         setErrorMsg(res.message || 'Failed to generate report.')
       }
@@ -74,6 +89,13 @@ export default function ReportsPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const goToPage = (p) => {
+    if (!pageInfo) return
+    const target = Math.min(Math.max(1, p), pageInfo.total_pages)
+    if (target === pageInfo.current_page) return
+    handleGenerate(target)
   }
 
   const handleDownload = () => {
@@ -206,7 +228,7 @@ export default function ReportsPage() {
             <div style={{ display: 'flex', gap: 10 }}>
               <button
                 type="button"
-                onClick={handleGenerate}
+                onClick={() => handleGenerate(1)}
                 disabled={loading}
                 style={{
                   height: 38,
@@ -267,7 +289,12 @@ export default function ReportsPage() {
       {reportData.length > 0 && (
         <div className="admin-card">
           <div className="admin-card-header">
-            <h6 className="admin-card-title"><i className="bi bi-table" /> Report Preview ({reportData.length} records)</h6>
+            <h6 className="admin-card-title">
+              <i className="bi bi-table" /> Report Preview
+              {pageInfo
+                ? ` (${pageInfo.total_records.toLocaleString()} total — page ${pageInfo.current_page} of ${pageInfo.total_pages})`
+                : ` (${reportData.length} records)`}
+            </h6>
           </div>
           <div className="admin-table-wrap">
             <table className="admin-table">
@@ -280,7 +307,9 @@ export default function ReportsPage() {
               <tbody>
                 {reportData.map((row, i) => (
                   <tr key={i}>
-                    <td style={{ color: 'var(--admin-ink-dim)' }}>{i + 1}</td>
+                    <td style={{ color: 'var(--admin-ink-dim)' }}>
+                      {pageInfo ? (pageInfo.current_page - 1) * pageInfo.page_size + i + 1 : i + 1}
+                    </td>
                     {reportHeaders.map(h => (
                       <td key={h}>
                         {h.toLowerCase().includes('count') || h.toLowerCase().includes('total') ? (
@@ -297,6 +326,38 @@ export default function ReportsPage() {
               </tbody>
             </table>
           </div>
+
+          {/* Pagination controls (member-detail reports only) */}
+          {pageInfo && pageInfo.total_pages > 1 && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '14px 20px', borderTop: '1px solid var(--border-dim)', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 13, color: 'var(--admin-ink-dim)' }}>
+                Showing {(pageInfo.current_page - 1) * pageInfo.page_size + 1}
+                {'–'}
+                {Math.min(pageInfo.current_page * pageInfo.page_size, pageInfo.total_records)} of {pageInfo.total_records.toLocaleString()}
+              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <button
+                  type="button"
+                  onClick={() => goToPage(pageInfo.current_page - 1)}
+                  disabled={loading || pageInfo.current_page <= 1}
+                  style={{ height: 34, padding: '0 14px', background: 'var(--admin-surface-raise)', border: '1px solid var(--border-dim)', borderRadius: 6, fontSize: 13, color: 'var(--admin-ink)', cursor: pageInfo.current_page <= 1 ? 'not-allowed' : 'pointer', opacity: pageInfo.current_page <= 1 ? 0.5 : 1, display: 'flex', alignItems: 'center', gap: 6 }}
+                >
+                  <i className="bi bi-chevron-left" /> Prev
+                </button>
+                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--admin-ink)' }}>
+                  {pageInfo.current_page} / {pageInfo.total_pages}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => goToPage(pageInfo.current_page + 1)}
+                  disabled={loading || pageInfo.current_page >= pageInfo.total_pages}
+                  style={{ height: 34, padding: '0 14px', background: 'var(--admin-surface-raise)', border: '1px solid var(--border-dim)', borderRadius: 6, fontSize: 13, color: 'var(--admin-ink)', cursor: pageInfo.current_page >= pageInfo.total_pages ? 'not-allowed' : 'pointer', opacity: pageInfo.current_page >= pageInfo.total_pages ? 0.5 : 1, display: 'flex', alignItems: 'center', gap: 6 }}
+                >
+                  Next <i className="bi bi-chevron-right" />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

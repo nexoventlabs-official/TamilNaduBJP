@@ -334,19 +334,53 @@
   opacity: 0.4;
 }
 
-/* Locked state: muted disc with a clearly-visible lock icon until valid.
-   Uses !important to beat the generic :disabled rule (equal specificity). */
-.chat-send-btn.locked,
-.chat-send-btn.locked:disabled {
-  background: var(--color-graphite) !important;
-  border: 1.5px solid var(--color-ash) !important;
-  color: var(--color-chalk) !important;
-  opacity: 1 !important;
+/* Not-ready state: still the send button, just slightly faded until the
+   field is valid. Stays clickable so we can show a validation bubble. */
+.chat-send-btn.not-ready {
+  opacity: 0.55;
 }
 
-.chat-send-btn.locked i {
-  font-size: 15px;
-  opacity: 0.85;
+.chat-send-btn.not-ready:hover {
+  opacity: 0.7;
+  transform: none;
+}
+
+/* Small transient validation bubble above the send button */
+.send-hint-bubble {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 8px);
+  max-width: 240px;
+  background: var(--color-abyss);
+  color: var(--color-chalk);
+  border: 1px solid var(--color-graphite);
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 1.4;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  z-index: 20;
+  animation: sendHintPop 0.16s ease-out;
+}
+
+/* little pointer at the bottom-right, aimed at the send button */
+.send-hint-bubble::after {
+  content: '';
+  position: absolute;
+  right: 16px;
+  bottom: -6px;
+  width: 12px;
+  height: 12px;
+  background: var(--color-abyss);
+  border-right: 1px solid var(--color-graphite);
+  border-bottom: 1px solid var(--color-graphite);
+  transform: rotate(45deg);
+}
+
+@keyframes sendHintPop {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 /* ── Welcome Banner Card ──────────────────────────────────── */

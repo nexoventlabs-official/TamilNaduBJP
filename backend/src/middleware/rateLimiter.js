@@ -9,8 +9,24 @@ const redis = require('../redis');
  * Each limiter gets a distinct prefix so their counters never collide.
  * @param {string} prefix - unique key prefix, e.g. 'rl:otp:'
  */
+// FIX-08: warn (log + Sentry) when a limiter silently falls back to the
+// in-memory store. Under PM2 cluster mode each worker keeps its own counter,
+// so the effective limit is multiplied by the worker count — a real security
+// weakening for OTP/admin brute-force guards. We can't avoid the fallback when
+// Redis is down, but we must be alerted the moment it happens.
+let _fallbackAlerted = false;
 function makeStore(prefix) {
-  if (!redis.client) return undefined; // no REDIS_URL → in-memory
+  if (!redis.client) {
+    console.warn(`[RateLimit] Redis unavailable — ${prefix} using in-memory store (NOT safe for multi-process)`);
+    // Alert once per process start to avoid Sentry noise on repeated calls.
+    if (!_fallbackAlerted) {
+      _fallbackAlerted = true;
+      try {
+        Sentry.captureMessage('Rate limiter using in-memory fallback — Redis unavailable', { level: 'warning' });
+      } catch (_) { /* Sentry not initialised — the console.warn above still fires */ }
+    }
+    return undefined; // no REDIS_URL / Redis down → express-rate-limit in-memory
+  }
   return new RedisStore({
     sendCommand: (...args) => redis.client.call(...args),
     prefix,

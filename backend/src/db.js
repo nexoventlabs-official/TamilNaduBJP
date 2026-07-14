@@ -203,13 +203,21 @@ async function _cacheSet(epicNo, data) {
   _epicCache.set(epicNo, { data, timestamp: Date.now() });
 }
 
+// FIX-09: per-lookup info logs (cache hit/miss, found, not-found) flood stdout
+// under load. Node's console.log writes synchronously and blocks the event
+// loop at high frequency (cold cache during a campaign = hundreds/min). Silence
+// them in production; enable with DEBUG_VOTER_LOOKUP=true when investigating.
+// Genuine warnings/errors below still use console.warn/console.error always.
+const VOTER_LOOKUP_DEBUG = process.env.DEBUG_VOTER_LOOKUP === 'true' || (process.env.NODE_ENV || 'development') !== 'production';
+const lookupLog = (...args) => { if (VOTER_LOOKUP_DEBUG) console.log(...args); };
+
 const findVoterByEpic = async (epicNo) => {
   if (!voterConnected) return null;
 
   // Check cache first — same EPIC = instant response
   const cached = await _cacheGet(epicNo);
   if (cached) {
-    console.log(`[DB1] Cache HIT for ${epicNo} ⚡`);
+    lookupLog(`[DB1] Cache HIT for ${epicNo} ⚡`);
     return cached;
   }
 
@@ -224,11 +232,11 @@ const findVoterByEpic = async (epicNo) => {
       const doc = await db.collection('voters_all').findOne({ EPIC_NO: epicNo });
       if (doc) {
         await _cacheSet(epicNo, doc);
-        console.log(`[DB1] ✓ Found ${epicNo} via voters_all ⚡ (single indexed query)`);
+        lookupLog(`[DB1] ✓ Found ${epicNo} via voters_all ⚡ (single indexed query)`);
         return doc;
       }
       // voters_all is authoritative (contains all 56.5M records) → not found
-      console.log(`[DB1] ✗ EPIC ${epicNo} not found in voters_all`);
+      lookupLog(`[DB1] ✗ EPIC ${epicNo} not found in voters_all`);
       return null;
     } catch (err) {
       console.warn(`[DB1] voters_all lookup failed for ${epicNo}, falling back to fan-out: ${err.message}`);
@@ -236,7 +244,7 @@ const findVoterByEpic = async (epicNo) => {
     }
   }
 
-  console.log(`[DB1] Cache MISS for ${epicNo} — querying all 234 collections`);
+  lookupLog(`[DB1] Cache MISS for ${epicNo} — querying all 234 collections`);
 
   try {
     // Build list of all collection names (ass_1 through ass_234)
@@ -245,7 +253,7 @@ const findVoterByEpic = async (epicNo) => {
       allCollections.push(`ass_${i}`);
     }
 
-    console.log(`[DB1] Querying ${allCollections.length} collections for ${epicNo} in parallel`);
+    lookupLog(`[DB1] Querying ${allCollections.length} collections for ${epicNo} in parallel`);
 
     // Query all collections in parallel, but return on FIRST MATCH
     // This is much faster than waiting for all 234 to complete
@@ -289,9 +297,9 @@ const findVoterByEpic = async (epicNo) => {
     // if a lookup fails due to a timeout, race condition, or transient DB error.
     if (result) {
       await _cacheSet(epicNo, result);
-      console.log(`[DB1] ✓ Found ${epicNo}: ${result.VOTER_NAME || result.FM_NAME_EN || 'Unknown'} — cached ✅`);
+      lookupLog(`[DB1] ✓ Found ${epicNo}: ${result.VOTER_NAME || result.FM_NAME_EN || 'Unknown'} — cached ✅`);
     } else {
-      console.log(`[DB1] ✗ EPIC ${epicNo} not found in any collection (not cached — will retry next request)`);
+      lookupLog(`[DB1] ✗ EPIC ${epicNo} not found in any collection (not cached — will retry next request)`);
     }
     
     return result;
