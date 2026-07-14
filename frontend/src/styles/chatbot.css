@@ -288,6 +288,8 @@
   color: var(--color-chalk);
   font-size: 16px; /* >= 16px prevents iOS Safari auto-zoom on focus */
   font-family: inherit;
+  font-weight: 700;          /* typed text bold while registering */
+  letter-spacing: 0.02em;
   min-width: 0;
   caret-color: var(--color-signal-mint);
 }
@@ -295,6 +297,8 @@
 .chat-input::placeholder {
   color: var(--color-ash);
   opacity: 0.6;
+  font-weight: 400;          /* keep placeholder light, only typed text is bold */
+  letter-spacing: normal;
 }
 
 .chat-input:disabled {
@@ -328,6 +332,21 @@
   color: var(--color-ash);
   cursor: not-allowed;
   opacity: 0.4;
+}
+
+/* Locked state: muted disc with a clearly-visible lock icon until valid.
+   Uses !important to beat the generic :disabled rule (equal specificity). */
+.chat-send-btn.locked,
+.chat-send-btn.locked:disabled {
+  background: var(--color-graphite) !important;
+  border: 1.5px solid var(--color-ash) !important;
+  color: var(--color-chalk) !important;
+  opacity: 1 !important;
+}
+
+.chat-send-btn.locked i {
+  font-size: 15px;
+  opacity: 0.85;
 }
 
 /* ── Welcome Banner Card ──────────────────────────────────── */
@@ -800,6 +819,7 @@
   display: flex;
   align-items: center;
   gap: var(--spacing-12);
+  flex-shrink: 0;
 }
 
 .sidebar-logo {
@@ -820,7 +840,11 @@
 }
 
 .sidebar-nav {
-  flex: 1;
+  flex: 1 1 auto;
+  min-height: 0;                     /* allow the flex child to shrink so it can scroll */
+  overflow-y: auto;                  /* scroll the menu when items overflow */
+  -webkit-overflow-scrolling: touch; /* momentum scrolling on iOS */
+  overscroll-behavior: contain;      /* don't scroll the page behind the drawer */
   padding: var(--spacing-16) 0;
 }
 
@@ -853,6 +877,7 @@
 .sidebar-footer {
   padding: var(--spacing-24);
   border-top: 1px solid var(--color-graphite);
+  flex-shrink: 0;
 }
 
 .sidebar-logout-btn {

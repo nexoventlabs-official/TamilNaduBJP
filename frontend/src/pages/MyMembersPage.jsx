@@ -12,6 +12,14 @@ export default function MyMembersPage() {
   const [error, setError] = useState(null)
   const [selectedMember, setSelectedMember] = useState(null)
 
+  // Incremental reveal: show 5 at a time, then a "+N" chip to load 5 more.
+  const PAGE = 5
+  const [l2Visible, setL2Visible] = useState(PAGE)
+  const [l3Visible, setL3Visible] = useState({})
+  const getL3Count = (code) => l3Visible[code] || PAGE
+  const showMoreL3 = (code) =>
+    setL3Visible((prev) => ({ ...prev, [code]: (prev[code] || PAGE) + PAGE }))
+
   useEffect(() => {
     if (!bjpCode) return
     chat.getMyMembers(bjpCode)
@@ -56,6 +64,39 @@ export default function MyMembersPage() {
   const directCount = tree.length
   const indirectCount = tree.reduce((acc, curr) => acc + (curr.referrals?.length || 0), 0)
   const totalCount = directCount + indirectCount
+
+  // Circular "+N" chip that reveals more nodes on click.
+  const renderMoreChip = (remaining, onClick, level) => {
+    const ringColor = level === 2 ? 'var(--color-signal-mint)' : '#17a2b8'
+    return (
+      <div
+        onClick={onClick}
+        role="button"
+        title={`Show ${Math.min(remaining, PAGE)} more`}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexShrink: 0,
+          width: 44,
+          height: 44,
+          borderRadius: '50%',
+          background: 'var(--color-carbon)',
+          border: `1.5px dashed ${ringColor}`,
+          color: ringColor,
+          fontSize: 13,
+          fontWeight: 700,
+          cursor: 'pointer',
+          zIndex: 3,
+          transition: 'all 0.15s ease'
+        }}
+        onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.08)' }}
+        onMouseLeave={(e) => { e.currentTarget.style.transform = 'none' }}
+      >
+        +{remaining}
+      </div>
+    )
+  }
 
   const renderNode = (member, level) => {
     const isRoot = level === 1
@@ -187,10 +228,10 @@ export default function MyMembersPage() {
 
           {/* LAYERS 2 & 3 */}
           {tree.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--color-ash)', maxWidth: 400 }}>
+            <div style={{ textAlign: 'center', padding: '32px 16px', color: 'var(--color-ash)', flexShrink: 0, width: 'min(320px, 80vw)' }}>
               <i className="bi bi-diagram-3" style={{ fontSize: 48, color: 'var(--color-graphite)', marginBottom: 16, display: 'block' }} />
               <h3 style={{ fontSize: 16, fontWeight: 600, color: 'var(--color-chalk)', marginBottom: 8 }}>Tree structure empty</h3>
-              <p style={{ fontSize: 13, margin: '0 auto' }}>
+              <p style={{ fontSize: 13, margin: 0, lineHeight: 1.6, wordBreak: 'normal', overflowWrap: 'anywhere' }}>
                 You haven't referred anyone yet. Share your custom BJP code to build your 3-layer support network!
               </p>
             </div>
@@ -210,8 +251,8 @@ export default function MyMembersPage() {
                 }} />
               )}
 
-              {/* Stack of Rows */}
-              {tree.map(parent => {
+              {/* Stack of Rows (show 5 at a time) */}
+              {tree.slice(0, l2Visible).map(parent => {
                 const hasChildren = parent.referrals && parent.referrals.length > 0
                 return (
                   <div key={parent.bjp_code} style={{
@@ -267,7 +308,7 @@ export default function MyMembersPage() {
                           }} />
                         )}
 
-                        {parent.referrals.map(child => (
+                        {parent.referrals.slice(0, getL3Count(parent.bjp_code)).map(child => (
                           <div key={child.bjp_code} style={{ display: 'flex', alignItems: 'center', gap: '16px', position: 'relative' }}>
                             {/* Vertical link line up to node */}
                             <div style={{
@@ -283,11 +324,36 @@ export default function MyMembersPage() {
                             {renderNode(child, 3)}
                           </div>
                         ))}
+
+                        {/* L3 "+N" — reveal 5 more children of this L2 parent */}
+                        {parent.referrals.length > getL3Count(parent.bjp_code) &&
+                          renderMoreChip(
+                            parent.referrals.length - getL3Count(parent.bjp_code),
+                            () => showMoreL3(parent.bjp_code),
+                            3
+                          )}
                       </div>
                     )}
                   </div>
                 )
               })}
+
+              {/* L2 "+N" — reveal 5 more direct referrals */}
+              {tree.length > l2Visible && (
+                <div style={{ display: 'flex', alignItems: 'center', position: 'relative' }}>
+                  <div style={{
+                    position: 'absolute',
+                    left: '-24px',
+                    top: '50%',
+                    width: '24px',
+                    height: '2px',
+                    background: 'var(--color-graphite)',
+                    transform: 'translateY(-50%)',
+                    zIndex: 1
+                  }} />
+                  {renderMoreChip(tree.length - l2Visible, () => setL2Visible((v) => v + PAGE), 2)}
+                </div>
+              )}
             </div>
           )}
         </div>

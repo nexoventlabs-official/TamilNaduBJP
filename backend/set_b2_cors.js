@@ -29,10 +29,24 @@ async function main() {
   const corsRules = {
     CORSRules: [
       {
+        // Public read of card/photo assets (presigned GET)
         AllowedHeaders: ['*'],
         AllowedMethods: ['GET', 'HEAD'],
         AllowedOrigins: ['*'],
         ExposeHeaders: ['ETag', 'Content-Length'],
+        MaxAgeSeconds: 3000
+      },
+      {
+        // Direct browser photo upload via presigned PUT (web scale)
+        AllowedHeaders: ['*'],
+        AllowedMethods: ['PUT'],
+        AllowedOrigins: [
+          'https://tnbjp.org',
+          'https://www.tnbjp.org',
+          'https://tamilnadubjp.live',
+          'https://www.tamilnadubjp.live',
+        ],
+        ExposeHeaders: ['ETag'],
         MaxAgeSeconds: 3000
       }
     ]

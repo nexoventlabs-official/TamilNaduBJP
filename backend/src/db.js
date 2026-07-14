@@ -54,8 +54,10 @@ const connectDB = async () => {
   try {
     await voterConn.openUri(voterUri, {
       dbName:                   config.mongoVoterDbName,
-      maxPoolSize:              10,
-      minPoolSize:              2,
+      // Raised 10 -> 50 to smooth cold-lookup bursts (each EPIC lookup fans
+      // out across 234 collections). Local Mongo, so connections are cheap.
+      maxPoolSize:              50,
+      minPoolSize:              5,
       serverSelectionTimeoutMS: 15000,
     });
     voterConnected = true;
@@ -211,9 +213,31 @@ const findVoterByEpic = async (epicNo) => {
     return cached;
   }
 
-  console.log(`[DB1] Cache MISS for ${epicNo} — querying all 234 collections`);
   const db = voterConn.db;
-  
+
+  // ── Fast path: unified voters_all collection (1 indexed query) ──
+  // Enabled via USE_VOTERS_ALL=true once the collection is built + indexed.
+  // Replaces the 234-collection fan-out — the key change that lets EPIC
+  // lookups scale to high concurrency. Falls back to the fan-out on error.
+  if (process.env.USE_VOTERS_ALL === 'true') {
+    try {
+      const doc = await db.collection('voters_all').findOne({ EPIC_NO: epicNo });
+      if (doc) {
+        await _cacheSet(epicNo, doc);
+        console.log(`[DB1] ✓ Found ${epicNo} via voters_all ⚡ (single indexed query)`);
+        return doc;
+      }
+      // voters_all is authoritative (contains all 56.5M records) → not found
+      console.log(`[DB1] ✗ EPIC ${epicNo} not found in voters_all`);
+      return null;
+    } catch (err) {
+      console.warn(`[DB1] voters_all lookup failed for ${epicNo}, falling back to fan-out: ${err.message}`);
+      // fall through to the 234-collection fan-out below
+    }
+  }
+
+  console.log(`[DB1] Cache MISS for ${epicNo} — querying all 234 collections`);
+
   try {
     // Build list of all collection names (ass_1 through ass_234)
     const allCollections = [];

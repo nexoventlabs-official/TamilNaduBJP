@@ -63,11 +63,25 @@ export const chat = {
   validateEpic: (epicNo, mobile) =>
     api.post('/api/validate-epic', { epic_no: epicNo, mobile }),
 
-  generateCard: (formData) =>
-    api.post('/api/generate-card', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-      timeout: 120000,
+  // Get a presigned URL to upload the photo directly to Backblaze B2
+  getPhotoUploadUrl: (epicNo, mobile) =>
+    api.post('/api/photo-upload-url', { epic_no: epicNo, mobile }),
+
+  // Upload the photo blob straight to B2 (bypasses our server). Uses the raw
+  // axios instance so no auth/CSRF/baseURL interceptors are applied.
+  uploadPhotoToB2: (uploadUrl, blob) =>
+    axios.put(uploadUrl, blob, {
+      headers: { 'Content-Type': 'image/jpeg' },
+      timeout: 60000,
+      withCredentials: false,
     }),
+
+  // Accepts either a JSON object (presigned path, photo already in B2) or a
+  // FormData (legacy multipart fallback).
+  generateCard: (data) =>
+    (typeof FormData !== 'undefined' && data instanceof FormData)
+      ? api.post('/api/generate-card', data, { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 120000 })
+      : api.post('/api/generate-card', data, { timeout: 120000 }),
 
   profile: (epicNo, mobile) =>
     api.get(`/api/profile/${epicNo}`, { params: { mobile } }),

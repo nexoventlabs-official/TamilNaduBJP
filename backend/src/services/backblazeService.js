@@ -16,7 +16,11 @@ const s3 = new S3Client({
     accessKeyId: config.b2.keyId,
     secretAccessKey: config.b2.appKey
   },
-  forcePathStyle: true
+  forcePathStyle: true,
+  // Keep presigned URLs clean (no CRC32 query params) so browser PUT
+  // uploads work reliably against B2. Also matches B2's S3 compatibility.
+  requestChecksumCalculation: 'WHEN_REQUIRED',
+  responseChecksumValidation:  'WHEN_REQUIRED',
 });
 
 const BUCKET_NAME = config.b2.bucketName || 'bjpmembers';
@@ -41,9 +45,30 @@ async function compressPhoto(buffer) {
  * Upload a passport photo buffer to Backblaze.
  * Returns the relative file key (e.g. 'member_photos/EPIC_MOBILE.jpg').
  */
-async function uploadPhoto(buffer, epicNo, mobile) {
+// Deterministic B2 object key for a member's photo (epic + mobile).
+function photoKeyFor(epicNo, mobile) {
   const suffix = mobile ? `_${mobile}` : '';
-  const key = `member_photos/${epicNo.toUpperCase()}${suffix}.jpg`.replace(/[/\\]/g, '_');
+  return `member_photos/${String(epicNo).toUpperCase()}${suffix}.jpg`.replace(/[/\\]/g, '_');
+}
+
+/**
+ * Issue a short-lived presigned PUT URL so the browser can upload the photo
+ * DIRECTLY to B2 — keeping photo bytes and compression off the API server
+ * (critical for high-concurrency web registration). Returns { uploadUrl, key }.
+ */
+async function getPhotoUploadUrl(epicNo, mobile) {
+  const key = photoKeyFor(epicNo, mobile);
+  const command = new PutObjectCommand({
+    Bucket:      BUCKET_NAME,
+    Key:         key,
+    ContentType: 'image/jpeg',
+  });
+  const uploadUrl = await getSignedUrl(s3, command, { expiresIn: 300 }); // 5 min
+  return { uploadUrl, key };
+}
+
+async function uploadPhoto(buffer, epicNo, mobile) {
+  const key = photoKeyFor(epicNo, mobile);
 
   try {
     // Compress before upload for faster serving
@@ -222,6 +247,8 @@ async function getCardPresignedUrl(keyOrUrl) {
 
 module.exports = {
   uploadPhoto,
+  photoKeyFor,
+  getPhotoUploadUrl,
   getPhotoPresignedUrl,
   getPhotoStream,
   uploadCard,

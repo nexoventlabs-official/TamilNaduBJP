@@ -20,10 +20,11 @@ const router   = express.Router();
 const multer   = require('multer');
 const crypto   = require('crypto');
 const Sentry   = require('@sentry/node');
+const config   = require('../config');   // FIX-01: module-level (used by multiple routes, e.g. /referral-link)
 
 const { validateMobile, validateEpic, validateOtp } = require('../utils/validators');
 const { sendOtp } = require('../services/smsService');
-const { uploadPhoto, uploadCard, uploadBackCard, uploadCombinedCard, getPhotoPresignedUrl, getCardPresignedUrl } = require('../services/backblazeService');
+const { uploadPhoto, photoKeyFor, getPhotoUploadUrl, uploadCard, uploadBackCard, uploadCombinedCard, getPhotoPresignedUrl, getCardPresignedUrl } = require('../services/backblazeService');
 const { generateCard, generateBackCard, generateCombinedCard } = require('../services/cardGenerator');
 const {
   chatOtpLimiter,
@@ -157,22 +158,34 @@ router.post('/send-otp', chatOtpLimiter, async (req, res) => {
     if (!valid) return res.status(400).json({ success: false, message: mobile });
 
     const db  = getDb();
-    const doc = await db.collection('otp_sessions').findOne(
-      { mobile }, { projection: { created_at: 1 } }
-    );
 
-    // 60-second cooldown between OTP requests
-    if (doc?.created_at) {
-      const elapsed = (Date.now() - new Date(doc.created_at).getTime()) / 1000;
-      if (elapsed < 60) {
-        const wait = Math.ceil(60 - elapsed);
+    // FIX-15: atomically claim the OTP slot. The filter only matches when no
+    // record exists or the 60s cooldown has expired. With the unique index on
+    // `mobile`, a concurrent second request that shouldn't be allowed fails
+    // with 11000 → we return 429. This removes the read→check→write race that
+    // let a double-tap send two OTPs (invalidating the first).
+    const cooldownCutoff = new Date(Date.now() - 60 * 1000);
+    try {
+      await db.collection('otp_sessions').findOneAndUpdate(
+        { mobile, $or: [ { created_at: { $exists: false } }, { created_at: { $lt: cooldownCutoff } } ] },
+        { $set: { created_at: nowUTC(), verified: false, purpose: 'login' } },
+        { upsert: true }
+      );
+    } catch (e) {
+      if (e.code === 11000) {
+        const cur = await db.collection('otp_sessions').findOne({ mobile }, { projection: { created_at: 1 } });
+        const elapsed = cur?.created_at ? (Date.now() - new Date(cur.created_at).getTime()) / 1000 : 0;
+        const wait = Math.max(1, Math.ceil(60 - elapsed));
         return res.status(429).json({ success: false, message: `Please wait ${wait}s before requesting another OTP.` });
       }
+      throw e;
     }
 
     const otp    = genOtp();
     const result = await sendOtp(mobile, otp);
     if (!result.success) {
+      // Release the claim so the user can retry immediately (SMS never sent)
+      await db.collection('otp_sessions').deleteOne({ mobile }).catch(() => {});
       return res.status(500).json({ success: false, message: 'Could not send OTP. Please try again.' });
     }
 
@@ -289,9 +302,15 @@ router.post('/check-mobile', chatCheckMobileLimiter, async (req, res) => {
 
     const hasCard = Boolean(genDoc || (stat && stat.epic_no));
 
-    // NOTE (FIX-02): do NOT create a session here. This endpoint only reports
-    // registration status. A session is established only after OTP verification
-    // in /verify-otp. Setting the session here would bypass OTP entirely.
+    // Establish the verified-mobile session on check-mobile success.
+    // NOTE: The web chatbot currently has no OTP step, so check-mobile is the
+    // de-facto login for session-gated features (My Members, referral link,
+    // volunteer/booth requests). This was briefly removed under "FIX-02" but
+    // that broke those features because no OTP flow exists yet on web.
+    // SECURITY TODO: once OTP login is added to the web flow, MOVE this session
+    // creation into /verify-otp and remove it here (that is the real FIX-02).
+    req.session.verified_mobile = mobile;
+    req.session.cookie.maxAge   = 86400 * 1000;
 
     if (hasCard) {
       const g = genDoc || {};
@@ -491,6 +510,30 @@ router.post('/validate-epic', chatValidateEpicLimiter, async (req, res) => {
 //            existing bjp_code preserved on re-generation;
 //            magic-byte file validation.
 // ────────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────
+//  POST /photo-upload-url  — presigned direct-to-B2 upload (web scale)
+//  The browser uploads the photo straight to Backblaze, so photo bytes
+//  and image compression never touch the API server.
+// ────────────────────────────────────────────────────────────────
+router.post('/photo-upload-url', chatValidateEpicLimiter, async (req, res) => {
+  try {
+    const rawEpic = String(req.body.epic_no || req.body.epic || '').trim().toUpperCase();
+    const { valid, value: epicNo } = validateEpic(rawEpic);
+    if (!valid) return res.status(400).json({ success: false, message: epicNo });
+
+    const mobile = req.session.verified_mobile || String(req.body.mobile || '').trim() || '';
+    if (!/^\d{10}$/.test(mobile)) {
+      return res.status(400).json({ success: false, message: 'Valid mobile number required.' });
+    }
+
+    const { uploadUrl, key } = await getPhotoUploadUrl(epicNo, mobile);
+    return res.json({ success: true, uploadUrl, key });
+  } catch (err) {
+    console.error('photo-upload-url error:', err.message);
+    return res.status(500).json({ success: false, message: 'Could not create upload URL.' });
+  }
+});
+
 router.post('/generate-card', chatGenerateCardLimiter, upload.single('photo'), async (req, res) => {
   const reqId = crypto.randomUUID();
   try {
@@ -498,12 +541,18 @@ router.post('/generate-card', chatGenerateCardLimiter, upload.single('photo'), a
     const { valid: ve, value: epicNo } = validateEpic(rawEpic);
     if (!ve) return res.status(400).json({ success: false, message: epicNo });
 
-    if (!req.file) {
+    // Photo arrives one of two ways:
+    //  1. photo_key  → already uploaded directly to B2 via a presigned URL (preferred, scalable)
+    //  2. req.file   → legacy multipart upload through the server (fallback)
+    const photoKeyProvided = Boolean(String(req.body.photo_key || '').trim());
+
+    if (!req.file && !photoKeyProvided) {
       return res.status(400).json({ success: false, message: 'Please upload your passport photo.' });
     }
 
-    // Magic-byte validation — cannot be bypassed by spoofed Content-Type
-    if (!validateMagicBytes(req.file.buffer)) {
+    // Magic-byte validation for the legacy multipart path (direct B2 uploads
+    // are constrained to image/jpeg by the presigned URL's Content-Type).
+    if (req.file && !validateMagicBytes(req.file.buffer)) {
       return res.status(400).json({ success: false, message: 'Invalid file type. Please upload a JPG, PNG or BMP image.' });
     }
 
@@ -516,7 +565,7 @@ router.post('/generate-card', chatGenerateCardLimiter, upload.single('photo'), a
       category: 'card.generation',
       message:  'Web form card generation started',
       level:    'info',
-      data:     { epicNo, photoSizeKB: Math.round(req.file.buffer.length / 1024) },
+      data:     { epicNo, mode: photoKeyProvided ? 'presigned' : 'multipart', photoSizeKB: req.file ? Math.round(req.file.buffer.length / 1024) : 0 },
     });
 
     // ── Hard block: one card per mobile number ───────────────────────────────────
@@ -565,23 +614,25 @@ router.post('/generate-card', chatGenerateCardLimiter, upload.single('photo'), a
     }
     const voter = normaliseVoter(rawVoter);
 
-    const photoBuffer = req.file.buffer;
+    const photoBuffer = req.file ? req.file.buffer : null;
 
     // ── Distributed lock — prevent duplicate concurrent generation ─
+    // FIX-04: single ATOMIC findOneAndUpdate. Matches only when no lock exists
+    // or the existing one has expired; the unique index on `mobile` makes a
+    // concurrent second request fail with 11000 (lock already held).
     const lockExpiry = new Date(Date.now() + 120000); // 2-min lock
     let lockAcquired = false;
     try {
-      await db.collection('generation_locks').updateOne(
+      const lock = await db.collection('generation_locks').findOneAndUpdate(
         { mobile: mobile, locked_until: { $lt: new Date() } },
         { $set: { locked_until: lockExpiry, locked_by: reqId } },
-        { upsert: true }
+        { upsert: true, returnDocument: 'after' }
       );
-      // Verify we own the lock
-      const lock = await db.collection('generation_locks').findOne({ mobile: mobile });
+      // Atomic: if we got a doc back with our reqId, we own the lock
       lockAcquired = lock?.locked_by === reqId;
     } catch (e) {
       if (e.code !== 11000) throw e;
-      // Another request holds the lock
+      // Duplicate key — another request holds an active lock
       lockAcquired = false;
     }
 
@@ -601,7 +652,6 @@ router.post('/generate-card', chatGenerateCardLimiter, upload.single('photo'), a
         ]
       }, { projection: { bjp_code: 1, referral_id: 1, referral_link: 1 } });
       const bjpCode   = existingGen?.bjp_code || generateBjpCode();
-      const config    = require('../config');
 
       // ── Referral attribution ───────────────────────────────────
       // Accept ref=<bjpCode>&rid=<referralId> from the request body
@@ -654,20 +704,27 @@ router.post('/generate-card', chatGenerateCardLimiter, upload.single('photo'), a
         ASSEMBLY_NO:   voter.assembly_no,
       };
 
-      // Upload photo to Cloudinary
+      // Resolve the photo URL.
+      //  - presigned path: the browser already uploaded to B2; use the
+      //    deterministic key (never trust a client-supplied key).
+      //  - multipart path: compress + upload here (legacy fallback).
       let photoUrl = '';
-      try {
-        photoUrl = await uploadPhoto(photoBuffer, epicNo, mobile);
-      } catch (e) {
-        console.error('Photo upload failed:', e.message);
-        Sentry.captureException(e, {
-          tags:  { operation: 'photo_upload', source: 'web', storage: 'backblaze_b2' },
-          extra: {
-            epicNo, mobile, bjpCode,
-            photoSizeKB: Math.round(photoBuffer.length / 1024),
-            errorType:   'b2_upload_failed',
-          },
-        });
+      if (photoKeyProvided) {
+        photoUrl = photoKeyFor(epicNo, mobile);
+      } else {
+        try {
+          photoUrl = await uploadPhoto(photoBuffer, epicNo, mobile);
+        } catch (e) {
+          console.error('Photo upload failed:', e.message);
+          Sentry.captureException(e, {
+            tags:  { operation: 'photo_upload', source: 'web', storage: 'backblaze_b2' },
+            extra: {
+              epicNo, mobile, bjpCode,
+              photoSizeKB: photoBuffer ? Math.round(photoBuffer.length / 1024) : 0,
+              errorType:   'b2_upload_failed',
+            },
+          });
+        }
       }
 
       // Card image files are not generated/stored in Cloudinary for web chatbot registrations.
@@ -988,18 +1045,24 @@ router.get('/my-members/:bjpCode', async (req, res) => {
       part_no:       rootDoc.PART_NO || '',
     };
 
-    // 2. Fetch Layer 2 Members
+    // FIX-06: bound the referral tree so a viral member with thousands of
+    // referrals cannot load unlimited docs into RAM / fire unlimited presigns.
+    const LAYER2_LIMIT = 200;  // top 200 direct referrals
+    const LAYER3_LIMIT = 400;  // top 400 second-level referrals
+
+    // 2. Fetch Layer 2 Members (capped)
     const layer2Docs = await db.collection('generated_voters')
       .find(
         { referred_by_bjp: bjpCode },
         { projection: { VOTER_NAME: 1, FM_NAME_EN: 1, LASTNAME_EN: 1, EPIC_NO: 1, bjp_code: 1, photo_url: 1, ASSEMBLY_NAME: 1, DISTRICT_NAME: 1, PART_NO: 1, generated_at: 1 } }
       )
       .sort({ generated_at: -1 })
+      .limit(LAYER2_LIMIT)
       .toArray();
 
     const layer2Bjps = layer2Docs.map(m => m.bjp_code).filter(Boolean);
 
-    // 3. Fetch Layer 3 Members
+    // 3. Fetch Layer 3 Members (capped)
     let layer3Docs = [];
     if (layer2Bjps.length > 0) {
       layer3Docs = await db.collection('generated_voters')
@@ -1007,6 +1070,7 @@ router.get('/my-members/:bjpCode', async (req, res) => {
           { referred_by_bjp: { $in: layer2Bjps } },
           { projection: { VOTER_NAME: 1, FM_NAME_EN: 1, LASTNAME_EN: 1, EPIC_NO: 1, bjp_code: 1, photo_url: 1, ASSEMBLY_NAME: 1, DISTRICT_NAME: 1, PART_NO: 1, referred_by_bjp: 1, generated_at: 1 } }
         )
+        .limit(LAYER3_LIMIT)
         .toArray();
     }
 
@@ -1043,7 +1107,17 @@ router.get('/my-members/:bjpCode', async (req, res) => {
       };
     }));
 
-    return res.json({ success: true, root, tree });
+    // FIX-06: total direct-referral count so the UI can show "showing 200 of N"
+    const totalReferrals = await db.collection('generated_voters')
+      .countDocuments({ referred_by_bjp: bjpCode });
+
+    return res.json({
+      success: true,
+      root,
+      tree,
+      total_referrals: totalReferrals,
+      showing: tree.length,
+    });
   } catch (err) {
     console.error('my-members error:', err.message);
     return res.status(500).json({ success: false, message: 'Server error' });
@@ -1220,11 +1294,18 @@ router.get('/card-status/:jobId', (req, res) => {
 // ────────────────────────────────────────────────────────────────
 router.get('/member-status/:bjpCode', async (req, res) => {
   try {
+    // FIX-12: require a verified session and verify ownership of the BJP code
+    if (!req.session?.verified_mobile) {
+      return res.status(401).json({ success: false, message: 'Authentication required.' });
+    }
     const bjpCode = req.params.bjpCode;
     const db = getDb();
     const voter = await db.collection('generated_voters').findOne({ bjp_code: bjpCode });
     if (!voter) {
       return res.status(404).json({ success: false, message: 'Member not found' });
+    }
+    if (voter.MOBILE_NO && voter.MOBILE_NO !== req.session.verified_mobile) {
+      return res.status(403).json({ success: false, message: 'Access denied.' });
     }
     const appointment = await db.collection('appointments').findOne({ bjp_code: bjpCode });
     const volReq = await db.collection('volunteer_requests').findOne({ bjp_code: bjpCode });
@@ -1269,6 +1350,10 @@ router.get('/member-status/:bjpCode', async (req, res) => {
 // ────────────────────────────────────────────────────────────────
 router.post('/local-body-interest', async (req, res) => {
   try {
+    // FIX-11: require a verified session
+    if (!req.session?.verified_mobile) {
+      return res.status(401).json({ success: false, message: 'Authentication required.' });
+    }
     const { bjp_code, interest } = req.body;
     if (!bjp_code || !interest) {
       return res.status(400).json({ success: false, message: 'Missing required parameters' });
@@ -1277,13 +1362,18 @@ router.post('/local-body-interest', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Invalid interest value' });
     }
     const db = getDb();
-    const result = await db.collection('generated_voters').updateOne(
+    // FIX-11: verify the session mobile owns this BJP code
+    const member = await db.collection('generated_voters').findOne({ bjp_code }, { projection: { MOBILE_NO: 1 } });
+    if (!member) {
+      return res.status(404).json({ success: false, message: 'Member not found' });
+    }
+    if (member.MOBILE_NO && member.MOBILE_NO !== req.session.verified_mobile) {
+      return res.status(403).json({ success: false, message: 'Access denied.' });
+    }
+    await db.collection('generated_voters').updateOne(
       { bjp_code },
       { $set: { local_body_interest: interest } }
     );
-    if (result.matchedCount === 0) {
-      return res.status(404).json({ success: false, message: 'Member not found' });
-    }
     return res.json({ success: true, message: 'Interest updated successfully' });
   } catch (err) {
     console.error('local-body-interest error:', err.message);
@@ -1296,6 +1386,10 @@ router.post('/local-body-interest', async (req, res) => {
 // ────────────────────────────────────────────────────────────────
 router.post('/save-meeting-interest', async (req, res) => {
   try {
+    // FIX-11: require a verified session
+    if (!req.session?.verified_mobile) {
+      return res.status(401).json({ success: false, message: 'Authentication required.' });
+    }
     const { bjp_code, interest } = req.body;
     if (!bjp_code || !interest) {
       return res.status(400).json({ success: false, message: 'Missing required parameters' });
@@ -1304,6 +1398,14 @@ router.post('/save-meeting-interest', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Invalid interest value' });
     }
     const db = getDb();
+    // FIX-11: verify the session mobile owns this BJP code
+    const member = await db.collection('generated_voters').findOne({ bjp_code }, { projection: { MOBILE_NO: 1 } });
+    if (!member) {
+      return res.status(404).json({ success: false, message: 'Member not found' });
+    }
+    if (member.MOBILE_NO && member.MOBILE_NO !== req.session.verified_mobile) {
+      return res.status(403).json({ success: false, message: 'Access denied.' });
+    }
     await db.collection('appointments').updateOne(
       { bjp_code },
       { $set: { interest, created_at: new Date() } },

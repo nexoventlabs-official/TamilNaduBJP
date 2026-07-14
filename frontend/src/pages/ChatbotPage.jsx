@@ -36,6 +36,20 @@ const getReferralParams = () => {
   return { ref: '', rid: '' }
 }
 
+// ── True only when a valid referral is present in the CURRENT URL.
+// (No localStorage fallback — used to decide the "rescan the QR" warning so a
+// plain revisit by an existing member doesn't falsely trigger it.)
+const hasReferralInUrl = () => {
+  try {
+    const p = new URLSearchParams(window.location.search)
+    const ref = (p.get('ref') || '').trim().toUpperCase()
+    const rid = (p.get('rid') || '').trim().toUpperCase()
+    return /^BJP-[0-9A-F]{8}$/.test(ref) && /^REF-[0-9A-F]{8}$/.test(rid)
+  } catch {
+    return false
+  }
+}
+
 // ── Constants ──────────────────────────────────────────────
 const S = {
   WELCOME:       'WELCOME',
@@ -2825,6 +2839,15 @@ function FullMyMembersPanel({ bjpCode, onBack }) {
   const [error, setError] = useState(null)
   const [selectedMember, setSelectedMember] = useState(null)
 
+  // Incremental reveal: show 5 at a time, then a "+N" chip to load 5 more.
+  const PAGE = 5
+  const [l2Visible, setL2Visible] = useState(PAGE)          // L2 (direct) count shown
+  const [l3Visible, setL3Visible] = useState({})            // { [parentCode]: count } for L3
+
+  const getL3Count = (code) => l3Visible[code] || PAGE
+  const showMoreL3 = (code) =>
+    setL3Visible((prev) => ({ ...prev, [code]: (prev[code] || PAGE) + PAGE }))
+
   useEffect(() => {
     if (!bjpCode) {
       setError('No referral code available.')
@@ -2847,6 +2870,39 @@ function FullMyMembersPanel({ bjpCode, onBack }) {
   const directCount = tree.length
   const indirectCount = tree.reduce((acc, curr) => acc + (curr.referrals?.length || 0), 0)
   const totalCount = directCount + indirectCount
+
+  // Circular "+N" chip that reveals more nodes on click.
+  const renderMoreChip = (remaining, onClick, level) => {
+    const ringColor = level === 2 ? 'var(--color-signal-mint)' : '#17a2b8'
+    return (
+      <div
+        onClick={onClick}
+        role="button"
+        title={`Show ${Math.min(remaining, PAGE)} more`}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexShrink: 0,
+          width: 40,
+          height: 40,
+          borderRadius: '50%',
+          background: 'var(--color-carbon)',
+          border: `1.5px dashed ${ringColor}`,
+          color: ringColor,
+          fontSize: 12,
+          fontWeight: 700,
+          cursor: 'pointer',
+          zIndex: 3,
+          transition: 'all 0.15s ease'
+        }}
+        onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.08)' }}
+        onMouseLeave={(e) => { e.currentTarget.style.transform = 'none' }}
+      >
+        +{remaining}
+      </div>
+    )
+  }
 
   const renderNode = (member, level) => {
     const isRoot = level === 1
@@ -2999,10 +3055,10 @@ function FullMyMembersPanel({ bjpCode, onBack }) {
 
               {/* LAYERS 2 & 3 */}
               {tree.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--color-ash)', maxWidth: 400 }}>
+                <div style={{ textAlign: 'center', padding: '32px 16px', color: 'var(--color-ash)', flexShrink: 0, width: 'min(280px, 72vw)' }}>
                   <i className="bi bi-diagram-3" style={{ fontSize: 48, color: 'var(--color-graphite)', marginBottom: 16, display: 'block' }} />
                   <h3 style={{ fontSize: 16, fontWeight: 600, color: 'var(--color-chalk)', marginBottom: 8 }}>Tree structure empty</h3>
-                  <p style={{ fontSize: 13, margin: '0 auto', color: 'var(--color-ash)' }}>
+                  <p style={{ fontSize: 13, margin: 0, color: 'var(--color-ash)', lineHeight: 1.6, wordBreak: 'normal', overflowWrap: 'anywhere' }}>
                     You haven't referred anyone yet. Share your custom BJP code to build your 3-layer support network!
                   </p>
                 </div>
@@ -3022,8 +3078,8 @@ function FullMyMembersPanel({ bjpCode, onBack }) {
                     }} />
                   )}
 
-                  {/* Stack of Rows */}
-                  {tree.map(parent => {
+                  {/* Stack of Rows (show 5 at a time) */}
+                  {tree.slice(0, l2Visible).map(parent => {
                     const hasChildren = parent.referrals && parent.referrals.length > 0
                     return (
                       <div key={parent.bjp_code} style={{
@@ -3075,16 +3131,42 @@ function FullMyMembersPanel({ bjpCode, onBack }) {
                               }} />
                             )}
 
-                            {parent.referrals.map(child => (
+                            {parent.referrals.slice(0, getL3Count(parent.bjp_code)).map(child => (
                               <div key={child.bjp_code} style={{ display: 'flex', alignItems: 'center', gap: '16px', position: 'relative' }}>
                                 {renderNode(child, 3)}
                               </div>
                             ))}
+
+                            {/* L3 "+N" — reveal 5 more children of this L2 parent */}
+                            {parent.referrals.length > getL3Count(parent.bjp_code) &&
+                              renderMoreChip(
+                                parent.referrals.length - getL3Count(parent.bjp_code),
+                                () => showMoreL3(parent.bjp_code),
+                                3
+                              )}
                           </div>
                         )}
                       </div>
                     )
                   })}
+
+                  {/* L2 "+N" — reveal 5 more direct referrals */}
+                  {tree.length > l2Visible && (
+                    <div style={{ display: 'flex', alignItems: 'center', position: 'relative', paddingLeft: 0 }}>
+                      {/* Horizontal link from the L2 vertical line to the chip */}
+                      <div style={{
+                        position: 'absolute',
+                        left: '-16px',
+                        top: '50%',
+                        width: '16px',
+                        height: '2px',
+                        background: 'var(--color-graphite)',
+                        transform: 'translateY(-50%)',
+                        zIndex: 1
+                      }} />
+                      {renderMoreChip(tree.length - l2Visible, () => setL2Visible((v) => v + PAGE), 2)}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -4211,8 +4293,12 @@ export default function ChatbotPage() {
       epicRef.current    = cache.card.epic_no || ''
       // Note: mobile is NOT stored in localStorage for PII protection
       
-      const { ref, rid } = getReferralParams()
-      if (ref && rid) {
+      // Only warn "already a member / rescan" when a referral is present in the
+      // CURRENT URL (i.e. they actually scanned someone's QR this visit).
+      // Do NOT use getReferralParams() here — it falls back to a 24h localStorage
+      // value, which caused a false "Already you are a member" on a plain revisit.
+      const urlRef = hasReferralInUrl()
+      if (urlRef) {
         addMsg('bot', 'text', { text: '⚠️ *Already you are a member!* Try to logout and rescan the QR.' })
       } else {
         addMsg('bot', 'text', { text: '👋 Welcome back to *BJP Tamil Nadu!*' })
@@ -4392,17 +4478,41 @@ export default function ChatbotPage() {
     await botSay('⏳ Generating your card… please wait a moment.', 400)
 
     try {
-      const formData = new FormData()
-      formData.append('epic_no', epicRef.current)
-      formData.append('mobile', mobileRef.current)
-      formData.append('photo', blob, 'photo.jpg')
-
-      // Pass referral attribution if user came via a referral link
       const { ref, rid } = referralRef.current
-      if (ref) formData.append('ref', ref)
-      if (rid) formData.append('rid', rid)
 
-      const res = await chat.generateCard(formData)
+      // Preferred path: upload the photo DIRECTLY to Backblaze B2 via a
+      // presigned URL, so photo bytes + image compression never touch our
+      // server (scales to large concurrent bursts). Only the upload step
+      // falls back to multipart — business errors are handled normally.
+      let photoKey = null
+      try {
+        const presign = await chat.getPhotoUploadUrl(epicRef.current, mobileRef.current)
+        if (presign?.uploadUrl && presign?.key) {
+          await chat.uploadPhotoToB2(presign.uploadUrl, blob)
+          photoKey = presign.key
+        }
+      } catch (_) {
+        photoKey = null // upload failed → use multipart fallback below
+      }
+
+      let res
+      if (photoKey) {
+        res = await chat.generateCard({
+          epic_no:   epicRef.current,
+          mobile:    mobileRef.current,
+          photo_key: photoKey,
+          ...(ref ? { ref } : {}),
+          ...(rid ? { rid } : {}),
+        })
+      } else {
+        const formData = new FormData()
+        formData.append('epic_no', epicRef.current)
+        formData.append('mobile', mobileRef.current)
+        formData.append('photo', blob, 'photo.jpg')
+        if (ref) formData.append('ref', ref)
+        if (rid) formData.append('rid', rid)
+        res = await chat.generateCard(formData)
+      }
 
       const card = {
         card_url:      res.card_url,
@@ -4567,12 +4677,20 @@ export default function ChatbotPage() {
     setInputValue('')
     setMessages([])
 
-    // 2. Destroy the backend session cookie (fire-and-forget)
+    // 2. Drop any stored referral attribution so a refresh after logout does
+    //    NOT keep showing the referral link. Only a fresh QR scan (which puts
+    //    ?ref=&rid= back in the URL) should re-attach a referral.
+    try { localStorage.removeItem('bjp_referral') } catch (_) {}
+
+    // 3. Destroy the backend session cookie (fire-and-forget)
     try { await chat.logout() } catch (_) {}
 
-    // 3. Full page reload after a tiny delay — ensures a totally clean slate
-    //    so no cached card / photo data bleeds into the next user's session
-    setTimeout(() => window.location.reload(), 300)
+    // 4. Reload to the CLEAN base URL (strip ?ref=&rid= query string) after a
+    //    tiny delay — ensures a totally clean slate so no cached card / photo
+    //    data or stale referral code bleeds into the next visit.
+    setTimeout(() => {
+      window.location.replace(window.location.origin + window.location.pathname)
+    }, 300)
   }
 
   // ── Input config ──────────────────────────────────────────
@@ -5194,10 +5312,12 @@ export default function ChatbotPage() {
                   </div>
                   <button
                     type="submit"
-                    className="chat-send-btn"
+                    className={`chat-send-btn${getIsSendDisabled() ? ' locked' : ''}`}
                     disabled={getIsSendDisabled()}
+                    aria-label={getIsSendDisabled() ? 'Locked — complete the field to continue' : 'Send'}
+                    title={getIsSendDisabled() ? 'Enter a valid value to unlock' : 'Send'}
                   >
-                    <i className="bi bi-send-fill" />
+                    <i className={`bi ${getIsSendDisabled() ? 'bi-lock-fill' : 'bi-send-fill'}`} />
                   </button>
                 </form>
               ) : null}

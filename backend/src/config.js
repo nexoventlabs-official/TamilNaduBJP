@@ -15,6 +15,12 @@ if (nodeEnv === 'production' && !process.env.BASE_URL) {
   throw new Error('BASE_URL must be set in production');
 }
 
+// FIX-13: fail fast if B2 storage credentials are missing — otherwise photo
+// uploads silently fail and members register with broken (empty) photos.
+if (!process.env.B2_KEY_ID || !process.env.B2_APP_KEY || !process.env.B2_BUCKET_NAME) {
+  throw new Error('B2_KEY_ID, B2_APP_KEY, and B2_BUCKET_NAME must be set in .env — photo uploads require them');
+}
+
 const config = {
   port:    process.env.PORT    || 5000,
   nodeEnv,
