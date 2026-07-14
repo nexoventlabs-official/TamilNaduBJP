@@ -54,6 +54,7 @@ const hasReferralInUrl = () => {
 const S = {
   WELCOME:       'WELCOME',
   AWAIT_MOBILE:  'AWAIT_MOBILE',
+  AWAIT_OTP:     'AWAIT_OTP',
   AWAIT_EPIC:    'AWAIT_EPIC',
   CONFIRM:       'CONFIRM',
   AWAIT_PHOTO:   'AWAIT_PHOTO',
@@ -4030,6 +4031,8 @@ export default function ChatbotPage() {
   const [isTyping, setIsTyping]     = useState(false)
   const [sendHint, setSendHint]     = useState('')   // small validation bubble near the send button
   const sendHintTimer = useRef(null)
+  const [otpResendIn, setOtpResendIn] = useState(0)  // seconds left before "Resend OTP" is allowed
+  const otpTimerRef = useRef(null)
   const [activeView, setActiveView] = useState('chat')
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [isFlipped, setIsFlipped]   = useState(false)
@@ -4263,6 +4266,9 @@ export default function ChatbotPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, isTyping])
 
+  // Clear the OTP resend timer on unmount
+  useEffect(() => () => { if (otpTimerRef.current) clearInterval(otpTimerRef.current) }, [])
+
   // ── Message helpers ───────────────────────────────────────
   const addMsg = useCallback((from, type, payload = {}) => {
     setMessages((prev) => [...prev, {
@@ -4343,6 +4349,49 @@ export default function ChatbotPage() {
       const res = await chat.checkMobile(mobile)
       setIsTyping(false)
       if (res.has_card) {
+        // Existing member → verify OTP BEFORE revealing the card (no PII yet).
+        setIsTyping(true)
+        try {
+          const sent = await chat.sendOtp(mobile)
+          setIsTyping(false)
+          if (!sent?.success) {
+            await botSay('❌ Could not send OTP right now. Please try again in a moment.', 300)
+            return
+          }
+        } catch (e) {
+          setIsTyping(false)
+          await botSay(`❌ ${e?.message || 'Could not send OTP. Please try again.'}`, 300)
+          return
+        }
+        await botSay(`🔐 You're already a registered member. To view your ID card, enter the 6-digit OTP we just sent to ${maskMobile(mobile)}.`, 300)
+        setChatState(S.AWAIT_OTP)
+        startOtpCountdown(60)
+        return
+      }
+    } catch (err) {
+      console.warn('checkMobile failed, falling back to normal flow:', err)
+      setIsTyping(false)
+    }
+
+    await botSay('✅ Mobile number saved! Now enter your EPIC Number (Voter ID).', 400)
+    await botSay('📋 Format: 3 letters + 7 digits  e.g. ABC1234567', 200)
+    setChatState(S.AWAIT_EPIC)
+  }
+
+  const handleOtpSubmit = async () => {
+    const otp = inputValue.trim()
+    if (!/^\d{6}$/.test(otp)) {
+      await botSay('❌ Please enter the 6-digit OTP sent to your number.', 300)
+      return
+    }
+    const mobile = mobileRef.current
+    addMsg('user', 'text', { text: '••••••' })   // never echo the OTP
+    setInputValue('')
+    setIsTyping(true)
+    try {
+      const res = await chat.verifyOtp(mobile, otp)
+      setIsTyping(false)
+      if (res.success && res.has_card) {
         const card = {
           epic_no:       res.epic_no || '',
           voter_name:    res.voter_name || '',
@@ -4361,19 +4410,56 @@ export default function ChatbotPage() {
         if (card.bjp_code) {
           fetchMemberStatus(card.bjp_code)
         }
-        await botSay('✅ You are already a registered member! Here is your Digital Member ID Card:', 300)
+        await botSay('✅ Verified! Here is your Digital Member ID Card:', 300)
         addMsg('bot', 'generated_card', { card })
         setChatState(S.DONE)
         return
       }
+      // Verified but somehow no card (edge case) → fall back to registration
+      await botSay('✅ Verified! Now enter your EPIC Number (Voter ID).', 300)
+      setChatState(S.AWAIT_EPIC)
     } catch (err) {
-      console.warn('checkMobile failed, falling back to normal flow:', err)
       setIsTyping(false)
+      // 400 = invalid/expired OTP, 429 = too many attempts
+      await botSay(`❌ ${err?.message || 'Invalid OTP. Please try again.'}`, 300)
+      // stay on AWAIT_OTP so the user can retry
     }
+  }
 
-    await botSay('✅ Mobile number saved! Now enter your EPIC Number (Voter ID).', 400)
-    await botSay('📋 Format: 3 letters + 7 digits  e.g. ABC1234567', 200)
-    setChatState(S.AWAIT_EPIC)
+  // Start / restart the resend cooldown (matches the backend's 60s cooldown).
+  const startOtpCountdown = (sec = 60) => {
+    if (otpTimerRef.current) clearInterval(otpTimerRef.current)
+    setOtpResendIn(sec)
+    otpTimerRef.current = setInterval(() => {
+      setOtpResendIn((s) => {
+        if (s <= 1) { clearInterval(otpTimerRef.current); otpTimerRef.current = null; return 0 }
+        return s - 1
+      })
+    }, 1000)
+  }
+
+  const handleResendOtp = async () => {
+    if (otpResendIn > 0 || isTyping) return
+    const mobile = mobileRef.current
+    if (!/^\d{10}$/.test(mobile || '')) return
+    setIsTyping(true)
+    try {
+      const sent = await chat.sendOtp(mobile)
+      setIsTyping(false)
+      if (sent?.success) {
+        await botSay(`📨 A new OTP has been sent to ${maskMobile(mobile)}.`, 250)
+        startOtpCountdown(60)
+      } else {
+        await botSay('❌ Could not resend OTP. Please try again shortly.', 250)
+      }
+    } catch (e) {
+      setIsTyping(false)
+      // Backend enforces a 60s cooldown; if we're early it returns the wait time.
+      const msg = e?.message || 'Could not resend OTP. Please try again.'
+      const m = /(\d+)\s*s/.exec(msg)
+      if (m) startOtpCountdown(Math.min(60, parseInt(m[1], 10)))
+      await botSay(`⏳ ${msg}`, 250)
+    }
   }
 
   const handleEpicSubmit = async () => {
@@ -4700,6 +4786,8 @@ export default function ChatbotPage() {
     switch (chatState) {
       case S.AWAIT_MOBILE:
         return { type: 'tel', placeholder: 'Enter 10-digit mobile number', maxLength: 10, inputMode: 'numeric' }
+      case S.AWAIT_OTP:
+        return { type: 'tel', placeholder: 'Enter 6-digit OTP', maxLength: 6, inputMode: 'numeric' }
       case S.AWAIT_EPIC:
         return { type: 'text', placeholder: 'EPIC Number (e.g. ABC1234567)', maxLength: 10 }
       case S.AWAIT_BOOTH_NO:
@@ -4713,6 +4801,7 @@ export default function ChatbotPage() {
     if (isTyping) return true
     const val = inputValue.trim()
     if (chatState === S.AWAIT_MOBILE) return val.length !== 10
+    if (chatState === S.AWAIT_OTP) return val.length !== 6
     if (chatState === S.AWAIT_EPIC) return val.length !== 10
     return !val
   }
@@ -4726,6 +4815,8 @@ export default function ChatbotPage() {
       val = letters + digits
     } else if (chatState === S.AWAIT_MOBILE) {
       val = val.replace(/\D/g, '')
+    } else if (chatState === S.AWAIT_OTP) {
+      val = val.replace(/\D/g, '').slice(0, 6)
     }
     if (sendHint) setSendHint('')   // clear the hint as soon as the user types
     setInputValue(val)
@@ -4743,6 +4834,9 @@ export default function ChatbotPage() {
     const val = inputValue.trim()
     if (chatState === S.AWAIT_MOBILE) {
       return /^\d{10}$/.test(val) ? '' : 'Please enter a 10-digit mobile number'
+    }
+    if (chatState === S.AWAIT_OTP) {
+      return /^\d{6}$/.test(val) ? '' : 'Please enter the 6-digit OTP'
     }
     if (chatState === S.AWAIT_EPIC) {
       return /^[A-Z]{3}\d{7}$/.test(val) ? '' : 'Please enter a valid EPIC number (e.g. ABC1234567)'
@@ -4766,6 +4860,7 @@ export default function ChatbotPage() {
 
     switch (chatState) {
       case S.AWAIT_MOBILE:   await handleMobileSubmit(); break
+      case S.AWAIT_OTP:      await handleOtpSubmit(); break
       case S.AWAIT_EPIC:     await handleEpicSubmit(); break
       case S.AWAIT_BOOTH_NO: await handleBoothNoSubmit(); break
       default: break
@@ -5284,6 +5379,21 @@ export default function ChatbotPage() {
 
               <div ref={messagesEndRef} style={{ height: 8 }} />
             </main>
+
+            {/* Resend OTP bar (only during OTP entry) */}
+            {chatState === S.AWAIT_OTP && (
+              <div className="otp-resend-bar">
+                {otpResendIn > 0 ? (
+                  <span className="otp-resend-wait">
+                    <i className="bi bi-clock-history" /> Resend OTP in {otpResendIn}s
+                  </span>
+                ) : (
+                  <button type="button" className="otp-resend-btn" onClick={handleResendOtp} disabled={isTyping}>
+                    <i className="bi bi-arrow-clockwise" /> Resend OTP
+                  </button>
+                )}
+              </div>
+            )}
 
             {/* Input area */}
             <footer className="chat-input-area">

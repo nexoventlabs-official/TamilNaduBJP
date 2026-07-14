@@ -12,7 +12,8 @@ const config = require('../config');
  * @returns {{ success: boolean, message: string }}
  */
 async function sendOtp(mobile, otp) {
-  const apiKey = config.smsApiKey;
+  const apiKey   = config.smsApiKey;
+  const template = config.smsTemplateName;
 
   if (!apiKey) {
     if (config.nodeEnv === 'production') {
@@ -26,18 +27,28 @@ async function sendOtp(mobile, otp) {
   }
 
   try {
-    const url  = `https://2factor.in/API/V1/${apiKey}/SMS/${mobile}/${otp}`;
+    // 2factor "send-your-own-OTP" endpoint.
+    //  - default template:  /SMS/{mobile}/{otp}
+    //  - DLT-approved tmpl:  /SMS/{mobile}/{otp}/{template_name}  (sender id bound to template)
+    // The OTP value is substituted into the template's OTP variable.
+    const base = `https://2factor.in/API/V1/${apiKey}/SMS/${mobile}/${otp}`;
+    const url  = template ? `${base}/${encodeURIComponent(template)}` : base;
+
     const resp = await axios.get(url, { timeout: 15000 });
 
     if (resp.status === 200 && resp.data && resp.data.Status === 'Success') {
-      return { success: true, message: 'OTP sent successfully' };
+      // Details holds the 2factor session id — useful for tracing, not secret.
+      return { success: true, message: 'OTP sent successfully', sessionId: resp.data.Details };
     }
 
-    // Log response status only — never log OTP
-    console.warn('[SMS] Unexpected response status:', resp.data?.Status || resp.status);
+    // Log status/details only — never log the OTP itself
+    console.warn('[SMS] Unexpected response:', resp.data?.Status || resp.status, '-', resp.data?.Details || '');
     return { success: false, message: 'Could not send OTP. Please try again.' };
   } catch (err) {
-    console.error('[SMS] Send error:', err.message);
+    // 2factor returns Status:'Error' with a Details message on failure (e.g.
+    // invalid template, insufficient balance) — surface it in logs (not OTP).
+    const details = err.response?.data?.Details;
+    console.error('[SMS] Send error:', details || err.message);
     return { success: false, message: 'Could not send OTP. Please try again.' };
   }
 }

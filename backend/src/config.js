@@ -66,6 +66,9 @@ const config = {
   },
 
   smsApiKey:          process.env.SMS_API_KEY          || '',
+  // 2factor approved OTP template name (e.g. 'OTP1', sender id SULTNE).
+  // When set, OTP SMS is sent using this DLT-approved template.
+  smsTemplateName:    process.env.SMS_TEMPLATE_NAME     || '',
   whatsappChannelUrl: process.env.WHATSAPP_CHANNEL_URL || '',
 
   // WhatsApp Cloud API

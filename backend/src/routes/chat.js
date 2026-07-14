@@ -251,21 +251,29 @@ router.post('/verify-otp', chatVerifyOtpLimiter, async (req, res) => {
       { sort: { generated_at: -1 } }
     );
 
-    if ((stat && stat.card_url) || (genDoc && (genDoc.card_url || genDoc.card_b2_key))) {
+    // Treat the member as "has card" whenever a record exists — same rule as
+    // /check-mobile. Web chatbot registrations render the card client-side, so
+    // card_url/card_b2_key are intentionally empty; keying off them here wrongly
+    // sent verified members back to the EPIC step instead of showing the card.
+    const hasCard = Boolean(genDoc || (stat && stat.epic_no));
+    if (hasCard) {
       const s = stat || {};
       const g = genDoc || {};
       const name = (g.VOTER_NAME || `${g.FM_NAME_EN || ''} ${g.LASTNAME_EN || ''}`.trim() || '').trim();
       // FIX-06: regenerate a fresh presigned card URL from the B2 key
       const cardUrl = g.card_b2_key ? await getCardPresignedUrl(g.card_b2_key) : (s.card_url || g.card_url || '');
       return res.json({
-        success:    true,
-        has_card:   true,
-        epic_no:    s.epic_no  || g.EPIC_NO   || '',
-        card_url:   cardUrl,
-        back_url:   s.back_url || g.back_url  || '',
-        voter_name: name,
-        photo_url:  await getPhotoPresignedUrl(g.photo_url || ''),
-        bjp_code:   g.bjp_code  || '',
+        success:        true,
+        has_card:       true,
+        epic_no:        s.epic_no  || g.EPIC_NO   || '',
+        card_url:       cardUrl,
+        back_url:       s.back_url || g.back_url  || '',
+        combined_url:   cardUrl || g.combined_url || '',
+        voter_name:     name,
+        photo_url:      await getPhotoPresignedUrl(g.photo_url || ''),
+        bjp_code:       g.bjp_code  || '',
+        referral_link:  g.referral_link || '',
+        referred_count: g.referred_members_count || 0,
       });
     }
 
@@ -302,36 +310,20 @@ router.post('/check-mobile', chatCheckMobileLimiter, async (req, res) => {
 
     const hasCard = Boolean(genDoc || (stat && stat.epic_no));
 
-    // Establish the verified-mobile session on check-mobile success.
-    // NOTE: The web chatbot currently has no OTP step, so check-mobile is the
-    // de-facto login for session-gated features (My Members, referral link,
-    // volunteer/booth requests). This was briefly removed under "FIX-02" but
-    // that broke those features because no OTP flow exists yet on web.
-    // SECURITY TODO: once OTP login is added to the web flow, MOVE this session
-    // creation into /verify-otp and remove it here (that is the real FIX-02).
+    // FIX-05 (login path): an EXISTING member must verify an OTP before we
+    // reveal any card data. Do NOT set the session and do NOT return PII here.
+    // The client then calls /send-otp → /verify-otp, and /verify-otp is what
+    // authenticates the user, sets the session, and returns the card.
+    if (hasCard) {
+      return res.json({ success: true, has_card: true, requires_otp: true });
+    }
+
+    // New user (no card on record) → establish the verified-mobile session so
+    // the registration flow (validate-epic / generate-card) is authenticated.
+    // There is no pre-existing PII for this number, so no OTP gate is needed
+    // to *start* a registration.
     req.session.verified_mobile = mobile;
     req.session.cookie.maxAge   = 86400 * 1000;
-
-    if (hasCard) {
-      const g = genDoc || {};
-      const name = g.VOTER_NAME || `${g.FM_NAME_EN || ''} ${g.LASTNAME_EN || ''}`.trim();
-      // FIX-06: regenerate a fresh presigned card URL from the B2 key
-      const cardUrl = g.card_b2_key ? await getCardPresignedUrl(g.card_b2_key) : (g.card_url || '');
-      return res.json({
-        success:       true,
-        has_card:      true,
-        has_pin:       false,
-        epic_no:       g.EPIC_NO || (stat && stat.epic_no) || '',
-        voter_name:    name,
-        card_url:      cardUrl,
-        back_url:      g.back_url || '',
-        combined_url:  cardUrl || g.combined_url || '',
-        photo_url:     await getPhotoPresignedUrl(g.photo_url || ''),
-        bjp_code:      g.bjp_code || '',
-        referral_link: g.referral_link || '',
-        referred_count: g.referred_members_count || 0,
-      });
-    }
 
     return res.json({ success: true, has_card: false, has_pin: false });
   } catch (err) {
