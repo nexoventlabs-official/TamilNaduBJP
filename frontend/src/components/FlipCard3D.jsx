@@ -140,6 +140,19 @@ export const FlipCard3D = forwardRef(function FlipCard3D(
       const wrap = iframeDoc.querySelector('.card-wrap')
       if (wrap) { wrap.style.transform = 'none'; wrap.style.margin = '0' }
 
+      // Wait for the card's web fonts (Poppins / Barlow / Great Vibes) to finish
+      // loading INSIDE the iframe before capturing. Otherwise html2canvas can
+      // snapshot with a fallback system font on slow/rural connections → wrong
+      // font + broken text spacing. Capped so a stuck font never hangs download.
+      try {
+        if (iframeDoc.fonts && iframeDoc.fonts.ready) {
+          await Promise.race([
+            iframeDoc.fonts.ready,
+            new Promise((resolve) => setTimeout(resolve, 3000)),
+          ])
+        }
+      } catch { /* proceed with capture regardless */ }
+
       const frontCanvas = await h2c(cardEl, {
         scale: 3,
         useCORS: true,

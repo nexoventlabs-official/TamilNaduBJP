@@ -3019,7 +3019,7 @@ function FullMyMembersPanel({ bjpCode, onBack }) {
               width: 14,
               height: 14,
               borderRadius: '50%',
-              background: level === 1 ? '#FF9933' : level === 2 ? 'var(--color-signal-mint)' : '#17a2b8',
+              background: '#2ecc71',
               color: '#000',
               fontSize: 8,
               fontWeight: 'bold',
