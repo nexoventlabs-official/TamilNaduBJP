@@ -81,6 +81,11 @@ function createRateLimiter(maxRequests, windowSeconds, prefix = 'rl:generic:', k
 // Admin login — 5 attempts per 15 min
 const adminLoginLimiter = createRateLimiter(5, 15 * 60, 'rl:adminlogin:');
 
+// Admin OTP login (mobile-keyed). Send has its own 60s cooldown in the route;
+// these bound abuse per mobile without locking the small admin whitelist out.
+const adminOtpSendLimiter   = createRateLimiter(5, 10 * 60, 'rl:adminotpsend:', mobileKey);
+const adminOtpVerifyLimiter = createRateLimiter(8, 10 * 60, 'rl:adminotpverify:', mobileKey);
+
 // OTP send (send-otp) — 3 sends per 5 min, keyed by mobile (not IP) so users
 // behind a shared carrier NAT aren't throttled by each other at scale.
 const chatOtpLimiter = createRateLimiter(3, 5 * 60, 'rl:otp:', mobileKey);
@@ -128,6 +133,8 @@ const publicVerifyLimiter = createRateLimiter(10, 60, 'rl:publicverify:');
 module.exports = {
   createRateLimiter,
   adminLoginLimiter,
+  adminOtpSendLimiter,
+  adminOtpVerifyLimiter,
   chatOtpLimiter,
   chatVerifyOtpLimiter,
   chatGenerateCardLimiter,

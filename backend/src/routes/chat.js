@@ -318,13 +318,9 @@ router.post('/check-mobile', chatCheckMobileLimiter, async (req, res) => {
       return res.json({ success: true, has_card: true, requires_otp: true });
     }
 
-    // New user (no card on record) → establish the verified-mobile session so
-    // the registration flow (validate-epic / generate-card) is authenticated.
-    // There is no pre-existing PII for this number, so no OTP gate is needed
-    // to *start* a registration.
-    req.session.verified_mobile = mobile;
-    req.session.cookie.maxAge   = 60 * 60 * 1000;   // 1 hour (rolling — slides on each request)
-
+    // New user (no card on record). Do NOT grant a session here — the web flow
+    // now verifies EVERY mobile via OTP first. The verified-mobile session is
+    // established only in /verify-otp, so registration always requires OTP.
     return res.json({ success: true, has_card: false, has_pin: false });
   } catch (err) {
     console.error('check-mobile error:', err.message);

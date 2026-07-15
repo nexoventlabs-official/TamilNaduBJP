@@ -5,13 +5,14 @@
 const express = require('express');
 const router  = express.Router();
 const axios   = require('axios');
-const bcrypt  = require('bcryptjs');
+const crypto  = require('crypto');
 
 const { requireAdminAuth } = require('../middleware/auth');
-const { adminLoginLimiter } = require('../middleware/rateLimiter');
+const { adminOtpSendLimiter, adminOtpVerifyLimiter } = require('../middleware/rateLimiter');
 const { LoginAttemptTracker } = require('../utils/security');
 const { writeAuditLog } = require('../utils/auditLog');
-const { sanitizeSearch } = require('../utils/validators');
+const { sanitizeSearch, validateMobile, validateOtp } = require('../utils/validators');
+const { sendOtp } = require('../services/smsService');
 const { getPhotoPresignedUrl } = require('../services/backblazeService');
 const config = require('../config');
 const { getDb, getVoterDb, getVoterTotalCount, findVoterByEpic } = require('../db');
@@ -41,32 +42,124 @@ async function getCollectionSize(voterDb, colName) {
 }
 
 // ────────────────────────────────────────────────────────────────
-//  POST /admin/api/login
+//  Admin OTP login — restricted to a whitelist of mobile numbers.
+//  Password auth removed. OTPs are sent ONLY to whitelisted admins.
 // ────────────────────────────────────────────────────────────────
-router.post('/api/login', adminLoginLimiter, async (req, res) => {
+const ADMIN_OTP_TTL_SEC      = 5 * 60;  // OTP valid for 5 minutes
+const ADMIN_OTP_COOLDOWN_SEC = 60;      // 60s between sends
+const ADMIN_OTP_MAX_ATTEMPTS = 5;
+
+const genAdminOtp  = () => String(crypto.randomInt(100000, 1000000));
+const hashAdminOtp = (otp, mobile) =>
+  crypto.createHash('sha256').update(`${otp}:${mobile}:admin`).digest('hex');
+const isAdminMobile = (mobile) => config.admin.allowedMobiles.includes(mobile);
+
+// POST /admin/api/send-otp — send an OTP, but ONLY to whitelisted numbers
+router.post('/api/send-otp', adminOtpSendLimiter, async (req, res) => {
+  try {
+    const { valid, value: mobile } = validateMobile((req.body.mobile || '').trim());
+    if (!valid) {
+      return res.status(400).json({ success: false, message: 'Enter a valid 10-digit mobile number.' });
+    }
+
+    // Only whitelisted admin numbers receive an OTP.
+    if (!isAdminMobile(mobile)) {
+      const Sentry = require('@sentry/node');
+      Sentry.captureMessage(`Admin OTP requested for non-whitelisted mobile ****${mobile.slice(-4)} from ${req.ip}`, {
+        level: 'warning',
+      });
+      return res.status(403).json({ success: false, message: 'This mobile number is not authorized for admin access.' });
+    }
+
+    const db = getDb();
+    const now = new Date();
+    const cooldownCutoff = new Date(Date.now() - ADMIN_OTP_COOLDOWN_SEC * 1000);
+
+    // Atomic cooldown claim (unique index on mobile prevents rapid re-sends)
+    try {
+      await db.collection('admin_otp_sessions').findOneAndUpdate(
+        { mobile, $or: [{ created_at: { $exists: false } }, { created_at: { $lt: cooldownCutoff } }] },
+        { $set: { created_at: now, attempts: 0 } },
+        { upsert: true }
+      );
+    } catch (e) {
+      if (e.code === 11000) {
+        const cur = await db.collection('admin_otp_sessions').findOne({ mobile }, { projection: { created_at: 1 } });
+        const elapsed = cur?.created_at ? (Date.now() - new Date(cur.created_at).getTime()) / 1000 : 0;
+        const wait = Math.max(1, Math.ceil(ADMIN_OTP_COOLDOWN_SEC - elapsed));
+        return res.status(429).json({ success: false, message: `Please wait ${wait}s before requesting another OTP.` });
+      }
+      throw e;
+    }
+
+    const otp = genAdminOtp();
+    await db.collection('admin_otp_sessions').updateOne(
+      { mobile },
+      { $set: { otp_hash: hashAdminOtp(otp, mobile), created_at: now, attempts: 0 } },
+      { upsert: true }
+    );
+
+    const result = await sendOtp(mobile, otp);
+    if (!result.success) {
+      await db.collection('admin_otp_sessions').deleteOne({ mobile });
+      return res.status(502).json({ success: false, message: 'Could not send OTP. Please try again.' });
+    }
+    return res.json({ success: true, message: 'OTP sent to your mobile number.' });
+  } catch (err) {
+    console.error('admin send-otp error:', err.message);
+    return res.status(500).json({ success: false, message: 'Server error.' });
+  }
+});
+
+// POST /admin/api/verify-otp — verify OTP and establish the admin session
+router.post('/api/verify-otp', adminOtpVerifyLimiter, async (req, res) => {
   const ip = req.ip || req.connection.remoteAddress || 'unknown';
+  try {
+    const { valid: mV, value: mobile } = validateMobile((req.body.mobile || '').trim());
+    const { valid: oV, value: otp }    = validateOtp((req.body.otp || '').trim());
+    if (!mV || !oV) {
+      return res.status(400).json({ success: false, message: 'Invalid mobile number or OTP.' });
+    }
+    if (!isAdminMobile(mobile)) {
+      return res.status(403).json({ success: false, message: 'This mobile number is not authorized for admin access.' });
+    }
 
-  const { locked, retryAfter } = loginTracker.isLocked(ip);
-  if (locked) {
-    return res.status(429).json({
-      success: false,
-      message: `Too many failed attempts. Try again in ${Math.ceil(retryAfter / 60)} minutes.`,
-    });
-  }
+    const db  = getDb();
+    const doc = await db.collection('admin_otp_sessions').findOne({ mobile });
+    if (!doc || !doc.otp_hash) {
+      return res.status(400).json({ success: false, message: 'No OTP request found. Please request a new OTP.' });
+    }
 
-  const { username, password } = req.body;
-  if (!username || !password) {
-    return res.status(400).json({ success: false, message: 'Username and password required.' });
-  }
+    const ageSec = doc.created_at ? (Date.now() - new Date(doc.created_at).getTime()) / 1000 : Infinity;
+    if (ageSec > ADMIN_OTP_TTL_SEC) {
+      await db.collection('admin_otp_sessions').deleteOne({ mobile });
+      return res.status(400).json({ success: false, message: 'OTP expired. Please request a new one.' });
+    }
+    if ((doc.attempts || 0) >= ADMIN_OTP_MAX_ATTEMPTS) {
+      await db.collection('admin_otp_sessions').deleteOne({ mobile });
+      return res.status(429).json({ success: false, message: 'Too many incorrect attempts. Please request a new OTP.' });
+    }
 
-  const passwordValid = await bcrypt.compare(password, config.admin.passwordHash || '');
-  if (username === config.admin.username && passwordValid) {
+    // Constant-time OTP comparison
+    let match = false;
+    try {
+      match = crypto.timingSafeEqual(
+        Buffer.from(hashAdminOtp(otp, mobile), 'hex'),
+        Buffer.from(doc.otp_hash, 'hex'),
+      );
+    } catch { match = false; }
+
+    if (!match) {
+      await db.collection('admin_otp_sessions').updateOne({ mobile }, { $inc: { attempts: 1 } });
+      return res.status(401).json({ success: false, message: 'Incorrect OTP. Please try again.' });
+    }
+
+    // Success → clear OTP, establish admin session
+    await db.collection('admin_otp_sessions').deleteOne({ mobile });
     loginTracker.reset(ip);
     req.session.adminLoggedIn = true;
-    req.session.adminUsername = username;
+    req.session.adminUsername = mobile;   // track WHICH admin is logged in
     req.session.cookie.maxAge = 86400 * 1000;
-    // Explicitly save session before responding so the Set-Cookie header
-    // is guaranteed to be sent even if the store is async
     return req.session.save((err) => {
       if (err) {
         console.error('Session save error:', err.message);
@@ -74,15 +167,10 @@ router.post('/api/login', adminLoginLimiter, async (req, res) => {
       }
       return res.json({ success: true, message: 'Login successful.' });
     });
+  } catch (err) {
+    console.error('admin verify-otp error:', err.message);
+    return res.status(500).json({ success: false, message: 'Server error.' });
   }
-
-  loginTracker.recordAttempt(ip, username, false);
-  const Sentry = require('@sentry/node');
-  Sentry.captureMessage(`Failed admin login attempt: '${username}' from IP ${ip}`, {
-    level: 'warning',
-    extra: { ip, username }
-  });
-  return res.status(401).json({ success: false, message: 'Invalid credentials.' });
 });
 
 // ────────────────────────────────────────────────────────────────
@@ -559,7 +647,7 @@ router.post('/api/volunteer-requests/:bjpCode/confirm', async (req, res) => {
         $set: {
           status: 'confirmed',
           reviewed_at: new Date(),
-          reviewed_by: config.admin.username,
+          reviewed_by: req.session.adminUsername || 'admin',
           wing: req.body.wing || 'General Wing',
           name: member.VOTER_NAME || `${member.FM_NAME_EN || ''} ${member.LASTNAME_EN || ''}`.trim()
         },
@@ -595,7 +683,7 @@ router.post('/api/volunteer-requests/:bjpCode/reject', async (req, res) => {
     const prev = await db.collection('volunteer_requests').findOne({ bjp_code: req.params.bjpCode });
     const r  = await db.collection('volunteer_requests').updateOne(
       { bjp_code: req.params.bjpCode, status: 'pending' },
-      { $set: { status: 'rejected', reviewed_at: new Date(), reviewed_by: config.admin.username } }
+      { $set: { status: 'rejected', reviewed_at: new Date(), reviewed_by: req.session.adminUsername || 'admin' } }
     );
 
     if (r.modifiedCount) {
@@ -724,7 +812,7 @@ router.post('/api/booth-agent-requests/:bjpCode/confirm', async (req, res) => {
         $set: {
           status: 'confirmed',
           reviewed_at: new Date(),
-          reviewed_by: config.admin.username,
+          reviewed_by: req.session.adminUsername || 'admin',
           district: req.body.district || member.DISTRICT_NAME || '',
           assembly: req.body.assembly || member.ASSEMBLY_NAME || '',
           booth_no: req.body.booth_no || member.part_no || '',
@@ -762,7 +850,7 @@ router.post('/api/booth-agent-requests/:bjpCode/reject', async (req, res) => {
     const prev = await db.collection('booth_agent_requests').findOne({ bjp_code: req.params.bjpCode });
     const r  = await db.collection('booth_agent_requests').updateOne(
       { bjp_code: req.params.bjpCode, status: 'pending' },
-      { $set: { status: 'rejected', reviewed_at: new Date(), reviewed_by: config.admin.username } }
+      { $set: { status: 'rejected', reviewed_at: new Date(), reviewed_by: req.session.adminUsername || 'admin' } }
     );
 
     if (r.modifiedCount) {

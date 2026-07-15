@@ -251,7 +251,12 @@ app.get('/admin/api/csrf-token', (req, res) => {
 app.use('/admin/api', (req, res, next) => {
   if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS') return next();
   const pathOnly = (req.originalUrl || '').split('?')[0];
-  if (pathOnly.endsWith('/admin/api/login')) return next(); // login has no prior token
+  // Admin login endpoints run pre-authentication (no stable session yet), so
+  // they can't use the double-submit CSRF token. They're protected instead by
+  // the mobile whitelist + OTP + rate limiting.
+  if (pathOnly.endsWith('/admin/api/login') ||
+      pathOnly.endsWith('/admin/api/send-otp') ||
+      pathOnly.endsWith('/admin/api/verify-otp')) return next();
   return doubleCsrfProtection(req, res, next);
 });
 

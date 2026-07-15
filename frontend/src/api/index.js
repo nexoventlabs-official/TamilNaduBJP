@@ -23,7 +23,12 @@ api.interceptors.request.use(async (cfg) => {
   const url = cfg.url || ''
   const method = (cfg.method || 'get').toLowerCase()
   const mutating = ['post', 'put', 'patch', 'delete'].includes(method)
-  if (mutating && url.startsWith('/admin/api') && !url.includes('/admin/api/login')) {
+  // Admin login endpoints (login/send-otp/verify-otp) run pre-auth and are
+  // CSRF-exempt on the server — don't try to attach a token to them.
+  const isAdminAuthRoute = url.includes('/admin/api/login') ||
+                           url.includes('/admin/api/send-otp') ||
+                           url.includes('/admin/api/verify-otp')
+  if (mutating && url.startsWith('/admin/api') && !isAdminAuthRoute) {
     try {
       const token = await ensureCsrfToken()
       if (token) {
@@ -133,8 +138,12 @@ export const chat = {
 }
 
 export const admin = {
-  login: (username, password) =>
-    api.post('/admin/api/login', { username, password }),
+  // OTP-based admin login (restricted to whitelisted mobile numbers)
+  sendOtp: (mobile) =>
+    api.post('/admin/api/send-otp', { mobile }),
+
+  verifyOtp: (mobile, otp) =>
+    api.post('/admin/api/verify-otp', { mobile, otp }),
 
   logout: () =>
     api.post('/admin/api/logout'),

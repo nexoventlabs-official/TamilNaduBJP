@@ -1141,6 +1141,12 @@ function SelectWingMsg({ bjpCode, epicNo, isLatest }) {
                 <circle cx="12" cy="12" r="10" />
                 <polyline points="22 4 12 14.01 9 11.01" />
               </svg>
+            ) : existingRequest.status === 'rejected' ? (
+              <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="2" strokeLinecap="round">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="15" y1="9" x2="9" y2="15" />
+                <line x1="9" y1="9" x2="15" y2="15" />
+              </svg>
             ) : (
               <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="#FF9933" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="pending-svg">
                 <circle cx="12" cy="12" r="10" style={{ strokeDasharray: '60', strokeDashoffset: '20', animation: 'spin-pending 3s linear infinite' }} />
@@ -1181,11 +1187,18 @@ function SelectWingMsg({ bjpCode, epicNo, isLatest }) {
               gap: 4
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--color-ash)' }}>
-                <i className="bi bi-clock-history" style={{ color: '#FF9933' }} />
+                <i
+                  className={`bi ${existingRequest.status === 'confirmed' ? 'bi-check-circle-fill' : existingRequest.status === 'rejected' ? 'bi-x-circle-fill' : 'bi-clock-history'}`}
+                  style={{ color: existingRequest.status === 'confirmed' ? '#2ecc71' : existingRequest.status === 'rejected' ? '#dc2626' : '#FF9933' }}
+                />
                 <span>Application Status</span>
               </div>
               <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-chalk)' }}>
-                {existingRequest.status === 'confirmed' ? 'Approved & Activated' : 'Pending Admin Verification'}
+                {existingRequest.status === 'confirmed'
+                  ? 'Approved & Activated'
+                  : existingRequest.status === 'rejected'
+                  ? 'Rejected by Admin'
+                  : 'Pending Admin Verification'}
               </span>
             </div>
           </div>
@@ -1414,6 +1427,12 @@ function BoothAgentSetupMsg({ bjpCode, epicNo, isLatest }) {
               <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="#2ecc71" strokeWidth="2">
                 <circle cx="12" cy="12" r="10" />
                 <polyline points="22 4 12 14.01 9 11.01" />
+              </svg>
+            ) : existingRequest.status === 'rejected' ? (
+              <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="2" strokeLinecap="round">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="15" y1="9" x2="9" y2="15" />
+                <line x1="9" y1="9" x2="15" y2="15" />
               </svg>
             ) : (
               <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="#FF9933" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="pending-svg">
@@ -4455,38 +4474,24 @@ export default function ChatbotPage() {
     addMsg('user', 'text', { text: maskMobile(mobile) })
     setInputValue('')
 
+    // Verify the mobile via OTP for EVERYONE (new members and returning members).
+    // After OTP: existing member → show their card; new member → proceed to EPIC.
     setIsTyping(true)
     try {
-      const res = await chat.checkMobile(mobile)
+      const sent = await chat.sendOtp(mobile)
       setIsTyping(false)
-      if (res.has_card) {
-        // Existing member → verify OTP BEFORE revealing the card (no PII yet).
-        setIsTyping(true)
-        try {
-          const sent = await chat.sendOtp(mobile)
-          setIsTyping(false)
-          if (!sent?.success) {
-            await botSay('❌ Could not send OTP right now. Please try again in a moment.', 300)
-            return
-          }
-        } catch (e) {
-          setIsTyping(false)
-          await botSay(`❌ ${e?.message || 'Could not send OTP. Please try again.'}`, 300)
-          return
-        }
-        await botSay(`🔐 You're already a registered member. To view your ID card, enter the 6-digit OTP we just sent to ${maskMobile(mobile)}.`, 300)
-        setChatState(S.AWAIT_OTP)
-        startOtpCountdown(60)
+      if (!sent?.success) {
+        await botSay('❌ Could not send OTP right now. Please try again in a moment.', 300)
         return
       }
-    } catch (err) {
-      console.warn('checkMobile failed, falling back to normal flow:', err)
+    } catch (e) {
       setIsTyping(false)
+      await botSay(`❌ ${e?.message || 'Could not send OTP. Please try again.'}`, 300)
+      return
     }
-
-    await botSay('✅ Mobile number saved! Now enter your EPIC Number (Voter ID).', 400)
-    await botSay('📋 Format: 3 letters + 7 digits  e.g. ABC1234567', 200)
-    setChatState(S.AWAIT_EPIC)
+    await botSay(`🔐 We've sent a 6-digit OTP to ${maskMobile(mobile)}. Please enter it to continue.`, 300)
+    setChatState(S.AWAIT_OTP)
+    startOtpCountdown(60)
   }
 
   const handleOtpSubmit = async () => {
@@ -4526,8 +4531,9 @@ export default function ChatbotPage() {
         setChatState(S.DONE)
         return
       }
-      // Verified but somehow no card (edge case) → fall back to registration
-      await botSay('✅ Verified! Now enter your EPIC Number (Voter ID).', 300)
+      // Verified and no existing registration → start a new registration.
+      await botSay('✅ Mobile verified! You are not registered yet — enter your EPIC Number (Voter ID) to continue.', 300)
+      await botSay('📋 Format: 3 letters + 7 digits  e.g. ABC1234567', 200)
       setChatState(S.AWAIT_EPIC)
     } catch (err) {
       setIsTyping(false)

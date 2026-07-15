@@ -93,6 +93,10 @@ async function ensureAppIndexes() {
     await db.collection('otp_sessions').createIndex({ mobile: 1 },     { unique: true, background: true });
     await db.collection('otp_sessions').createIndex({ created_at: 1 }, { expireAfterSeconds: 600, background: true });
 
+    // Admin OTP login sessions (separate from member OTP to avoid key collisions)
+    await db.collection('admin_otp_sessions').createIndex({ mobile: 1 },     { unique: true, background: true });
+    await db.collection('admin_otp_sessions').createIndex({ created_at: 1 }, { expireAfterSeconds: 600, background: true });
+
     // Unique indexes prevent TOCTOU races on volunteer/booth requests
     await db.collection('volunteer_requests').createIndex(   { bjp_code: 1 }, { unique: true, sparse: true, background: true });
     await db.collection('volunteer_requests').createIndex(   { ptc_code: 1 }, { unique: true, sparse: true, background: true });

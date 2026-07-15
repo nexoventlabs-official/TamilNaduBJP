@@ -2,9 +2,16 @@ require('dotenv').config();
 
 const nodeEnv = process.env.NODE_ENV || 'development';
 
-// ── Startup secret validations ────────────────────────────────────
-if (!process.env.ADMIN_USERNAME || !process.env.ADMIN_PASSWORD_HASH) {
-  throw new Error('ADMIN_USERNAME and ADMIN_PASSWORD_HASH must be set in .env');
+// ── Admin access: OTP login restricted to a whitelist of mobile numbers ──
+// Set ADMIN_ALLOWED_MOBILES as a comma-separated list of 10-digit numbers.
+// Only these numbers can receive an admin login OTP.
+const adminAllowedMobiles = (process.env.ADMIN_ALLOWED_MOBILES || '')
+  .split(',')
+  .map((s) => s.replace(/\D/g, '').slice(-10))
+  .filter((m) => /^\d{10}$/.test(m));
+
+if (nodeEnv === 'production' && adminAllowedMobiles.length === 0) {
+  throw new Error('ADMIN_ALLOWED_MOBILES must list at least one 10-digit mobile number for admin OTP login');
 }
 
 if (!process.env.SESSION_SECRET || process.env.SESSION_SECRET.length < 32) {
@@ -61,8 +68,8 @@ const config = {
   },
 
   admin: {
-    username:     process.env.ADMIN_USERNAME,
-    passwordHash: process.env.ADMIN_PASSWORD_HASH,
+    // OTP login whitelist (10-digit mobiles). Password auth removed.
+    allowedMobiles: adminAllowedMobiles,
   },
 
   smsApiKey:          process.env.SMS_API_KEY          || '',
