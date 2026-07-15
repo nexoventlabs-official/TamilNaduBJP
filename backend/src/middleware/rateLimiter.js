@@ -34,12 +34,25 @@ function makeStore(prefix) {
 }
 
 /**
- * Factory for creating rate limiters.
- * @param {number} maxRequests  - max requests allowed in window
- * @param {number} windowSeconds - window duration in seconds
- * @param {string} prefix       - unique Redis key prefix for this limiter
+ * Key a limiter by the request's mobile number (from the JSON body) instead of
+ * IP, falling back to IP when no valid mobile is present. Indian mobile carriers
+ * use carrier-grade NAT, so thousands of distinct users can share one public IP;
+ * keying OTP/enumeration limiters by IP would falsely throttle them at scale.
+ * Per-mobile abuse is still fully blocked (plus the 60s cooldown + unique index).
  */
-function createRateLimiter(maxRequests, windowSeconds, prefix = 'rl:generic:') {
+function mobileKey(req) {
+  const m = String(req.body?.mobile || '').replace(/\D/g, '');
+  return m.length >= 10 ? m.slice(-10) : req.ip;
+}
+
+/**
+ * Factory for creating rate limiters.
+ * @param {number} maxRequests   - max requests allowed in window
+ * @param {number} windowSeconds - window duration in seconds
+ * @param {string} prefix        - unique Redis key prefix for this limiter
+ * @param {function} [keyGenerator] - optional custom key function (defaults to IP)
+ */
+function createRateLimiter(maxRequests, windowSeconds, prefix = 'rl:generic:', keyGenerator) {
   if (process.env.DISABLE_RATE_LIMITER === 'true') {
     return (req, res, next) => next();
   }
@@ -49,11 +62,13 @@ function createRateLimiter(maxRequests, windowSeconds, prefix = 'rl:generic:') {
     standardHeaders: true,
     legacyHeaders: false,
     store: makeStore(prefix),
+    ...(keyGenerator ? { keyGenerator } : {}),
     handler: (req, res) => {
       const route = req.originalUrl || req.url;
-      Sentry.captureMessage(`Rate limit exceeded: ${req.ip} on ${route}`, {
+      const key = keyGenerator ? keyGenerator(req) : req.ip;
+      Sentry.captureMessage(`Rate limit exceeded: ${key} on ${route}`, {
         level: 'warning',
-        extra: { ip: req.ip, route }
+        extra: { key, route }
       });
       res.status(429).json({
         success: false,
@@ -66,14 +81,16 @@ function createRateLimiter(maxRequests, windowSeconds, prefix = 'rl:generic:') {
 // Admin login — 5 attempts per 15 min
 const adminLoginLimiter = createRateLimiter(5, 15 * 60, 'rl:adminlogin:');
 
-// OTP send (send-otp) — 3 sends per 5 min
-const chatOtpLimiter = createRateLimiter(3, 5 * 60, 'rl:otp:');
+// OTP send (send-otp) — 3 sends per 5 min, keyed by mobile (not IP) so users
+// behind a shared carrier NAT aren't throttled by each other at scale.
+const chatOtpLimiter = createRateLimiter(3, 5 * 60, 'rl:otp:', mobileKey);
 
-// OTP verification — 5 attempts per 15 min (brute-force guard)
-const chatVerifyOtpLimiter = createRateLimiter(5, 15 * 60, 'rl:verifyotp:');
+// OTP verification — 5 attempts per 15 min (brute-force guard), keyed by mobile.
+const chatVerifyOtpLimiter = createRateLimiter(5, 15 * 60, 'rl:verifyotp:', mobileKey);
 
-// Mobile-registration check — 5 checks per 5 min (enumeration guard, FIX-05)
-const chatCheckMobileLimiter = createRateLimiter(5, 5 * 60, 'rl:checkmobile:');
+// Mobile-registration check — 5 checks per 5 min (enumeration guard, FIX-05),
+// keyed by mobile so a shared NAT IP doesn't block legitimate concurrent users.
+const chatCheckMobileLimiter = createRateLimiter(5, 5 * 60, 'rl:checkmobile:', mobileKey);
 
 // Card generation — 15 attempts per 10 min, keyed by session mobile (not IP).
 // Multiple members can share the same mobile carrier NAT IP; using session

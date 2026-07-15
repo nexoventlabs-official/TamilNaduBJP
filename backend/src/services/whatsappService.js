@@ -190,7 +190,7 @@ async function sendFlowMessage(to, flowType) {
           type: 'flow',
           header: { type: 'text', text: headerText },
           body:   { text: bodyText },
-          footer: { text: 'BJP Tamil Nadu — Lead the Change' },
+          footer: { text: 'BJP Tamil Nadu' },
           action: {
             name: 'flow',
             parameters: {

@@ -202,7 +202,7 @@ You should see these lines **4 times** (once per worker):
 [DB2] App DB connected (db: bjptamilnadu)
 [DB1] Voter DB connected (db: voter_db) — READ-ONLY [LOCAL]
 [DB2] MongoDB indexes ensured.
-WE THE LEADERS — Lead the Change
+TAMIL NADU BJP
 API server running on port 5000
 ```
 

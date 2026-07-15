@@ -229,7 +229,7 @@ async function handleTextMessage(from, mobile, db) {
         'Hi *' + name + '*! Welcome to *BJP Tamil Nadu*.\nTap the button below to receive your Digital Member ID Card instantly.',
         [{ id: BTN_MY_CARD, title: 'My Card' }],
         'BJP Tamil Nadu',
-        'Lead the Change',
+        '',
       );
     } else if (pending && pending.status === 'awaiting_photo') {
       const { makeUploadToken } = require('./upload');
@@ -239,7 +239,7 @@ async function handleTextMessage(from, mobile, db) {
         from,
         '📸 Upload Your Photo',
         `Hi! We have your details (EPIC: *${pending.epic_no}*).\n\nTap the button below to upload your passport-size photo and generate your *Digital Member ID Card*.\n\n_You can also send your photo directly in this chat._`,
-        'BJP Tamil Nadu — Lead the Change',
+        'BJP Tamil Nadu',
         'Upload Photo',
         uploadUrl,
       );
@@ -542,7 +542,7 @@ async function handleImageMessage(from, mobile, imageInfo, db) {
       'Assembly : ' + (pending.assembly_name || ''),
       'BJP Code : ' + bjpCode,
       '',
-      'BJP Tamil Nadu -- Lead the Change',
+      'BJP Tamil Nadu',
     ].join('\n');
 
     await sendImageMessage(from, frontUrl, frontCaption);
@@ -559,7 +559,7 @@ async function handleImageMessage(from, mobile, imageInfo, db) {
       '👥 *Share your referral link* with friends and family to invite them to join. ' +
       'Every member you refer will be shown in your *My Members* list!\n\n' +
       '🔗 Your personal referral link is ready — tap the button below to open it.',
-      'BJP Tamil Nadu — Lead the Change',
+      'BJP Tamil Nadu',
       '🔗 View My Referral Link',
       referralLink,
     );
@@ -641,13 +641,13 @@ async function handleSendCard(from, mobile, db) {
     if (epicNo)  parts.push('EPIC No  : ' + epicNo);
     if (bjpCode) parts.push('BJP Code : ' + bjpCode);
     parts.push('');
-    parts.push('BJP Tamil Nadu -- Lead the Change');
+    parts.push('BJP Tamil Nadu');
 
     await sendImageMessage(from, cardUrl, parts.join('\n'));
 
     if (backUrl) {
       await new Promise(function(r) { setTimeout(r, 800); });
-      await sendImageMessage(from, backUrl, 'Your Digital Member ID Card -- BACK\n\nBJP Tamil Nadu -- Lead the Change');
+      await sendImageMessage(from, backUrl, 'Your Digital Member ID Card -- BACK\n\nBJP Tamil Nadu');
     }
   } catch (err) {
     console.error('[Webhook] handleSendCard error (' + mobile + '):', err.message);

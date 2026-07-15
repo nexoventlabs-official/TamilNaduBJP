@@ -76,7 +76,7 @@ async function sendWAImage(imageUrl, caption) {
   console.log('[4/4] Sending to WhatsApp...');
   const fid = await sendWAImage(
     frontUrl,
-    '🪪 *Digital Member ID Card — FRONT* (TEST)\n👤 Test Member\n🔖 BJP-TESTCARD\n\nBJP Tamil Nadu — Lead the Change',
+    '🪪 *Digital Member ID Card — FRONT* (TEST)\n👤 Test Member\n🔖 BJP-TESTCARD\n\nBJP Tamil Nadu',
   );
   console.log(`      ✅ Front sent: ${fid}`);
 
@@ -84,7 +84,7 @@ async function sendWAImage(imageUrl, caption) {
 
   const bid = await sendWAImage(
     backUrl,
-    '🪪 *Digital Member ID Card — BACK* (TEST)\n\nBJP Tamil Nadu — Lead the Change',
+    '🪪 *Digital Member ID Card — BACK* (TEST)\n\nBJP Tamil Nadu',
   );
   console.log(`      ✅ Back sent: ${bid}`);
 

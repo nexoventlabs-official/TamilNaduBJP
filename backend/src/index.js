@@ -2,15 +2,19 @@
  * BJP Tamil Nadu — Express API Server
  * =====================================
  * Node.js port of Flask app.py
- * Lead the Change
  */
 require('dotenv').config();
 
 const Sentry = require('@sentry/node');
 
-// Initialize Sentry before requiring other route modules to ensure auto-instrumentation works
+// Initialize Sentry before requiring other route modules to ensure auto-instrumentation works.
+// DSN comes from the SENTRY_DSN env var (dotenv is loaded above). If it's unset,
+// the SDK is effectively disabled and all Sentry.* calls become safe no-ops.
+if (!process.env.SENTRY_DSN) {
+  console.warn('[Startup] SENTRY_DSN not set — error monitoring is disabled.');
+}
 Sentry.init({
-  dsn: "https://9beaab4828c82c718969bbcb7d4db92b@o4511709522886656.ingest.us.sentry.io/4511709628989441",
+  dsn: process.env.SENTRY_DSN || undefined,
 
   // Sample 10% of transactions to stay within the Sentry free tier
   tracesSampleRate: 0.1,
@@ -172,13 +176,17 @@ app.use(cookieParser());
 
 // ── Sessions ──────────────────────────────────────────────────────
 // Prefer Redis (shared across instances, fast); fall back to MongoDB.
+// Rolling 1-hour session: expires 1h after the member's LAST request. The
+// store TTL is refreshed on every request (touch) via `rolling: true`, so an
+// active user stays logged in and 1h of inactivity ends the session.
+const SESSION_TTL_SECONDS = 60 * 60; // 1 hour
 const sessionStore = redis.client
-  ? new RedisSessionStore({ client: redis.client, prefix: 'sess:', ttl: 86400 })
+  ? new RedisSessionStore({ client: redis.client, prefix: 'sess:', ttl: SESSION_TTL_SECONDS })
   : MongoStore.create({
       mongoUrl:       config.mongoUri,
       dbName:         config.mongoDb,
       collectionName: 'sessions',
-      ttl:            86400,
+      ttl:            SESSION_TTL_SECONDS,
       autoRemove:     'native',
     });
 console.log(`[Session] Using ${redis.client ? 'Redis' : 'MongoDB'} store`);
@@ -186,13 +194,14 @@ console.log(`[Session] Using ${redis.client ? 'Redis' : 'MongoDB'} store`);
 app.use(session({
   secret:            config.sessionSecret,
   resave:            false,
+  rolling:           true,             // slide expiry on every request (touch store + reset cookie)
   saveUninitialized: false,
   store: sessionStore,
   cookie: {
     httpOnly: true,
     sameSite: config.nodeEnv === 'production' ? 'none' : 'lax',
     secure:   config.nodeEnv === 'production',
-    maxAge:   86400 * 1000,
+    maxAge:   SESSION_TTL_SECONDS * 1000,   // 1 hour, refreshed each request
   },
   name: 'bjp.session',
 }));
@@ -285,7 +294,7 @@ async function startServer() {
 
   app.listen(config.port, () => {
     console.log('─────────────────────────────────────────');
-    console.log('  WE THE LEADERS — Lead the Change');
+    console.log('  TAMIL NADU BJP');
     console.log(`  API server running on port ${config.port}`);
     console.log(`  Environment : ${config.nodeEnv}`);
     console.log(`  Base URL    : ${config.baseUrl}`);

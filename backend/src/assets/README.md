@@ -4,7 +4,7 @@ The card generator automatically resolves assets from the project's existing
 `Id cards/` folder (sibling to the `backend/` directory):
 
 ```
-ANNAMALAI_MEMBERSHIP/
+NAINAR_NAGENDRAN_MEMBERSHIP/
 ├── Id cards/
 │   ├── leader.png              ← leader silhouette image
 │   ├── Montserrat-ExtraBold.ttf

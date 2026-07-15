@@ -137,7 +137,7 @@ async function sendWAImage(imageUrl, caption) {
     `🏛️  Assembly : ${doc.ASSEMBLY_NAME}`,
     `🔖 BJP Code : ${doc.bjp_code || doc.ptc_code || 'N/A'}`,
     '',
-    'BJP Tamil Nadu — Lead the Change',
+    'BJP Tamil Nadu',
   ].join('\n');
 
   const frontMsgId = await sendWAImage(frontUrl, frontCaption);
@@ -147,7 +147,7 @@ async function sendWAImage(imageUrl, caption) {
   await new Promise(r => setTimeout(r, 1000));
 
   // Back card
-  const backCaption = '🪪 *Your Digital Member ID Card — BACK*\n\nBJP Tamil Nadu — Lead the Change';
+  const backCaption = '🪪 *Your Digital Member ID Card — BACK*\n\nBJP Tamil Nadu';
   const backMsgId   = await sendWAImage(backUrl, backCaption);
   console.log(`      ✅ Back card sent   | msg ID: ${backMsgId}`);
 

@@ -384,7 +384,7 @@ async function handleConfirmDetails(body, flowToken) {
             waTo,
             '📸 Upload Your Photo',
             `Hi *${displayName}*! Your voter details are verified ✅\n\nTap the button below to upload your passport-size photo and generate your *Digital Member ID Card*.\n\n_You can also send your photo directly in this chat._`,
-            'BJP Tamil Nadu — Lead the Change',
+            'BJP Tamil Nadu',
             'Upload Photo',
             uploadUrl,
           );

@@ -235,7 +235,7 @@ router.post('/verify-otp', chatVerifyOtpLimiter, async (req, res) => {
     // Delete OTP immediately after first successful use
     await db.collection('otp_sessions').deleteOne({ mobile });
     req.session.verified_mobile = mobile;
-    req.session.cookie.maxAge   = 86400 * 1000;
+    req.session.cookie.maxAge   = 60 * 60 * 1000;   // 1 hour (rolling — slides on each request)
 
     // Check if user already has a card
     const stat   = await db.collection('generation_stats').findOne({ auth_mobile: mobile });
@@ -323,7 +323,7 @@ router.post('/check-mobile', chatCheckMobileLimiter, async (req, res) => {
     // There is no pre-existing PII for this number, so no OTP gate is needed
     // to *start* a registration.
     req.session.verified_mobile = mobile;
-    req.session.cookie.maxAge   = 86400 * 1000;
+    req.session.cookie.maxAge   = 60 * 60 * 1000;   // 1 hour (rolling — slides on each request)
 
     return res.json({ success: true, has_card: false, has_pin: false });
   } catch (err) {
@@ -613,7 +613,7 @@ router.post('/generate-card', chatGenerateCardLimiter, upload.single('photo'), a
     // they can't proceed / can't re-register). Forcing an explicit save here
     // means a store failure returns an error before we write anything.
     req.session.verified_mobile = mobile;
-    req.session.cookie.maxAge   = 86400 * 1000;
+    req.session.cookie.maxAge   = 60 * 60 * 1000;   // 1 hour (rolling — slides on each request)
     await new Promise((resolve, reject) =>
       req.session.save((err) => (err ? reject(err) : resolve()))
     );

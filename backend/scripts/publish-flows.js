@@ -1,5 +1,5 @@
 /**
- * Check and publish WhatsApp Flows for the Annamalai Membership project.
+ * Check and publish WhatsApp Flows for the Nainar Nagendran Membership project.
  *
  * What it does:
  *   1. Fetches current status of REGISTRATION and LOGIN flows from Meta
@@ -105,7 +105,7 @@ async function publishFlow(flowId) {
 
 (async () => {
   console.log("\n══════════════════════════════════════════════");
-  console.log("  Annamalai — Publish WhatsApp Flows");
+  console.log("  Nainar Nagendran — Publish WhatsApp Flows");
   console.log("══════════════════════════════════════════════\n");
 
   const endpointUri = BASE_URL ? `${BASE_URL}/api/webhook/flow` : null;

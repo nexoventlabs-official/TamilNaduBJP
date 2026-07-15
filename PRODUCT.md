@@ -51,6 +51,8 @@ Updated for the current production droplet (**4 vCPU / 8 GB RAM**, local voter D
 1. **Two card paths, very different ceilings**:
    - **Web registration (client-side canvas render)**: server work is just EPIC validation + photo upload, so this scales to roughly **~150–250 concurrent** registrations (hundreds–~1,000/min). This must remain the default path for web flows.
    - **WhatsApp card generation (server Puppeteer)**: the real bottleneck — safely **~4–8 concurrent** renders, ~30–60 cards/min. A burst beyond that risks an OOM crash because the shared browser has no concurrency cap and the droplet has **no swap**.
-2. **Voter DB Lookup Limits**: the parallel search across 234 assembly collections is connection-pool bound at `maxPoolSize 10`. Repeat lookups are now served from **Redis** (fast), but a burst of unique *cold* lookups still degrades past ~150–200 concurrent. Raising the pool to 50 is recommended.
-3. **Recovery Characteristics**: 8 GB gives more headroom than the legacy 2 GB box, but with **no swap** a severe Puppeteer overload can still wedge the droplet and require a reboot. Durable fixes: a WhatsApp render queue (cap ~4 concurrent) and 2–4 GB swap.
-4. **Scaling readiness**: cache, rate limiting, and sessions now live in Redis, so the app can run multiple instances behind a load balancer without weakening rate limits or duplicating cache.
+2. **Voter DB Lookup Limits**: the parallel search across 234 assembly collections is connection-pool bound at `maxPoo`
+3. 
+4. `lSize 10`. Repeat lookups are now served from **Redis** (fast), but a burst of unique *cold* lookups still degrades past ~150–200 concurrent. Raising the pool to 50 is recommended.
+5. **Recovery Characteristics**: 8 GB gives more headroom than the legacy 2 GB box, but with **no swap** a severe Puppeteer overload can still wedge the droplet and require a reboot. Durable fixes: a WhatsApp render queue (cap ~4 concurrent) and 2–4 GB swap.
+6. **Scaling readiness**: cache, rate limiting, and sessions now live in Redis, so the app can run multiple instances behind a load balancer without weakening rate limits or duplicating cache.

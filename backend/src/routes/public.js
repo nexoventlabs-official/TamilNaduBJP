@@ -68,7 +68,6 @@ router.get('/', async (req, res) => {
   res.json({
     success:   true,
     service:   'BJP Tamil Nadu — API Server',
-    tagline:   'Lead the Change',
     version:   '1.0.0',
     timestamp: new Date().toISOString(),
     status: {
@@ -183,8 +182,7 @@ ${cardUrl ? `.view-card{display:block;margin-top:20px;padding:14px;background:#f
 </style>
 </head>
 <body>
-<div class="logo">WE THE LEADERS</div>
-<div class="tagline">Lead the Change</div>
+<div class="logo">TAMIL NADU BJP</div>
 <div class="card">
   ${photoUrl ? `<img class="card-photo" src="${esc(photoUrl)}" alt="Member Photo"/>` : '<div class="no-photo">No photo</div>'}
   <div class="card-body">
@@ -335,7 +333,6 @@ router.get('/refer/:bjpCode/:referralId', async (req, res) => {
 </head>
 <body style="font-family:sans-serif;text-align:center;padding:40px;">
   <h2>BJP Tamil Nadu</h2>
-  <p><em>Lead the Change</em></p>
   <p>Redirecting… <a href="${redirectUrl}">Click here</a> if not redirected.</p>
   <script>window.location.href="${redirectUrl}";</script>
 </body>

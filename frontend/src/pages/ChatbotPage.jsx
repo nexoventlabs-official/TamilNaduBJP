@@ -64,7 +64,10 @@ const S = {
 }
 
 const CACHE_KEY = 'bjp_card_cache'
-const CACHE_TTL = 7 * 24 * 60 * 60 * 1000
+// Rolling 1-hour session: the cached login is valid for 1h from the LAST
+// activity. Every user action refreshes `timestamp` (see touchCache), so an
+// active member stays logged in; 1h of inactivity expires it (auto-logout).
+const CACHE_TTL = 60 * 60 * 1000   // 1 hour
 
 const getCache = () => {
   try {
@@ -81,6 +84,17 @@ const getCache = () => {
 
 const saveCache = (card, profile) =>
   localStorage.setItem(CACHE_KEY, JSON.stringify({ card, profile, timestamp: Date.now() }))
+
+// Refresh the last-active timestamp (sliding expiry) without touching the data.
+const touchCache = () => {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY)
+    if (!raw) return
+    const data = JSON.parse(raw)
+    data.timestamp = Date.now()
+    localStorage.setItem(CACHE_KEY, JSON.stringify(data))
+  } catch { /* ignore */ }
+}
 
 const clearCache = () => localStorage.removeItem(CACHE_KEY)
 
@@ -313,10 +327,37 @@ function FullReferralPanel({ link, onBack }) {
 
   const handleDownloadQR = () => {
     if (!canvasRef.current) return
-    const a = document.createElement('a')
-    a.download = 'bjp-referral-qr.png'
-    a.href = canvasRef.current.toDataURL('image/png')
-    a.click()
+    const filename = 'bjp-referral-qr.png'
+    canvasRef.current.toBlob((blob) => {
+      if (!blob) return
+      const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent) ||
+                    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+      if (isIOS) {
+        // WebKit ignores <a download> — share (Save to Photos) or open for long-press save
+        const file = new File([blob], filename, { type: 'image/png' })
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          navigator.share({ files: [file], title: 'BJP Referral QR' }).catch((e) => {
+            if (e && e.name === 'AbortError') return
+            const u = URL.createObjectURL(blob)
+            window.open(u, '_blank')
+            setTimeout(() => URL.revokeObjectURL(u), 15000)
+          })
+          return
+        }
+        const u = URL.createObjectURL(blob)
+        window.open(u, '_blank')
+        setTimeout(() => URL.revokeObjectURL(u), 15000)
+        return
+      }
+      const url = URL.createObjectURL(blob)
+      const a   = document.createElement('a')
+      a.href     = url
+      a.download = filename
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      setTimeout(() => URL.revokeObjectURL(url), 1000)
+    }, 'image/png', 1.0)
   }
 
   return (
@@ -4268,6 +4309,76 @@ export default function ChatbotPage() {
 
   // Clear the OTP resend timer on unmount
   useEffect(() => () => { if (otpTimerRef.current) clearInterval(otpTimerRef.current) }, [])
+
+  // ── Rolling session: auto-logout after 1 hour of inactivity ────
+  // Timer resets on every user action (sliding). If the member returns before
+  // 1h, the clock restarts; 1h of no activity logs them out automatically.
+  const AUTO_LOGOUT_MS   = 60 * 60 * 1000
+  const inactivityRef    = useRef(null)
+  const lastActivityRef  = useRef(0)
+
+  const doAutoLogout = useCallback(async () => {
+    if (inactivityRef.current) { clearTimeout(inactivityRef.current); inactivityRef.current = null }
+    // Clear client-side session state
+    clearCache()
+    cardRef.current    = null
+    profileRef.current = null
+    mobileRef.current  = ''
+    epicRef.current    = ''
+    try { localStorage.removeItem('bjp_referral') } catch { /* ignore */ }
+    // Best-effort destroy the server session
+    try { await chat.logout() } catch { /* ignore */ }
+    // Reset UI to a logged-out state with a notice (no reload → keep the message)
+    setSidebarOpen(false)
+    setActiveView('chat')
+    setModalCard(null)
+    setShowModal(false)
+    setMessages([])
+    setChatState(S.WELCOME)
+    addMsg('bot', 'text', { text: '🔒 You have been logged out after 1 hour of inactivity. Tap Start to continue.' })
+    addMsg('bot', 'welcome_banner', {})
+  // addMsg is a stable useCallback([]) declared later — referencing it in the
+  // dep array here would hit the temporal dead zone at render (ReferenceError).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const armInactivityTimer = useCallback(() => {
+    if (inactivityRef.current) clearTimeout(inactivityRef.current)
+    inactivityRef.current = setTimeout(() => { doAutoLogout() }, AUTO_LOGOUT_MS)
+  }, [doAutoLogout])
+
+  // Track activity + arm the inactivity timer only while logged in (card shown).
+  useEffect(() => {
+    if (chatState !== S.DONE) return
+
+    const onActivity = () => {
+      const now = Date.now()
+      if (now - lastActivityRef.current < 15000) return  // throttle to once / 15s
+      lastActivityRef.current = now
+      touchCache()
+      armInactivityTimer()
+    }
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible') return
+      if (!getCache()) { doAutoLogout(); return }  // expired while tab was hidden
+      touchCache()
+      armInactivityTimer()
+    }
+    const events = ['mousedown', 'keydown', 'touchstart', 'scroll']
+    events.forEach((e) => window.addEventListener(e, onActivity, { passive: true }))
+    document.addEventListener('visibilitychange', onVisible)
+
+    // Being on the logged-in screen counts as activity — start the clock.
+    lastActivityRef.current = Date.now()
+    touchCache()
+    armInactivityTimer()
+
+    return () => {
+      events.forEach((e) => window.removeEventListener(e, onActivity))
+      document.removeEventListener('visibilitychange', onVisible)
+      if (inactivityRef.current) { clearTimeout(inactivityRef.current); inactivityRef.current = null }
+    }
+  }, [chatState, armInactivityTimer, doAutoLogout])
 
   // ── Message helpers ───────────────────────────────────────
   const addMsg = useCallback((from, type, payload = {}) => {

@@ -17,6 +17,8 @@ export const FlipCard3D = forwardRef(function FlipCard3D(
   const [flipped, setFlipped]     = useState(false)
   const [downloading, setDownloading] = useState(false)
   const [loading, setLoading] = useState(true)
+  // iOS: preview overlay { url, blob, filename } — reliable save on all iOS browsers
+  const [iosPreview, setIosPreview] = useState(null)
   const iframeRef = useRef(null)
 
   // Card original dimensions
@@ -147,12 +149,43 @@ export const FlipCard3D = forwardRef(function FlipCard3D(
         height: ORIG_H,
       })
 
-      // Trigger download of front canvas directly (no backside combine)
-      const epic = String(cardData?.epic_no || cardData?.EPIC_NO || 'member').toUpperCase()
-      const a    = document.createElement('a')
-      a.download = `BJP_Card_${epic}.png`
-      a.href     = frontCanvas.toDataURL('image/png', 1.0)
+      const epic     = String(cardData?.epic_no || cardData?.EPIC_NO || 'member').toUpperCase()
+      const filename = `BJP_Card_${epic}.png`
+
+      // Get a PNG blob (works better than a data URL for large images)
+      const blob = await new Promise((resolve) => frontCanvas.toBlob(resolve, 'image/png', 1.0))
+      if (!blob) throw new Error('blob generation failed')
+
+      // iOS / iPadOS: WebKit ignores the <a download> attribute (this is true
+      // for Chrome/Firefox on iOS too — they're all WebKit). Use the Web Share
+      // API so the user can "Save to Photos"; fall back to opening the image.
+      const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent) ||
+                    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+
+      if (isIOS) {
+        // Show an in-app preview overlay. This is reliable across ALL iOS
+        // browsers (Safari, Chrome/CriOS, Firefox) because it doesn't depend on
+        // the <a download> attribute, popups, or a live user-activation window
+        // (html2canvas takes ~1-2s, after which Chrome-iOS blocks share/popup).
+        // The overlay's Save button fires on a FRESH tap, so navigator.share
+        // works; long-press on the image also saves to Photos.
+        const url = URL.createObjectURL(blob)
+        setIosPreview((prev) => {
+          if (prev?.url) URL.revokeObjectURL(prev.url)
+          return { url, blob, filename }
+        })
+        return
+      }
+
+      // Desktop / Android: standard blob download
+      const url = URL.createObjectURL(blob)
+      const a   = document.createElement('a')
+      a.href     = url
+      a.download = filename
+      document.body.appendChild(a)
       a.click()
+      document.body.removeChild(a)
+      setTimeout(() => URL.revokeObjectURL(url), 1000)
     } catch (err) {
       console.error('Download failed:', err)
       // Fallback: use iframe's own downloadPNG if our method fails
@@ -161,6 +194,30 @@ export const FlipCard3D = forwardRef(function FlipCard3D(
     } finally {
       setDownloading(false)
     }
+  }
+
+  // iOS overlay: "Save / Share" fires on a fresh tap → valid user activation,
+  // so navigator.share works even on Chrome-iOS. Falls back to opening the image.
+  const handleIosSave = async () => {
+    if (!iosPreview) return
+    const file = new File([iosPreview.blob], iosPreview.filename, { type: 'image/png' })
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({ files: [file], title: 'BJP Member ID Card' })
+        return
+      } catch (e) {
+        if (e && e.name === 'AbortError') return  // user cancelled — leave overlay open
+      }
+    }
+    // No file-share support → open the image in a new tab for long-press save
+    window.open(iosPreview.url, '_blank')
+  }
+
+  const closeIosPreview = () => {
+    setIosPreview((prev) => {
+      if (prev?.url) setTimeout(() => URL.revokeObjectURL(prev.url), 500)
+      return null
+    })
   }
 
   const cardStyle = { width: `${width}px`, height: `${height}px` }
@@ -332,6 +389,54 @@ export const FlipCard3D = forwardRef(function FlipCard3D(
           >
             <i className="bi bi-eye" /> Full View
           </button>
+        </div>
+      )}
+
+      {/* iOS save overlay — long-press the image OR tap Save to Photos */}
+      {iosPreview && (
+        <div
+          onClick={closeIosPreview}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 9999,
+            background: 'rgba(0,0,0,0.88)', backdropFilter: 'blur(6px)',
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+            padding: 20, gap: 16,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, maxWidth: 520, width: '100%' }}
+          >
+            <p style={{ color: '#fff', fontSize: 14, textAlign: 'center', margin: 0, lineHeight: 1.5 }}>
+              Press &amp; hold the card and tap <b>“Save to Photos”</b>, or use the button below.
+            </p>
+            <img
+              src={iosPreview.url}
+              alt="BJP Member ID Card"
+              style={{ width: '100%', height: 'auto', borderRadius: 12, boxShadow: '0 8px 30px rgba(0,0,0,0.5)' }}
+            />
+            <div style={{ display: 'flex', gap: 12, width: '100%' }}>
+              <button
+                onClick={handleIosSave}
+                style={{
+                  flex: 1, padding: '12px 16px', borderRadius: 10, border: 'none',
+                  background: '#F26522', color: '#fff', fontWeight: 700, fontSize: 15, cursor: 'pointer',
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                }}
+              >
+                <i className="bi bi-download" /> Save to Photos
+              </button>
+              <button
+                onClick={closeIosPreview}
+                style={{
+                  padding: '12px 16px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.4)',
+                  background: 'transparent', color: '#fff', fontWeight: 600, fontSize: 15, cursor: 'pointer',
+                }}
+              >
+                Close
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
