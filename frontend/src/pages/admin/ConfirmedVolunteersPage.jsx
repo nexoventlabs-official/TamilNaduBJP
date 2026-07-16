@@ -1,6 +1,13 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { admin } from '../../api'
+import '../../styles/admin-medialist.css'
+
+function Cover({ url }) {
+  const [error, setError] = useState(false)
+  if (url && !error) return <img className="ml-cover" src={url} alt="" onError={() => setError(true)} />
+  return <div className="ml-cover"><i className="bi bi-person-fill" /></div>
+}
 
 function Pagination({ page, total, perPage = 20, onChange }) {
   const totalPages = Math.max(1, Math.ceil(total / perPage))
@@ -84,59 +91,33 @@ export default function ConfirmedVolunteersPage() {
           <div className="empty-state"><i className="bi bi-check-circle" /><p>No confirmed organizers found{search ? ` for "${search}"` : ''}.</p></div>
         ) : (
           <>
-            <div className="admin-table-wrap">
-              <table className="admin-table">
-                <thead>
-                  <tr>
-                    <th>#</th>
-                    <th>Photo</th>
-                    <th>Name</th>
-                    <th>EPIC No</th>
-                    <th>BJP Code</th>
-                    <th>Mobile</th>
-                    <th>Assembly</th>
-                    <th>Confirmed At</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {volunteers.map((v, i) => {
-                    const codeVal = v.bjp_code || v.ptc_code
-                    return (
-                      <tr 
-                        key={codeVal || v.epic_no || i}
-                        style={{ cursor: 'pointer' }}
-                        onClick={() => codeVal && navigate(`/admin/generated-voters/${codeVal}`)}
-                      >
-                        <td style={{ color: '#8696a0' }}>{(page - 1) * 20 + i + 1}</td>
-                        <td>
-                          {v.photo_url ? (
-                            <img src={v.photo_url} alt="Profile" style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover' }} />
-                          ) : (
-                            <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#eee', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                              <i className="bi bi-person-fill" style={{ fontSize: 18, color: '#bbb' }} />
-                            </div>
-                          )}
-                        </td>
-                        <td>{v.name || v.Name}</td>
-                        <td>
-                          <Link to={`/admin/voters/${v.epic_no}`} style={{ color: '#64b5f6', fontSize: 12 }}>{v.epic_no}</Link>
-                        </td>
-                        <td>
-                          {codeVal
-                            ? <Link to={`/admin/generated-voters/${codeVal}`} style={{ color: '#43a047', fontSize: 12 }}>{codeVal}</Link>
-                            : '—'
-                          }
-                        </td>
-                        <td style={{ color: '#8696a0', fontSize: 12 }}>{v.mobile || '—'}</td>
-                        <td style={{ color: '#8696a0' }}>{v.assembly || v.AssemblyName || '—'}</td>
-                        <td style={{ color: '#8696a0', fontSize: 11 }}>
-                          {v.confirmed_at ? new Date(v.confirmed_at).toLocaleDateString() : '—'}
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
+            <div className="admin-medialist">
+              {volunteers.map((v, i) => {
+                const codeVal = v.bjp_code || v.ptc_code
+                return (
+                  <div
+                    key={codeVal || v.epic_no || i}
+                    className="ml-row ml-clickable"
+                    onClick={() => codeVal && navigate(`/admin/generated-voters/${codeVal}`)}
+                  >
+                    <span className="ml-index">{(page - 1) * 20 + i + 1}</span>
+                    <Cover url={v.photo_url} />
+                    <div className="ml-info">
+                      <span className="ml-name">{v.name || v.Name || '—'}</span>
+                      <span className="ml-sub">
+                        <code>{v.epic_no}</code>
+                        {codeVal && <span className="ml-code">{codeVal}</span>}
+                        {(v.assembly || v.AssemblyName) && <span>{v.assembly || v.AssemblyName}</span>}
+                        {v.mobile && <span className="ml-mob">{v.mobile}</span>}
+                      </span>
+                    </div>
+                    <div className="ml-right">
+                      <span className="ml-badge b-confirmed">Organizer</span>
+                      <span className="ml-date">{v.confirmed_at ? new Date(v.confirmed_at).toLocaleDateString() : ''}</span>
+                    </div>
+                  </div>
+                )
+              })}
             </div>
             <Pagination page={page} total={data.total} onChange={setPage} />
           </>

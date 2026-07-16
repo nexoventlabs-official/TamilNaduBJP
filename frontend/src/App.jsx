@@ -1,4 +1,5 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
+import { LanguageProvider } from './i18n/LanguageContext'
 import ChatbotPage from './pages/ChatbotPage'
 import NotFoundPage from './pages/NotFoundPage'
 import CardPage from './pages/CardPage'
@@ -24,7 +25,7 @@ import MeetRequestsPage from './pages/admin/MeetRequestsPage'
 export default function App() {
   return (
     <Routes>
-      <Route path="/" element={<ChatbotPage />} />
+      <Route path="/" element={<LanguageProvider><ChatbotPage /></LanguageProvider>} />
       <Route path="/card/:epicNo" element={<CardPage />} />
       <Route path="/verify/:epicNo" element={<VerifyPage />} />
       <Route path="/refer/:bjpCode/:referralId" element={<ReferralPage />} />

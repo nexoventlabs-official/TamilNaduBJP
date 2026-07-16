@@ -1,6 +1,34 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { admin } from '../../api'
+import '../../styles/admin-medialist.css'
+
+// Gold crown for #1, silver/bronze medals for #2/#3, plain number otherwise
+function RankBadge({ rank }) {
+  if (rank === 1) {
+    return (
+      <span className="ml-rank" title="Top referrer">
+        <svg className="ml-crown" width="22" height="22" viewBox="0 0 24 24" fill="#FFC107" xmlns="http://www.w3.org/2000/svg">
+          <path d="M3 7l4.5 3.5L12 4l4.5 6.5L21 7l-1.8 10.5H4.8L3 7z" />
+          <rect x="4.8" y="18.2" width="14.4" height="2.4" rx="0.8" />
+          <circle cx="3" cy="6.2" r="1.4" />
+          <circle cx="21" cy="6.2" r="1.4" />
+          <circle cx="12" cy="3.2" r="1.4" />
+        </svg>
+      </span>
+    )
+  }
+  const medalCls = rank === 2 ? 'silver' : rank === 3 ? 'bronze' : 'plain'
+  return (
+    <span className="ml-rank"><span className={`ml-medal ${medalCls}`}>{rank}</span></span>
+  )
+}
+
+function LbCover({ url }) {
+  const [error, setError] = useState(false)
+  if (url && !error) return <img className="ml-cover" src={url} alt="" onError={() => setError(true)} />
+  return <div className="ml-cover"><i className="bi bi-person-fill" /></div>
+}
 
 function StatCard({ icon, label, value, color, bg }) {
   return (
@@ -91,52 +119,34 @@ export default function DashboardPage() {
             <h6 className="admin-card-title"><i className="bi bi-trophy-fill text-coral" /> Top 5 Referrers</h6>
             <span style={{ fontSize: 11, color: '#8696a0' }}>Referral Champions</span>
           </div>
-          <div className="admin-table-wrap" style={{ border: 'none', margin: 0 }}>
-            <table className="admin-table" style={{ fontSize: 12 }}>
-              <thead>
-                <tr>
-                  <th style={{ padding: '8px 12px' }}>#</th>
-                  <th style={{ padding: '8px 12px' }}>Photo</th>
-                  <th style={{ padding: '8px 12px' }}>Name</th>
-                  <th style={{ padding: '8px 12px' }}>Code</th>
-                  <th style={{ padding: '8px 12px' }}>Assembly</th>
-                  <th style={{ padding: '8px 12px' }}>Count</th>
-                </tr>
-              </thead>
-              <tbody>
-                {s.top_referrals && s.top_referrals.length > 0 ? (
-                  s.top_referrals.map((r, idx) => (
-                    <tr key={idx} onClick={() => navigate(`/admin/generated-voters/${r.code}`)} style={{ cursor: 'pointer' }} className="admin-clickable-row">
-                      <td style={{ padding: '8px 12px', color: 'var(--admin-ink-dim)', verticalAlign: 'middle' }}>{idx + 1}</td>
-                      <td style={{ padding: '8px 12px', verticalAlign: 'middle' }}>
-                        {r.photo_url ? (
-                          <img src={r.photo_url} alt="Profile" style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', border: '1px solid rgba(0,0,0,0.08)' }} />
-                        ) : (
-                          <div style={{ width: 36, height: 36, borderRadius: '50%', backgroundColor: 'rgba(0,0,0,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <i className="bi bi-person-fill" style={{ color: '#8696a0', fontSize: 16 }} />
-                          </div>
-                        )}
-                      </td>
-                      <td style={{ padding: '8px 12px', fontWeight: '500', verticalAlign: 'middle' }}>{r.name}</td>
-                      <td style={{ padding: '8px 12px', fontFamily: 'monospace', verticalAlign: 'middle' }}>{r.code}</td>
-                      <td style={{ padding: '8px 12px', verticalAlign: 'middle' }}>{r.assembly || r.district}</td>
-                      <td style={{ padding: '8px 12px', verticalAlign: 'middle' }}>
-                        <span className="badge-status badge-generated" style={{ fontWeight: '600', padding: '2px 6px', fontSize: 11 }}>
-                          {r.referrals}
-                        </span>
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={6} style={{ textAlign: 'center', padding: 20, color: 'var(--admin-ink-dim)' }}>
-                      No referrals data yet.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+          {s.top_referrals && s.top_referrals.length > 0 ? (
+            <div className="admin-medialist">
+              {s.top_referrals.map((r, idx) => (
+                <div
+                  key={idx}
+                  className={`ml-row ml-clickable${idx === 0 ? ' ml-first' : ''}`}
+                  onClick={() => navigate(`/admin/generated-voters/${r.code}`)}
+                >
+                  <RankBadge rank={idx + 1} />
+                  <LbCover url={r.photo_url} />
+                  <div className="ml-info">
+                    <span className="ml-name">{r.name || '—'}</span>
+                    <span className="ml-sub">
+                      {r.code && <span className="ml-code">{r.code}</span>}
+                      {(r.assembly || r.district) && <span>{r.assembly || r.district}</span>}
+                    </span>
+                  </div>
+                  <div className="ml-right">
+                    <span className="ml-count" title="Referrals"><i className="bi bi-people-fill" /> {r.referrals}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div style={{ textAlign: 'center', padding: 24, color: 'var(--admin-ink-dim)', fontSize: 13 }}>
+              No referrals data yet.
+            </div>
+          )}
         </div>
       </div>
 

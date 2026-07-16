@@ -1,6 +1,13 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { admin } from '../../api'
+import '../../styles/admin-medialist.css'
+
+function Cover({ url }) {
+  const [error, setError] = useState(false)
+  if (url && !error) return <img className="ml-cover" src={url} alt="" onError={() => setError(true)} />
+  return <div className="ml-cover"><i className="bi bi-person-fill" /></div>
+}
 
 function Pagination({ page, total, perPage = 20, onChange }) {
   const totalPages = Math.max(1, Math.ceil(total / perPage))
@@ -84,66 +91,33 @@ export default function ConfirmedBoothAgentsPage() {
           <div className="empty-state"><i className="bi bi-shield-check" /><p>No confirmed booth agents found{search ? ` for "${search}"` : ''}.</p></div>
         ) : (
           <>
-            <div className="admin-table-wrap">
-              <table className="admin-table">
-                <thead>
-                  <tr>
-                    <th>#</th>
-                    <th>Photo</th>
-                    <th>Name</th>
-                    <th>EPIC No</th>
-                    <th>BJP Code</th>
-                    <th>Booth No</th>
-                    <th>Mobile</th>
-                    <th>Assembly</th>
-                    <th>Confirmed At</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {agents.map((a, i) => {
-                    const codeVal = a.bjp_code || a.ptc_code
-                    return (
-                      <tr 
-                        key={codeVal || a.epic_no || i}
-                        style={{ cursor: 'pointer' }}
-                        onClick={() => codeVal && navigate(`/admin/generated-voters/${codeVal}`)}
-                      >
-                        <td style={{ color: 'var(--admin-ink-dim)' }}>{(page - 1) * 20 + i + 1}</td>
-                        <td>
-                          {a.photo_url ? (
-                            <img src={a.photo_url} alt="Profile" style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover' }} />
-                          ) : (
-                            <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#eee', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                              <i className="bi bi-person-fill" style={{ fontSize: 18, color: '#bbb' }} />
-                            </div>
-                          )}
-                        </td>
-                        <td>{a.name || a.Name}</td>
-                        <td>
-                          <Link to={`/admin/voters/${a.epic_no}`} style={{ color: 'var(--admin-badge-blue)', fontSize: 12 }}>{a.epic_no}</Link>
-                        </td>
-                        <td>
-                          {codeVal
-                            ? <Link to={`/admin/generated-voters/${codeVal}`} style={{ color: 'var(--admin-badge-green)', fontSize: 12 }}>{codeVal}</Link>
-                            : '—'
-                          }
-                        </td>
-                        <td>
-                          {a.booth_no
-                            ? <span style={{ background: 'rgba(21,101,192,0.12)', color: 'var(--admin-badge-blue)', padding: '2px 8px', borderRadius: 12, fontSize: 12, fontWeight: 600 }}>{a.booth_no}</span>
-                            : '—'
-                          }
-                        </td>
-                        <td style={{ color: 'var(--admin-ink-dim)', fontSize: 12 }}>{a.mobile || '—'}</td>
-                        <td style={{ color: 'var(--admin-ink-dim)' }}>{a.assembly || a.AssemblyName || '—'}</td>
-                        <td style={{ color: 'var(--admin-ink-dim)', fontSize: 11 }}>
-                          {a.confirmed_at ? new Date(a.confirmed_at).toLocaleDateString() : '—'}
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
+            <div className="admin-medialist">
+              {agents.map((a, i) => {
+                const codeVal = a.bjp_code || a.ptc_code
+                return (
+                  <div
+                    key={codeVal || a.epic_no || i}
+                    className="ml-row ml-clickable"
+                    onClick={() => codeVal && navigate(`/admin/generated-voters/${codeVal}`)}
+                  >
+                    <span className="ml-index">{(page - 1) * 20 + i + 1}</span>
+                    <Cover url={a.photo_url} />
+                    <div className="ml-info">
+                      <span className="ml-name">{a.name || a.Name || '—'}</span>
+                      <span className="ml-sub">
+                        <code>{a.epic_no}</code>
+                        {codeVal && <span className="ml-code">{codeVal}</span>}
+                        {(a.assembly || a.AssemblyName) && <span>{a.assembly || a.AssemblyName}</span>}
+                        {a.mobile && <span className="ml-mob">{a.mobile}</span>}
+                      </span>
+                    </div>
+                    <div className="ml-right">
+                      {a.booth_no && <span className="ml-tag"><i className="bi bi-building" /> Booth {a.booth_no}</span>}
+                      <span className="ml-date">{a.confirmed_at ? new Date(a.confirmed_at).toLocaleDateString() : ''}</span>
+                    </div>
+                  </div>
+                )
+              })}
             </div>
             <Pagination page={page} total={data.total} onChange={setPage} />
           </>

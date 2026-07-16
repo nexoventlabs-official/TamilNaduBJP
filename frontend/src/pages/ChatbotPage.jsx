@@ -7,6 +7,7 @@ import { chat, publicApi } from '../api'
 import { FlipCard3D } from '../components/FlipCard3D'
 import html2canvas from 'html2canvas'
 import '../styles/chatbot.css'
+import { useLang } from '../i18n/LanguageContext'
 
 // ── Read referral params from landing URL (?ref=BJP-XXXX&rid=REF-XXXX)
 const getReferralParams = () => {
@@ -132,6 +133,7 @@ const getActiveStep = (chatState) => {
 
 // ── Crop Modal ──────────────────────────────────────────────
 function CropModal({ src, onCrop, onCancel }) {
+  const { t } = useLang()
   const imgRef = useRef(null)
   const cropperRef = useRef(null)
 
@@ -174,17 +176,17 @@ function CropModal({ src, onCrop, onCancel }) {
     <div className="crop-overlay">
       <div className="crop-modal">
         <div className="crop-modal-header">
-          <h5><i className="bi bi-crop" /> Crop Your Photo</h5>
+          <h5><i className="bi bi-crop" /> {t('Crop Your Photo')}</h5>
           <button className="crop-close-btn" onClick={onCancel}><i className="bi bi-x-lg" /></button>
         </div>
         <div className="crop-modal-body">
           <img ref={imgRef} src={src} alt="Crop preview" style={{ display: 'block', maxWidth: '100%' }} />
         </div>
         <div className="crop-modal-footer">
-          <span className="crop-hint"><i className="bi bi-info-circle" /> Drag to adjust. Aspect ratio 2.68:3.84.</span>
-          <button className="btn btn-sm btn-outline-secondary" onClick={onCancel}>Cancel</button>
+          <span className="crop-hint"><i className="bi bi-info-circle" /> {t('Drag to adjust. Aspect ratio 2.68:3.84.')}</span>
+          <button className="btn btn-sm btn-outline-secondary" onClick={onCancel}>{t('Cancel')}</button>
           <button className="btn btn-sm btn-danger" onClick={handleCrop}>
-            <i className="bi bi-check-lg" /> Use Photo
+            <i className="bi bi-check-lg" /> {t('Use Photo')}
           </button>
         </div>
       </div>
@@ -194,16 +196,17 @@ function CropModal({ src, onCrop, onCancel }) {
 
 // ── Message renderers ───────────────────────────────────────
 function WelcomeBannerMsg({ onStart }) {
+  const { t } = useLang()
   return (
     <div className="welcome-banner">
       <img src="/banner.png" alt="BJP Tamil Nadu" className="banner-img"
         loading="lazy"
         onError={(e) => { e.target.style.display = 'none' }} />
       <div className="banner-content">
-        <h2>World's Largest. India's Biggest. Soon to be Tamil Nadu's No. 1.</h2>
-        <p>You are joining the world's leading political organization. Click below to generate your personalized Member Card.</p>
+        <h2>{t("World's Largest. India's Biggest. Soon to be Tamil Nadu's No. 1.")}</h2>
+        <p>{t("You are joining the world's leading political organization. Click below to generate your personalized Member Card.")}</p>
         <button className="btn-start" onClick={onStart}>
-          <i className="bi bi-play-circle-fill" /> Start
+          <i className="bi bi-play-circle-fill" /> {t('Start')}
         </button>
       </div>
     </div>
@@ -211,6 +214,7 @@ function WelcomeBannerMsg({ onStart }) {
 }
 
 function VoterCardMsg({ voter, isLatest, chatState, onConfirm, onRetry, disabled }) {
+  const { t } = useLang()
   const v = voter || {}
   const rows = [
     { label: 'Name',         value: v.name || v.Name || v.voter_name },
@@ -228,12 +232,12 @@ function VoterCardMsg({ voter, isLatest, chatState, onConfirm, onRetry, disabled
   return (
     <div className="voter-details-card">
       <div className="vdc-header">
-        <i className="bi bi-person-badge" /> Voter Details
+        <i className="bi bi-person-badge" /> {t('Voter Details')}
       </div>
       <div className="vdc-body">
         {rows.map((r) => (
           <div className="vdc-row" key={r.label}>
-            <span className="vdc-label">{r.label}</span>
+            <span className="vdc-label">{t(r.label)}</span>
             <span className="vdc-value">{r.value}</span>
           </div>
         ))}
@@ -241,10 +245,10 @@ function VoterCardMsg({ voter, isLatest, chatState, onConfirm, onRetry, disabled
       {showButtons && (
         <div className="interactive-buttons">
           <button className="interactive-btn" onClick={onConfirm} disabled={disabled}>
-            <i className="bi bi-check-circle-fill" /> Confirm Details
+            <i className="bi bi-check-circle-fill" /> {t('Confirm Details')}
           </button>
           <button className="interactive-btn" onClick={onRetry} disabled={disabled} style={{ color: '#d32f2f' }}>
-            <i className="bi bi-arrow-counterclockwise" /> Re-enter ID
+            <i className="bi bi-arrow-counterclockwise" /> {t('Re-enter ID')}
           </button>
         </div>
       )}
@@ -254,6 +258,7 @@ function VoterCardMsg({ voter, isLatest, chatState, onConfirm, onRetry, disabled
 
 // ── Referral Link Message ────────────────────────────────────
 function FullReferralPanel({ link, onBack }) {
+  const { t } = useLang()
   const canvasRef = useRef(null)
   const [copied, setCopied] = useState(false)
   const [qrReady, setQrReady] = useState(false)
@@ -300,14 +305,14 @@ function FullReferralPanel({ link, onBack }) {
   const handleShareWhatsApp = () => {
     if (!link || !canvasRef.current) return
     // WhatsApp bold markdown: *text*
-    const shareText = `*🪷 Join BJP Tamil Nadu!*\n\n*Generate your free Digital Member ID Card here:*\n${link}`
+    const shareText = `${t('*🪷 Join BJP Tamil Nadu!*')}\n\n${t('*Generate your free Digital Member ID Card here:*')}\n${link}`
     // Try Web Share API (mobile) — sends QR image + text as a single share
     if (navigator.canShare && canvasRef.current) {
       canvasRef.current.toBlob((blob) => {
         const file = new File([blob], 'bjp-referral-qr.png', { type: 'image/png' })
         if (navigator.canShare({ files: [file] })) {
           navigator.share({
-            title: '🪷 Join BJP Tamil Nadu!',
+            title: t('🪷 Join BJP Tamil Nadu!'),
             text: shareText,
             files: [file]
           }).catch(() => {
@@ -374,7 +379,7 @@ function FullReferralPanel({ link, onBack }) {
             <i className="bi bi-chevron-left" />
           </button>
           <i className="bi bi-link-45deg brochure-title-orange" />
-          <span>Referral Link</span>
+          <span>{t('Referral Link')}</span>
         </div>
       </header>
 
@@ -402,7 +407,7 @@ function FullReferralPanel({ link, onBack }) {
             {/* Caption */}
             <p style={{ fontSize: 13, color: 'var(--color-ash)', textAlign: 'center', margin: 0, lineHeight: 1.5 }}>
               <i className="bi bi-qr-code me-1" style={{ color: '#f26522' }} />
-              Scan this QR to join BJP Tamil Nadu
+              {t('Scan this QR to join BJP Tamil Nadu')}
             </p>
 
             {/* Link Box */}
@@ -428,30 +433,30 @@ function FullReferralPanel({ link, onBack }) {
                 style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.15)', background: copied ? 'rgba(46,204,113,0.15)' : 'rgba(255,255,255,0.07)', color: copied ? '#2ecc71' : 'var(--color-chalk)', fontSize: 14, fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s' }}
               >
                 <i className={`bi bi-${copied ? 'check-lg' : 'clipboard'}`} />
-                {copied ? 'Copied!' : 'Copy Link'}
+                {copied ? t('Copied!') : t('Copy Link')}
               </button>
               <button
                 onClick={handleShareWhatsApp}
                 style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px', borderRadius: 10, border: 'none', background: '#25d366', color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}
               >
-                <i className="bi bi-whatsapp" /> Share on WhatsApp
+                <i className="bi bi-whatsapp" /> {t('Share on WhatsApp')}
               </button>
               <button
                 onClick={handleDownloadQR}
                 style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px', borderRadius: 10, border: '1px solid rgba(242,101,34,0.4)', background: 'rgba(242,101,34,0.08)', color: '#f26522', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}
               >
-                <i className="bi bi-download" /> Download QR Code
+                <i className="bi bi-download" /> {t('Download QR Code')}
               </button>
             </div>
 
             <p style={{ fontSize: 12, color: 'var(--color-ash)', textAlign: 'center', margin: 0, lineHeight: 1.6 }}>
               <i className="bi bi-people-fill" style={{ color: '#f26522', marginRight: 4 }} />
-              Everyone who joins via your link or QR appears in your <strong style={{ color: 'var(--color-chalk)' }}>My Members</strong> list.
+              <span dangerouslySetInnerHTML={{ __html: t('Everyone who joins via your link or QR appears in your *My Members* list.').replace(/\*(.*?)\*/g, '<strong style="color: var(--color-chalk)">$1</strong>') }} />
             </p>
           </>
         ) : (
           <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-ash)', fontSize: 13 }}>
-            <i className="bi bi-exclamation-circle me-2" /> No referral link available.
+            <i className="bi bi-exclamation-circle me-2" /> {t('No referral link available.')}
           </div>
         )}
       </div>
@@ -475,14 +480,16 @@ function GeneratedCardMsg({ card, isNew = false }) {  const c = card || {}
   }, [c])
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: '4px 0' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 8, padding: '4px 0' }}>
       {fullCardData ? (
         <FlipCard3D
           cardData={fullCardData}
           backUrl={c.back_url || fullCardData.back_url}
-          width={300}
+          width={Math.min(310, (typeof window !== 'undefined' ? window.innerWidth : 360) - 96)}
           autoFlip={isNew}
-          showActions={true}
+          showActions={false}
+          showDownloadIcon={true}
+          onCardClick={() => window.dispatchEvent(new CustomEvent('show-card-modal', { detail: fullCardData }))}
         />
       ) : (
         <div className="card-skeleton">
@@ -640,6 +647,7 @@ const triggerPDFDownload = (iframeId, fileName) => {
 };
 
 function WelcomeLetterMsg({ name, date, refCode, autoDownload }) {
+  const { t } = useLang()
   const safeId = name.replace(/[^a-zA-Z0-9]/g, '-')
   const wrapperRef = useRef(null)
   
@@ -690,7 +698,7 @@ function WelcomeLetterMsg({ name, date, refCode, autoDownload }) {
           <i className="bi bi-file-earmark-pdf-fill" style={{ color: 'var(--color-signal-mint)', fontSize: 20 }} />
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, textAlign: 'left' }}>
-          <span style={{ fontSize: 12, fontWeight: 'bold', color: 'var(--color-chalk)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>Welcome_Letter.pdf</span>
+          <span style={{ fontSize: 12, fontWeight: 'bold', color: 'var(--color-chalk)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{t('Welcome_Letter.pdf')}</span>
           <span style={{ fontSize: 9, color: 'var(--color-ash)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{date}</span>
         </div>
       </div>
@@ -750,7 +758,7 @@ function WelcomeLetterMsg({ name, date, refCode, autoDownload }) {
           onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-1px)' }}
           onMouseLeave={(e) => { e.currentTarget.style.transform = 'none' }}
         >
-          <i className="bi bi-file-earmark-pdf-fill" /> Download PDF
+          <i className="bi bi-file-earmark-pdf-fill" /> {t('Download PDF')}
         </button>
       </div>
     </div>
@@ -758,6 +766,7 @@ function WelcomeLetterMsg({ name, date, refCode, autoDownload }) {
 }
 
 function ReferralLinkMsg({ link }) {
+  const { t } = useLang()
   const canvasRef = useRef(null)
   const [copied, setCopied] = useState(false)
   const [qrReady, setQrReady] = useState(false)
@@ -801,13 +810,13 @@ function ReferralLinkMsg({ link }) {
 
   const handleShareWhatsApp = () => {
     if (!link) return
-    const shareText = `*🪷 Join BJP Tamil Nadu!*\n\n*Generate your free Digital Member ID Card here:*\n${link}`
+    const shareText = `${t('*🪷 Join BJP Tamil Nadu!*')}\n\n${t('*Generate your free Digital Member ID Card here:*')}\n${link}`
     if (navigator.canShare && canvasRef.current) {
       canvasRef.current.toBlob((blob) => {
         const file = new File([blob], 'bjp-referral-qr.png', { type: 'image/png' })
         if (navigator.canShare({ files: [file] })) {
           navigator.share({
-            title: '🪷 Join BJP Tamil Nadu!',
+            title: t('🪷 Join BJP Tamil Nadu!'),
             text: shareText,
             files: [file]
           }).catch(() => {
@@ -825,7 +834,7 @@ function ReferralLinkMsg({ link }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, padding: '8px 4px' }}>
       <div style={{ color: 'var(--color-ash)', fontSize: 13, textAlign: 'center', fontWeight: 500, lineHeight: 1.5 }}>
-        🪷 Here is your referral link and QR code! Share this to invite others and build your team:
+        {t('🪷 Here is your referral link and QR code! Share this to invite others and build your team:')}
       </div>
       
       {/* QR Code */}
@@ -884,7 +893,7 @@ function ReferralLinkMsg({ link }) {
           }}
         >
           <i className={`bi bi-${copied ? 'check-lg' : 'clipboard'}`} />
-          {copied ? 'Copied!' : 'Copy Link'}
+          {copied ? t('Copied!') : t('Copy Link')}
         </button>
         <button
           onClick={handleShareWhatsApp}
@@ -904,7 +913,7 @@ function ReferralLinkMsg({ link }) {
             cursor: 'pointer'
           }}
         >
-          <i className="bi bi-whatsapp" /> Share WhatsApp
+          <i className="bi bi-whatsapp" /> {t('Share WhatsApp')}
         </button>
       </div>
     </div>
@@ -912,6 +921,7 @@ function ReferralLinkMsg({ link }) {
 }
 
 function AppreciationLetterMsg({ name, date, refCode, autoDownload }) {
+  const { t } = useLang()
   const safeId = name.replace(/[^a-zA-Z0-9]/g, '-')
   
   const handlePrint = () => {
@@ -961,7 +971,7 @@ function AppreciationLetterMsg({ name, date, refCode, autoDownload }) {
           <i className="bi bi-file-earmark-pdf-fill" style={{ color: 'var(--color-signal-mint)', fontSize: 20 }} />
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, textAlign: 'left' }}>
-          <span style={{ fontSize: 12, fontWeight: 'bold', color: 'var(--color-chalk)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>Appreciation_Letter.pdf</span>
+          <span style={{ fontSize: 12, fontWeight: 'bold', color: 'var(--color-chalk)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{t('Appreciation_Letter.pdf')}</span>
           <span style={{ fontSize: 9, color: 'var(--color-ash)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{date}</span>
         </div>
       </div>
@@ -1021,7 +1031,7 @@ function AppreciationLetterMsg({ name, date, refCode, autoDownload }) {
           onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-1px)' }}
           onMouseLeave={(e) => { e.currentTarget.style.transform = 'none' }}
         >
-          <i className="bi bi-file-earmark-pdf-fill" /> Download PDF
+          <i className="bi bi-file-earmark-pdf-fill" /> {t('Download PDF')}
         </button>
       </div>
     </div>
@@ -1029,6 +1039,7 @@ function AppreciationLetterMsg({ name, date, refCode, autoDownload }) {
 }
 
 function SelectWingMsg({ bjpCode, epicNo, isLatest }) {
+  const { t } = useLang()
   const [selectedWing, setSelectedWing] = useState('')
   const [submitted, setSubmitted] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -1086,9 +1097,9 @@ function SelectWingMsg({ bjpCode, epicNo, isLatest }) {
     try {
       const res = await chat.requestVolunteer(bjpCode, epicNo, selectedWing)
       setSubmitted(true)
-      setStatusText(res.message || '✅ Organizer request submitted! Admin will review it shortly.')
+      setStatusText(res.message || t('✅ Organizer request submitted! Admin will review it shortly.'))
     } catch (err) {
-      setStatusText(`❌ ${err.message || 'Unable to submit request. Please try again.'}`)
+      setStatusText(`❌ ${err.message || t('Unable to submit request. Please try again.')}`)
     } finally {
       setLoading(false)
     }
@@ -1098,7 +1109,7 @@ function SelectWingMsg({ bjpCode, epicNo, isLatest }) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 200 }}>
         <div style={{ width: 32, height: 32, border: '3px solid rgba(46, 204, 113, 0.15)', borderTopColor: 'var(--color-signal-mint)', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
-        <div style={{ fontSize: 13, color: 'var(--color-ash)', marginTop: 12 }}>Checking status...</div>
+        <div style={{ fontSize: 13, color: 'var(--color-ash)', marginTop: 12 }}>{t('Checking status...')}</div>
       </div>
     )
   }
@@ -1126,9 +1137,9 @@ function SelectWingMsg({ bjpCode, epicNo, isLatest }) {
         }}>
           <i className="bi bi-hand-thumbs-up-fill" style={{ fontSize: 36, color: '#FF9933' }} />
         </div>
-        <h3 style={{ fontSize: 20, fontWeight: 700, color: 'var(--color-chalk)', marginBottom: 8 }}>BJP Organizer Wing</h3>
+        <h3 style={{ fontSize: 20, fontWeight: 700, color: 'var(--color-chalk)', marginBottom: 8 }}>{t('BJP Organizer Wing')}</h3>
         <p style={{ fontSize: 13, color: 'var(--color-ash)', lineHeight: '1.6', margin: '0 auto', maxWidth: '480px' }}>
-          As a BJP Organizer, you play a pivotal role in strengthening the party's foundation. Select your preferred Wing to lead local initiatives, mobilize community support, and drive organizational progress across Tamil Nadu.
+          {t("As a BJP Organizer, you play a pivotal role in strengthening the party's foundation. Select your preferred Wing to lead local initiatives, mobilize community support, and drive organizational progress across Tamil Nadu.")}
         </p>
       </div>
 
@@ -1156,7 +1167,7 @@ function SelectWingMsg({ bjpCode, epicNo, isLatest }) {
           </div>
 
           <div style={{ textAlign: 'center', fontSize: 15, fontWeight: 600, color: 'var(--color-chalk)' }}>
-            Status: <span style={{ textTransform: 'capitalize', color: existingRequest.status === 'confirmed' ? '#2ecc71' : existingRequest.status === 'rejected' ? '#dc2626' : '#FF9933' }}>{existingRequest.status}</span>
+            {t('Status:')} <span style={{ textTransform: 'capitalize', color: existingRequest.status === 'confirmed' ? '#2ecc71' : existingRequest.status === 'rejected' ? '#dc2626' : '#FF9933' }}>{t(existingRequest.status)}</span>
           </div>
 
           {/* Grid fields */}
@@ -1172,7 +1183,7 @@ function SelectWingMsg({ bjpCode, epicNo, isLatest }) {
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--color-ash)' }}>
                 <i className="bi bi-tag-fill" style={{ color: '#FF9933' }} />
-                <span>Assigned Wing</span>
+                <span>{t('Assigned Wing')}</span>
               </div>
               <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-chalk)' }}>{existingRequest.wing}</span>
             </div>
@@ -1191,14 +1202,14 @@ function SelectWingMsg({ bjpCode, epicNo, isLatest }) {
                   className={`bi ${existingRequest.status === 'confirmed' ? 'bi-check-circle-fill' : existingRequest.status === 'rejected' ? 'bi-x-circle-fill' : 'bi-clock-history'}`}
                   style={{ color: existingRequest.status === 'confirmed' ? '#2ecc71' : existingRequest.status === 'rejected' ? '#dc2626' : '#FF9933' }}
                 />
-                <span>Application Status</span>
+                <span>{t('Application Status')}</span>
               </div>
               <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-chalk)' }}>
                 {existingRequest.status === 'confirmed'
-                  ? 'Approved & Activated'
+                  ? t('Approved & Activated')
                   : existingRequest.status === 'rejected'
-                  ? 'Rejected by Admin'
-                  : 'Pending Admin Verification'}
+                  ? t('Rejected by Admin')
+                  : t('Pending Admin Verification')}
               </span>
             </div>
           </div>
@@ -1214,7 +1225,7 @@ function SelectWingMsg({ bjpCode, epicNo, isLatest }) {
           margin: '0 auto'
         }}>
           <label htmlFor="wing-select" style={{ fontSize: 13, display: 'block', marginBottom: 8, color: 'var(--color-chalk)', fontWeight: '500' }}>
-            Select Preferred Wing:
+            {t('Select Preferred Wing:')}
           </label>
           <select
             id="wing-select"
@@ -1232,8 +1243,8 @@ function SelectWingMsg({ bjpCode, epicNo, isLatest }) {
             onChange={(e) => setSelectedWing(e.target.value)}
             disabled={loading}
           >
-            <option value="" style={{ color: 'var(--color-ash)' }}>-- Choose a Wing --</option>
-            {wings.map(w => <option key={w} value={w}>{w}</option>)}
+            <option value="" style={{ color: 'var(--color-ash)' }}>{t('-- Choose a Wing --')}</option>
+            {wings.map(w => <option key={w} value={w}>{t(w)}</option>)}
           </select>
           <button
             style={{
@@ -1255,7 +1266,7 @@ function SelectWingMsg({ bjpCode, epicNo, isLatest }) {
             onClick={handleSubmit}
             disabled={!selectedWing || loading}
           >
-            {loading ? 'Submitting...' : 'Submit Request'}
+            {loading ? t('Submitting...') : t('Submit Request')}
           </button>
         </div>
       ) : (
@@ -1289,6 +1300,7 @@ function SelectWingMsg({ bjpCode, epicNo, isLatest }) {
 }
 
 function BoothAgentSetupMsg({ bjpCode, epicNo, isLatest }) {
+  const { t } = useLang()
   const [districtsData, setDistrictsData] = useState(null)
   const [district, setDistrict] = useState('')
   const [assembly, setAssembly] = useState(null)
@@ -1326,12 +1338,12 @@ function BoothAgentSetupMsg({ bjpCode, epicNo, isLatest }) {
         if (res.success && res.data) {
           setDistrictsData(res.data)
         } else {
-          setErrorMsg('Failed to load district data.')
+          setErrorMsg(t('Failed to load district data.'))
           setStep('error')
         }
       })
       .catch(err => {
-        setErrorMsg('Failed to load district data: ' + (err.message || ''))
+        setErrorMsg(t('Failed to load district data: {error}', { error: err.message || '' }))
         setStep('error')
       })
   }, [step])
@@ -1351,7 +1363,7 @@ function BoothAgentSetupMsg({ bjpCode, epicNo, isLatest }) {
       const res = await chat.requestBoothAgent(bjpCode, epicNo, booth, assembly.name, district)
       setStep('submitted')
     } catch (err) {
-      setErrorMsg(err.message || 'Failed to submit booth agent request.')
+      setErrorMsg(err.message || t('Failed to submit booth agent request.'))
       setStep('error')
     } finally {
       setLoading(false)
@@ -1362,7 +1374,7 @@ function BoothAgentSetupMsg({ bjpCode, epicNo, isLatest }) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 200 }}>
         <div style={{ width: 32, height: 32, border: '3px solid rgba(46, 204, 113, 0.15)', borderTopColor: 'var(--color-signal-mint)', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
-        <div style={{ fontSize: 13, color: 'var(--color-ash)', marginTop: 12 }}>Checking status...</div>
+        <div style={{ fontSize: 13, color: 'var(--color-ash)', marginTop: 12 }}>{t('Checking status...')}</div>
       </div>
     )
   }
@@ -1380,7 +1392,7 @@ function BoothAgentSetupMsg({ bjpCode, epicNo, isLatest }) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 200 }}>
         <div style={{ width: 32, height: 32, border: '3px solid rgba(46, 204, 113, 0.15)', borderTopColor: 'var(--color-signal-mint)', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
-        <div style={{ fontSize: 13, color: 'var(--color-ash)', marginTop: 12 }}>Loading districts...</div>
+        <div style={{ fontSize: 13, color: 'var(--color-ash)', marginTop: 12 }}>{t('Loading districts...')}</div>
       </div>
     )
   }
@@ -1413,9 +1425,9 @@ function BoothAgentSetupMsg({ bjpCode, epicNo, isLatest }) {
         }}>
           <i className="bi bi-building-fill-check" style={{ fontSize: 36, color: '#FF9933' }} />
         </div>
-        <h3 style={{ fontSize: 20, fontWeight: 700, color: 'var(--color-chalk)', marginBottom: 8 }}>BJP Booth Agent</h3>
+        <h3 style={{ fontSize: 20, fontWeight: 700, color: 'var(--color-chalk)', marginBottom: 8 }}>{t('BJP Booth Agent')}</h3>
         <p style={{ fontSize: 13, color: 'var(--color-ash)', lineHeight: '1.6', margin: '0 auto', maxWidth: '480px' }}>
-          As a BJP Booth Agent, you are the crucial guardian of our democratic process at the polling booth level. You will be responsible for booth management, voter facilitation, and ensuring fair elections in your local part.
+          {t('As a BJP Booth Agent, you are the crucial guardian of our democratic process at the polling booth level. You will be responsible for booth management, voter facilitation, and ensuring fair elections in your local part.')}
         </p>
       </div>
 
@@ -1443,7 +1455,7 @@ function BoothAgentSetupMsg({ bjpCode, epicNo, isLatest }) {
           </div>
 
           <div style={{ textAlign: 'center', fontSize: 15, fontWeight: 600, color: 'var(--color-chalk)' }}>
-            Status: <span style={{ textTransform: 'capitalize', color: existingRequest.status === 'confirmed' ? '#2ecc71' : existingRequest.status === 'rejected' ? '#dc2626' : '#FF9933' }}>{existingRequest.status}</span>
+            {t('Status:')} <span style={{ textTransform: 'capitalize', color: existingRequest.status === 'confirmed' ? '#2ecc71' : existingRequest.status === 'rejected' ? '#dc2626' : '#FF9933' }}>{t(existingRequest.status)}</span>
           </div>
 
           {/* Grid fields */}
@@ -1459,7 +1471,7 @@ function BoothAgentSetupMsg({ bjpCode, epicNo, isLatest }) {
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--color-ash)' }}>
                 <i className="bi bi-map" style={{ color: '#FF9933' }} />
-                <span>District</span>
+                <span>{t('District')}</span>
               </div>
               <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-chalk)' }}>{existingRequest.district}</span>
             </div>
@@ -1475,7 +1487,7 @@ function BoothAgentSetupMsg({ bjpCode, epicNo, isLatest }) {
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--color-ash)' }}>
                 <i className="bi bi-geo-alt" style={{ color: '#FF9933' }} />
-                <span>Assembly</span>
+                <span>{t('Assembly')}</span>
               </div>
               <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-chalk)' }}>{existingRequest.assembly}</span>
             </div>
@@ -1492,9 +1504,9 @@ function BoothAgentSetupMsg({ bjpCode, epicNo, isLatest }) {
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--color-ash)' }}>
                 <i className="bi bi-pin-map" style={{ color: '#FF9933' }} />
-                <span>Polling Booth Location</span>
+                <span>{t('Polling Booth Location')}</span>
               </div>
-              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-chalk)' }}>Booth Number {existingRequest.booth_no}</span>
+              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-chalk)' }}>{t('Booth Number {booth}', { booth: existingRequest.booth_no })}</span>
             </div>
           </div>
         </div>
@@ -1513,7 +1525,7 @@ function BoothAgentSetupMsg({ bjpCode, epicNo, isLatest }) {
           {step === 'district' && (
             <>
               <label htmlFor="district-select" style={{ fontSize: 13, display: 'block', marginBottom: 8, color: 'var(--color-chalk)', fontWeight: '500' }}>
-                Select District:
+                {t('Select District:')}
               </label>
               <select
                 id="district-select"
@@ -1525,7 +1537,7 @@ function BoothAgentSetupMsg({ bjpCode, epicNo, isLatest }) {
                   setBooth('')
                 }}
               >
-                <option value="" style={{ color: 'var(--color-ash)' }}>-- Choose a District --</option>
+                <option value="" style={{ color: 'var(--color-ash)' }}>{t('-- Choose a District --')}</option>
                 {districts.map(d => <option key={d} value={d}>{d}</option>)}
               </select>
               <button
@@ -1548,7 +1560,7 @@ function BoothAgentSetupMsg({ bjpCode, epicNo, isLatest }) {
                 onClick={handleDistrictSubmit}
                 disabled={!district}
               >
-                Next <i className="bi bi-chevron-right" />
+                {t('Next')} <i className="bi bi-chevron-right" />
               </button>
             </>
           )}
@@ -1556,10 +1568,10 @@ function BoothAgentSetupMsg({ bjpCode, epicNo, isLatest }) {
           {step === 'assembly' && (
             <>
               <div style={{ fontSize: 12, color: 'var(--color-ash)', marginBottom: 12 }}>
-                District: <strong style={{ color: 'var(--color-chalk)' }}>{district}</strong>
+                {t('District')}: <strong style={{ color: 'var(--color-chalk)' }}>{district}</strong>
               </div>
               <label htmlFor="assembly-select" style={{ fontSize: 13, display: 'block', marginBottom: 8, color: 'var(--color-chalk)', fontWeight: '500' }}>
-                Choose Assembly:
+                {t('Choose Assembly:')}
               </label>
               <select
                 id="assembly-select"
@@ -1570,7 +1582,7 @@ function BoothAgentSetupMsg({ bjpCode, epicNo, isLatest }) {
                   setBooth('')
                 }}
               >
-                <option value="" style={{ color: 'var(--color-ash)' }}>-- Choose an Assembly --</option>
+                <option value="" style={{ color: 'var(--color-ash)' }}>{t('-- Choose an Assembly --')}</option>
                 {assemblies.map(a => <option key={a.no} value={JSON.stringify(a)}>{a.name} ({a.no})</option>)}
               </select>
               <div style={{ display: 'flex', gap: 8 }}>
@@ -1592,7 +1604,7 @@ function BoothAgentSetupMsg({ bjpCode, epicNo, isLatest }) {
                   }}
                   onClick={() => setStep('district')}
                 >
-                  <i className="bi bi-chevron-left" /> Back
+                  <i className="bi bi-chevron-left" /> {t('Back')}
                 </button>
                 <button
                   style={{
@@ -1614,7 +1626,7 @@ function BoothAgentSetupMsg({ bjpCode, epicNo, isLatest }) {
                   onClick={handleAssemblySubmit}
                   disabled={!assembly}
                 >
-                  Next <i className="bi bi-chevron-right" />
+                  {t('Next')} <i className="bi bi-chevron-right" />
                 </button>
               </div>
             </>
@@ -1623,11 +1635,11 @@ function BoothAgentSetupMsg({ bjpCode, epicNo, isLatest }) {
           {step === 'booth' && (
             <>
               <div style={{ fontSize: 12, color: 'var(--color-ash)', marginBottom: 12, lineHeight: '1.4' }}>
-                District: <strong style={{ color: 'var(--color-chalk)' }}>{district}</strong><br/>
-                Assembly: <strong style={{ color: 'var(--color-chalk)' }}>{assembly.name}</strong>
+                {t('District')}: <strong style={{ color: 'var(--color-chalk)' }}>{district}</strong><br/>
+                {t('Assembly')}: <strong style={{ color: 'var(--color-chalk)' }}>{assembly.name}</strong>
               </div>
               <label htmlFor="booth-select" style={{ fontSize: 13, display: 'block', marginBottom: 8, color: 'var(--color-chalk)', fontWeight: '500' }}>
-                Select Polling Booth:
+                {t('Select Polling Booth:')}
               </label>
               <select
                 id="booth-select"
@@ -1635,8 +1647,8 @@ function BoothAgentSetupMsg({ bjpCode, epicNo, isLatest }) {
                 value={booth}
                 onChange={(e) => setBooth(e.target.value)}
               >
-                <option value="" style={{ color: 'var(--color-ash)' }}>-- Choose a Booth Number --</option>
-                {booths.map(b => <option key={b} value={b}>Booth {b}</option>)}
+                <option value="" style={{ color: 'var(--color-ash)' }}>{t('-- Choose a Booth Number --')}</option>
+                {booths.map(b => <option key={b} value={b}>{t('Booth {booth}', { booth: b })}</option>)}
               </select>
               <div style={{ display: 'flex', gap: 8 }}>
                 <button
@@ -1658,7 +1670,7 @@ function BoothAgentSetupMsg({ bjpCode, epicNo, isLatest }) {
                   onClick={() => setStep('assembly')}
                   disabled={loading}
                 >
-                  <i className="bi bi-chevron-left" /> Back
+                  <i className="bi bi-chevron-left" /> {t('Back')}
                 </button>
                 <button
                   style={{
@@ -1680,7 +1692,7 @@ function BoothAgentSetupMsg({ bjpCode, epicNo, isLatest }) {
                   onClick={handleBoothSubmit}
                   disabled={!booth || loading}
                 >
-                  {loading ? 'Submitting...' : 'Submit Request'}
+                  {loading ? t('Submitting...') : t('Submit Request')}
                 </button>
               </div>
             </>
@@ -1702,8 +1714,8 @@ function BoothAgentSetupMsg({ bjpCode, epicNo, isLatest }) {
           fontSize: 14,
           lineHeight: '1.6'
         }}>
-          ✅ <strong>Your booth agent request has been submitted successfully!</strong><br/>
-          <span style={{ fontSize: 12, opacity: 0.8 }}>Admin will review your request shortly.</span>
+          ✅ <strong>{t('Your booth agent request has been submitted successfully!')}</strong><br/>
+          <span style={{ fontSize: 12, opacity: 0.8 }}>{t('Admin will review your request shortly.')}</span>
         </div>
       )}
       <style>{`
@@ -1721,6 +1733,7 @@ function BoothAgentSetupMsg({ bjpCode, epicNo, isLatest }) {
 
 // ── Card Full View Modal Component ──────────────────────────
 function CardModal({ cardData, onClose }) {
+  const { t } = useLang()
   const modalRef = useRef(null)
   const [downloading, setDownloading] = useState(false)
   const [cardWidth, setCardWidth] = useState(Math.min(window.innerWidth - 48, 520))
@@ -1785,7 +1798,7 @@ function CardModal({ cardData, onClose }) {
 
         <div style={{ alignSelf: 'flex-start', marginTop: 4 }}>
           <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-ash)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            <i className="bi bi-credit-card-2-front" /> Digital Member Card
+            <i className="bi bi-credit-card-2-front" /> {t('Digital Member Card')}
           </div>
         </div>
 
@@ -1827,7 +1840,7 @@ function CardModal({ cardData, onClose }) {
             ) : (
               <i className="bi bi-download" />
             )}
-            Download Card
+            {t('Download Card')}
           </button>
           <button
             onClick={onClose}
@@ -1846,7 +1859,7 @@ function CardModal({ cardData, onClose }) {
               cursor: 'pointer',
             }}
           >
-            Close
+            {t('Close')}
           </button>
         </div>
       </div>
@@ -2144,6 +2157,7 @@ const SCHEMES = [
 ];
 
 function BrochurePanel({ onBack }) {
+  const { t } = useLang()
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('All');
   const [expandedId, setExpandedId] = useState(null);
@@ -2189,7 +2203,7 @@ function BrochurePanel({ onBack }) {
             <i className="bi bi-chevron-left" />
           </button>
           <i className="bi bi-book-fill brochure-title-orange" />
-          <span>BJP Brochure</span>
+          <span>{t('BJP Brochure')}</span>
         </div>
       </header>
 
@@ -2200,7 +2214,7 @@ function BrochurePanel({ onBack }) {
             <input 
               type="text" 
               className="brochure-search-input" 
-              placeholder="Search Central Welfare Schemes..." 
+              placeholder={t('Search Central Welfare Schemes...')} 
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -2213,7 +2227,7 @@ function BrochurePanel({ onBack }) {
                 className={`category-pill ${activeCategory === cat ? 'active' : ''}`}
                 onClick={() => { setActiveCategory(cat); setExpandedId(null); }}
               >
-                {cat === 'All' ? 'All Schemes' : cat}
+                {cat === 'All' ? t('All Schemes') : t(cat)}
               </button>
             ))}
           </div>
@@ -2223,7 +2237,7 @@ function BrochurePanel({ onBack }) {
           {filteredSchemes.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--color-ash)' }}>
               <i className="bi bi-clipboard-x" style={{ fontSize: 32, marginBottom: 12, display: 'block' }} />
-              No schemes found matching your search.
+              {t('No schemes found matching your search.')}
             </div>
           ) : (
             filteredSchemes.map((scheme, index) => {
@@ -2236,7 +2250,7 @@ function BrochurePanel({ onBack }) {
                 >
                   <div className="scheme-card-header">
                     <div>
-                      <div className="scheme-meta-cat">{scheme.category}</div>
+                      <div className="scheme-meta-cat">{t(scheme.category)}</div>
                       <h3 className="scheme-title">{index + 1}. {scheme.title}</h3>
                     </div>
                     {scheme.highlight && <span className="scheme-badge">{scheme.highlight}</span>}
@@ -2252,21 +2266,21 @@ function BrochurePanel({ onBack }) {
 
                   <button className="scheme-toggle-btn" onClick={(e) => { e.stopPropagation(); setExpandedId(isExpanded ? null : scheme.id); }}>
                     <i className={`bi bi-chevron-${isExpanded ? 'up' : 'down'}`} />
-                    <span>{isExpanded ? 'Hide Steps & Documents' : 'View Requirements & 5-Step Application'}</span>
+                    <span>{isExpanded ? t('Hide Steps & Documents') : t('View Requirements & 5-Step Application')}</span>
                   </button>
 
                   {isExpanded && (
                     <div className="scheme-details-expanded" onClick={(e) => e.stopPropagation()}>
                       <div>
                         <div className="details-section-title">
-                          <i className="bi bi-info-circle-fill" /> Eligibility & Benefits
+                          <i className="bi bi-info-circle-fill" /> {t('Eligibility & Benefits')}
                         </div>
                         <p className="details-text">{scheme.eligibility}</p>
                       </div>
 
                       <div>
                         <div className="details-section-title">
-                          <i className="bi bi-file-earmark-check-fill" /> Required Documents
+                          <i className="bi bi-file-earmark-check-fill" /> {t('Required Documents')}
                         </div>
                         <div className="documents-list">
                           {scheme.documents.map((doc, idx) => (
@@ -2280,7 +2294,7 @@ function BrochurePanel({ onBack }) {
 
                       <div>
                         <div className="details-section-title">
-                          <i className="bi bi-lightning-fill" /> How to Apply (5 Steps)
+                          <i className="bi bi-lightning-fill" /> {t('How to Apply (5 Steps)')}
                         </div>
                         <div className="steps-list">
                           {scheme.steps.map((step, idx) => (
@@ -2322,7 +2336,7 @@ function BrochurePanel({ onBack }) {
                             onClick={(e) => e.stopPropagation()}
                           >
                             <i className="bi bi-box-arrow-up-right" />
-                            Apply Online (Click Here)
+                            {t('Apply Online (Click Here)')}
                           </a>
                         </div>
                       )}
@@ -2339,6 +2353,7 @@ function BrochurePanel({ onBack }) {
 }
 
 function FullLetterPanel({ type, name, date, refCode, epicNo, onBack }) {
+  const { t } = useLang()
   const [selectedLang, setSelectedLang] = useState('ta')
   const [resolvedRefCode, setResolvedRefCode] = useState(refCode || '')
 
@@ -2394,7 +2409,7 @@ function FullLetterPanel({ type, name, date, refCode, epicNo, onBack }) {
             <i className="bi bi-chevron-left" />
           </button>
           <i className={`bi bi-${isAppreciation ? 'award-fill' : 'envelope-paper-fill'} brochure-title-orange`} />
-          <span>{isAppreciation ? 'Letter of Appreciation' : 'Welcome Letter'}</span>
+          <span>{isAppreciation ? t('Letter of Appreciation') : t('Welcome Letter')}</span>
         </div>
         <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
           {/* Tamil / Eng Toggle */}
@@ -2451,7 +2466,7 @@ function FullLetterPanel({ type, name, date, refCode, epicNo, onBack }) {
               alignItems: 'center',
               justifyContent: 'center'
             }}
-            title={isAppreciation ? 'Download Appreciation Letter' : 'Download Welcome Letter'}
+            title={isAppreciation ? t('Download Appreciation Letter') : t('Download Welcome Letter')}
           >
             <i className="bi bi-download" style={{ fontSize: 16 }} />
           </button>
@@ -2492,13 +2507,14 @@ function FullLetterPanel({ type, name, date, refCode, epicNo, onBack }) {
 }
 
 function FullBoothPanel({ epicNo, onBack }) {
+  const { t } = useLang()
   const [boothData, setBoothData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
   useEffect(() => {
     if (!epicNo) {
-      setError('No booth data available. Please complete registration first.')
+      setError(t('No booth data available. Please complete registration first.'))
       setLoading(false)
       return
     }
@@ -2507,7 +2523,7 @@ function FullBoothPanel({ epicNo, onBack }) {
         setBoothData(data)
       })
       .catch((err) => {
-        setError(err.message || 'Unable to load booth information.')
+        setError(err.message || t('Unable to load booth information.'))
       })
       .finally(() => {
         setLoading(false)
@@ -2550,7 +2566,7 @@ function FullBoothPanel({ epicNo, onBack }) {
             <i className="bi bi-chevron-left" />
           </button>
           <i className="bi bi-building brochure-title-orange" />
-          <span>Booth Information</span>
+          <span>{t('Booth Information')}</span>
         </div>
       </header>
 
@@ -2593,8 +2609,8 @@ function FullBoothPanel({ epicNo, onBack }) {
               }}>
                 <i className="bi bi-building" style={{ fontSize: 36, color: '#FF9933' }} />
               </div>
-              <h3 style={{ fontSize: 20, fontWeight: 700, color: 'var(--color-chalk)', marginBottom: 4 }}>Polling Booth Details</h3>
-              <p style={{ fontSize: 13, color: 'var(--color-ash)', margin: 0 }}>Registered election booth location and part details</p>
+              <h3 style={{ fontSize: 20, fontWeight: 700, color: 'var(--color-chalk)', marginBottom: 4 }}>{t('Polling Booth Details')}</h3>
+              <p style={{ fontSize: 13, color: 'var(--color-ash)', margin: 0 }}>{t('Registered election booth location and part details')}</p>
             </div>
 
             {/* Details Grid */}
@@ -2622,7 +2638,7 @@ function FullBoothPanel({ epicNo, onBack }) {
                 </div>
               )) : (
                 <div style={{ gridColumn: 'span 2', textAlign: 'center', padding: '24px', color: 'var(--color-ash)' }}>
-                  No details found.
+                  {t('No details found.')}
                 </div>
               )}
             </div>
@@ -2634,13 +2650,14 @@ function FullBoothPanel({ epicNo, onBack }) {
 }
 
 function FullProfilePanel({ epicNo, mobile, referredCount, onBack }) {
+  const { t } = useLang()
   const [profileData, setProfileData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
   useEffect(() => {
     if (!epicNo) {
-      setError('No profile data available.')
+      setError(t('No profile data available.'))
       setLoading(false)
       return
     }
@@ -2649,7 +2666,7 @@ function FullProfilePanel({ epicNo, mobile, referredCount, onBack }) {
         setProfileData(data)
       })
       .catch((err) => {
-        setError(err.message || 'Unable to load profile.')
+        setError(err.message || t('Unable to load profile.'))
       })
       .finally(() => {
         setLoading(false)
@@ -2680,7 +2697,7 @@ function FullProfilePanel({ epicNo, mobile, referredCount, onBack }) {
             <i className="bi bi-chevron-left" />
           </button>
           <i className="bi bi-person-circle brochure-title-orange" />
-          <span>My Profile</span>
+          <span>{t('My Profile')}</span>
         </div>
       </header>
 
@@ -2753,9 +2770,9 @@ function FullProfilePanel({ epicNo, mobile, referredCount, onBack }) {
               </div>
 
               <div>
-                <h3 style={{ fontSize: 18, fontWeight: 700, color: 'var(--color-chalk)', marginBottom: 4 }}>{profileData.name || 'Member'}</h3>
+                <h3 style={{ fontSize: 18, fontWeight: 700, color: 'var(--color-chalk)', marginBottom: 4 }}>{profileData.name || t('Member')}</h3>
                 <p style={{ fontSize: 12, color: 'var(--color-signal-mint)', fontWeight: 600, margin: 0 }}>
-                  {referredCount >= 5 ? 'BJP Volunteer Agent' : 'BJP Registered Member'}
+                  {referredCount >= 5 ? t('BJP Volunteer Agent') : t('BJP Registered Member')}
                 </p>
               </div>
             </div>
@@ -2779,7 +2796,7 @@ function FullProfilePanel({ epicNo, mobile, referredCount, onBack }) {
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--color-ash)' }}>
                   <i className="bi bi-hash" style={{ color: '#FF9933' }} />
-                  <span>Member Code</span>
+                  <span>{t('Member Code')}</span>
                 </div>
                 <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-chalk)', fontFamily: 'monospace' }}>{profileData.bjp_code || profileData.ptc_code || 'N/A'}</span>
               </div>
@@ -2795,7 +2812,7 @@ function FullProfilePanel({ epicNo, mobile, referredCount, onBack }) {
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--color-ash)' }}>
                   <i className="bi bi-card-text" style={{ color: '#FF9933' }} />
-                  <span>EPIC Number</span>
+                  <span>{t('EPIC Number')}</span>
                 </div>
                 <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-chalk)', fontFamily: 'monospace' }}>{profileData.epic_no || 'N/A'}</span>
               </div>
@@ -2811,7 +2828,7 @@ function FullProfilePanel({ epicNo, mobile, referredCount, onBack }) {
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--color-ash)' }}>
                   <i className="bi bi-phone" style={{ color: '#FF9933' }} />
-                  <span>Mobile Number</span>
+                  <span>{t('Mobile Number')}</span>
                 </div>
                 <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-chalk)', fontFamily: 'monospace' }}>{profileData.mobile || mobile || 'N/A'}</span>
               </div>
@@ -2827,9 +2844,9 @@ function FullProfilePanel({ epicNo, mobile, referredCount, onBack }) {
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--color-ash)' }}>
                   <i className="bi bi-geo" style={{ color: '#FF9933' }} />
-                  <span>State</span>
+                  <span>{t('State')}</span>
                 </div>
-                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-chalk)' }}>Tamil Nadu</span>
+                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-chalk)' }}>{t('Tamil Nadu')}</span>
               </div>
 
               <div style={{ 
@@ -2843,7 +2860,7 @@ function FullProfilePanel({ epicNo, mobile, referredCount, onBack }) {
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--color-ash)' }}>
                   <i className="bi bi-geo-alt" style={{ color: '#FF9933' }} />
-                  <span>Assembly</span>
+                  <span>{t('Assembly')}</span>
                 </div>
                 <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-chalk)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={profileData.assembly}>{profileData.assembly || 'N/A'}</span>
               </div>
@@ -2859,7 +2876,7 @@ function FullProfilePanel({ epicNo, mobile, referredCount, onBack }) {
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--color-ash)' }}>
                   <i className="bi bi-map" style={{ color: '#FF9933' }} />
-                  <span>District</span>
+                  <span>{t('District')}</span>
                 </div>
                 <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-chalk)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={profileData.district}>{profileData.district || 'N/A'}</span>
               </div>
@@ -2876,7 +2893,7 @@ function FullProfilePanel({ epicNo, mobile, referredCount, onBack }) {
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <i className="bi bi-people-fill" style={{ color: 'var(--color-signal-mint)', fontSize: 16 }} />
-                  <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-chalk)' }}>Total Referrals</span>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-chalk)' }}>{t('Total Referrals')}</span>
                 </div>
                 <span style={{ fontSize: 18, fontWeight: 800, color: 'var(--color-signal-mint)' }}>{referredCount}</span>
               </div>
@@ -2894,6 +2911,7 @@ function FullProfilePanel({ epicNo, mobile, referredCount, onBack }) {
 }
 
 function FullMyMembersPanel({ bjpCode, onBack }) {
+  const { t } = useLang()
   const [root, setRoot] = useState(null)
   const [tree, setTree] = useState([])
   const [loading, setLoading] = useState(true)
@@ -2911,7 +2929,7 @@ function FullMyMembersPanel({ bjpCode, onBack }) {
 
   useEffect(() => {
     if (!bjpCode) {
-      setError('No referral code available.')
+      setError(t('No referral code available.'))
       setLoading(false)
       return
     }
@@ -2921,7 +2939,7 @@ function FullMyMembersPanel({ bjpCode, onBack }) {
         setTree(data.tree || [])
       })
       .catch((err) => {
-        setError(err.message || 'Unable to load referred members.')
+        setError(err.message || t('Unable to load referred members.'))
       })
       .finally(() => {
         setLoading(false)
@@ -2939,7 +2957,7 @@ function FullMyMembersPanel({ bjpCode, onBack }) {
       <div
         onClick={onClick}
         role="button"
-        title={`Show ${Math.min(remaining, PAGE)} more`}
+        title={t('Show {count} more', { count: Math.min(remaining, PAGE) })}
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -3065,7 +3083,7 @@ function FullMyMembersPanel({ bjpCode, onBack }) {
             <i className="bi bi-chevron-left" />
           </button>
           <i className="bi bi-people-fill brochure-title-orange" />
-          <span>My Members</span>
+          <span>{t('My Members')}</span>
         </div>
       </header>
 
@@ -3083,7 +3101,7 @@ function FullMyMembersPanel({ bjpCode, onBack }) {
           <div style={{ width: '100%', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
             {/* Stats bar */}
             <div style={{ fontSize: 12, color: 'var(--color-signal-mint)', fontWeight: 600, borderBottom: '1px solid var(--color-graphite)', paddingBottom: 12 }}>
-              Referral Tree Network — {directCount} Direct | {indirectCount} Indirect ({totalCount} Total)
+              {t('Referral Tree Network — {directCount} Direct | {indirectCount} Indirect ({totalCount} Total)', { directCount, indirectCount, totalCount })}
             </div>
 
             {/* Tree Container (Left-to-Right layout) */}
@@ -3118,9 +3136,9 @@ function FullMyMembersPanel({ bjpCode, onBack }) {
               {tree.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '32px 16px', color: 'var(--color-ash)', flexShrink: 0, width: 'min(280px, 72vw)' }}>
                   <i className="bi bi-diagram-3" style={{ fontSize: 48, color: 'var(--color-graphite)', marginBottom: 16, display: 'block' }} />
-                  <h3 style={{ fontSize: 16, fontWeight: 600, color: 'var(--color-chalk)', marginBottom: 8 }}>Tree structure empty</h3>
+                  <h3 style={{ fontSize: 16, fontWeight: 600, color: 'var(--color-chalk)', marginBottom: 8 }}>{t('Tree structure empty')}</h3>
                   <p style={{ fontSize: 13, margin: 0, color: 'var(--color-ash)', lineHeight: 1.6, wordBreak: 'normal', overflowWrap: 'anywhere' }}>
-                    You haven't referred anyone yet. Share your custom BJP code to build your 3-layer support network!
+                    {t("You haven't referred anyone yet. Share your custom BJP code to build your 3-layer support network!")}
                   </p>
                 </div>
               ) : (
@@ -3275,7 +3293,7 @@ function FullMyMembersPanel({ bjpCode, onBack }) {
               <i className="bi bi-x-lg" />
             </button>
 
-            <h3 style={{ fontSize: 16, fontWeight: 'bold', color: 'var(--color-chalk)', marginBottom: 20 }}>Member Details</h3>
+            <h3 style={{ fontSize: 16, fontWeight: 'bold', color: 'var(--color-chalk)', marginBottom: 20 }}>{t('Member Details')}</h3>
 
             <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 20 }}>
               <FlipCard3D
@@ -3304,30 +3322,30 @@ function FullMyMembersPanel({ bjpCode, onBack }) {
               gap: 12
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-                <span style={{ color: '#555555' }}>Member Name</span>
+                <span style={{ color: '#555555' }}>{t('Member Name')}</span>
                 <span style={{ color: '#111111', fontWeight: 600 }}>{selectedMember.name}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-                <span style={{ color: '#555555' }}>EPIC Number</span>
+                <span style={{ color: '#555555' }}>{t('EPIC Number')}</span>
                 <span style={{ color: '#111111', fontFamily: 'monospace', fontWeight: 600 }}>{selectedMember.epic_no || '—'}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-                <span style={{ color: '#555555' }}>BJP Code</span>
+                <span style={{ color: '#555555' }}>{t('BJP Code')}</span>
                 <span style={{ color: '#FF9933', fontFamily: 'monospace', fontWeight: 700 }}>{selectedMember.bjp_code}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-                <span style={{ color: '#555555' }}>Assembly (Booth)</span>
+                <span style={{ color: '#555555' }}>{t('Assembly (Booth)')}</span>
                 <span style={{ color: '#111111', fontWeight: 600 }}>
                   {selectedMember.assembly_name ? `${selectedMember.assembly_name} (Part ${selectedMember.part_no || '—'})` : '—'}
                 </span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-                <span style={{ color: '#555555' }}>District</span>
+                <span style={{ color: '#555555' }}>{t('District')}</span>
                 <span style={{ color: '#111111', fontWeight: 600 }}>{selectedMember.district || '—'}</span>
               </div>
               {selectedMember.generated_at && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-                  <span style={{ color: '#555555' }}>Joined Date</span>
+                  <span style={{ color: '#555555' }}>{t('Joined Date')}</span>
                   <span style={{ color: '#111111', fontWeight: 600 }}>{new Date(selectedMember.generated_at).toLocaleDateString()}</span>
                 </div>
               )}
@@ -3340,13 +3358,14 @@ function FullMyMembersPanel({ bjpCode, onBack }) {
 }
 
 function LocalBodyPanel({ onBack, localBodyInterest, handleLocalBodyInterestSubmit }) {
+  const { t } = useLang()
   const isLocked = localBodyInterest === 'interested' || localBodyInterest === 'not_interested';
 
   const handleClick = (value) => {
     if (isLocked) return;
     const confirmMsg = value === 'interested'
-      ? 'Are you sure you want to submit "Interested"? This selection cannot be changed later.'
-      : 'Are you sure you want to submit "Not Interested"? This selection cannot be changed later.';
+      ? t('Are you sure you want to submit "Interested"? This selection cannot be changed later.')
+      : t('Are you sure you want to submit "Not Interested"? This selection cannot be changed later.');
     
     if (window.confirm(confirmMsg)) {
       handleLocalBodyInterestSubmit(value);
@@ -3377,7 +3396,7 @@ function LocalBodyPanel({ onBack, localBodyInterest, handleLocalBodyInterestSubm
             <i className="bi bi-chevron-left" />
           </button>
           <i className="bi bi-check-square-fill brochure-title-orange" />
-          <span>Local Body Election</span>
+          <span>{t('Local Body Election')}</span>
         </div>
       </header>
 
@@ -3408,11 +3427,11 @@ function LocalBodyPanel({ onBack, localBodyInterest, handleLocalBodyInterestSubm
           </div>
           
           <h2 style={{ fontSize: 20, fontWeight: 700, color: 'var(--color-chalk)' }}>
-            Local Body Elections
+            {t('Local Body Elections')}
           </h2>
           
           <p style={{ fontSize: 13, lineHeight: '1.6', color: 'var(--color-ash)', maxWidth: 400 }}>
-            BJP Tamil Nadu is preparing a database of active members who are interested in contesting, organizing, or coordinating local initiatives for the upcoming local body elections.
+            {t('BJP Tamil Nadu is preparing a database of active members who are interested in contesting, organizing, or coordinating local initiatives for the upcoming local body elections.')}
           </p>
 
           <div style={{
@@ -3423,7 +3442,7 @@ function LocalBodyPanel({ onBack, localBodyInterest, handleLocalBodyInterestSubm
           }} />
 
           <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-chalk)' }}>
-            Are you interested in participating or contesting in the upcoming Local Body Elections?
+            {t('Are you interested in participating or contesting in the upcoming Local Body Elections?')}
           </p>
 
           <div style={{ display: 'flex', gap: 16, width: '100%', marginTop: 8, justifyContent: 'center' }}>
@@ -3448,10 +3467,10 @@ function LocalBodyPanel({ onBack, localBodyInterest, handleLocalBodyInterestSubm
               {localBodyInterest === 'interested' ? (
                 <>
                   <i className="bi bi-check-circle-fill" style={{ fontSize: 16 }} />
-                  Interested
+                  {t('Interested')}
                 </>
               ) : (
-                'Interested'
+                t('Interested')
               )}
             </button>
             <button
@@ -3475,10 +3494,10 @@ function LocalBodyPanel({ onBack, localBodyInterest, handleLocalBodyInterestSubm
               {localBodyInterest === 'not_interested' ? (
                 <>
                   <i className="bi bi-x-circle-fill" style={{ fontSize: 16 }} />
-                  Not Interested
+                  {t('Not Interested')}
                 </>
               ) : (
-                'Not Interested'
+                t('Not Interested')
               )}
             </button>
           </div>
@@ -3497,8 +3516,8 @@ function LocalBodyPanel({ onBack, localBodyInterest, handleLocalBodyInterestSubm
               lineHeight: '1.5'
             }}>
               {localBodyInterest === 'interested' 
-                ? '🎉 Your interest has been submitted! Our election coordinators will reach out to you.'
-                : 'Thank you for letting us know. You can change your selection at any time.'}
+                ? t('🎉 Your interest has been submitted! Our election coordinators will reach out to you.')
+                : t('Thank you for letting us know. You can change your selection at any time.')}
             </div>
           )}
         </div>
@@ -3508,6 +3527,7 @@ function LocalBodyPanel({ onBack, localBodyInterest, handleLocalBodyInterestSubm
 }
 
 function FullCardPanel({ card, onBack }) {
+  const { t } = useLang()
   const c = card || {}
   const [fullCardData, setFullCardData] = useState(null)
   const cardRef3D = useRef(null)
@@ -3557,7 +3577,7 @@ function FullCardPanel({ card, onBack }) {
             <i className="bi bi-chevron-left" />
           </button>
           <i className="bi bi-credit-card-2-front brochure-title-orange" />
-          <span>My Member Card</span>
+          <span>{t('My Member Card')}</span>
         </div>
         <div style={{ display: 'flex', gap: 12 }}>
           <button 
@@ -3571,7 +3591,7 @@ function FullCardPanel({ card, onBack }) {
               alignItems: 'center',
               justifyContent: 'center'
             }}
-            title="Download ID Card"
+            title={t('Download ID Card')}
           >
             <i className="bi bi-download" style={{ fontSize: 16 }} />
           </button>
@@ -3591,7 +3611,7 @@ function FullCardPanel({ card, onBack }) {
             />
             <div style={{ color: 'var(--color-ash)', fontSize: 13, textAlign: 'center', maxWidth: 360, marginTop: 12 }}>
               <i className="bi bi-info-circle-fill" style={{ color: '#FF9933', marginRight: 6 }} />
-              Hover or click on the card to flip it and view the backside voter details.
+              {t('Hover or click on the card to flip it and view the backside voter details.')}
             </div>
           </>
         ) : (
@@ -3603,6 +3623,7 @@ function FullCardPanel({ card, onBack }) {
 }
 
 function FullFormPanel({ title, icon, onBack, children }) {
+  const { t } = useLang()
   return (
     <div className="chatbot-container brochure-panel">
       <header className="brochure-header">
@@ -3627,7 +3648,7 @@ function FullFormPanel({ title, icon, onBack, children }) {
             <i className="bi bi-chevron-left" />
           </button>
           <i className={`bi bi-${icon} brochure-title-orange`} />
-          <span>{title}</span>
+          <span>{t(title)}</span>
         </div>
       </header>
 
@@ -3639,6 +3660,7 @@ function FullFormPanel({ title, icon, onBack, children }) {
 }
 
 function BestPerformersPanel({ onBack }) {
+  const { t } = useLang()
   const [performers, setPerformers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -3650,7 +3672,7 @@ function BestPerformersPanel({ onBack }) {
         setPerformers(data.performers || []);
       })
       .catch((err) => {
-        setError(err.message || 'Unable to load leaderboard.');
+        setError(err.message || t('Unable to load leaderboard.'));
       })
       .finally(() => {
         setLoading(false);
@@ -3681,7 +3703,7 @@ function BestPerformersPanel({ onBack }) {
             <i className="bi bi-chevron-left" />
           </button>
           <i className="bi bi-trophy-fill brochure-title-orange" />
-          <span>Best Performers</span>
+          <span>{t('Best Performers')}</span>
         </div>
       </header>
 
@@ -3698,30 +3720,22 @@ function BestPerformersPanel({ onBack }) {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div style={{ textAlign: 'center', padding: '10px 0' }}>
-              <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--color-chalk)', marginBottom: 6 }}>Referral Champions 👑</h2>
+              <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--color-chalk)', marginBottom: 6 }}>{t('Referral Champions 👑')}</h2>
               <p style={{ fontSize: 13, color: 'var(--color-ash)', maxWidth: 440, margin: '0 auto' }}>
-                Leading volunteers who are driving local outreach and expanding our digital footprint across Tamil Nadu.
+                {t('Leading volunteers who are driving local outreach and expanding our digital footprint across Tamil Nadu.')}
               </p>
             </div>
 
             {performers.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--color-ash)' }}>
                 <i className="bi bi-people-fill" style={{ fontSize: 40, color: 'var(--color-graphite)', marginBottom: 12, display: 'block' }} />
-                <p>No referrals recorded yet. Be the first performer!</p>
+                <p>{t('No referrals recorded yet. Be the first performer!')}</p>
               </div>
             ) : (
               performers.map((p, index) => {
                 const rank = index + 1;
-                
-                const rankStyles = {
-                  1: { border: '2px solid #FF9933', badge: '#FF9933', emoji: '👑' },
-                  2: { border: '1px solid #c0c0c0', badge: '#c0c0c0', emoji: '🥈' },
-                  3: { border: '1px solid #cd7f32', badge: '#cd7f32', emoji: '🥉' },
-                  4: { border: '1px solid var(--color-graphite)', badge: 'var(--color-ash)', emoji: '' },
-                  5: { border: '1px solid var(--color-graphite)', badge: 'var(--color-ash)', emoji: '' }
-                };
-
-                const style = rankStyles[rank] || rankStyles[5];
+                const isFirst = rank === 1;
+                const medalColor = rank === 2 ? '#c0c0c0' : rank === 3 ? '#cd7f32' : 'var(--color-ash)';
 
                 return (
                   <div 
@@ -3730,52 +3744,52 @@ function BestPerformersPanel({ onBack }) {
                     style={{
                       display: 'flex',
                       alignItems: 'center',
-                      gap: 16,
-                      padding: '12px 18px',
-                      background: 'var(--color-carbon)',
-                      border: style.border,
-                      borderRadius: '16px',
+                      gap: 14,
+                      padding: '12px 16px',
+                      background: isFirst
+                        ? 'linear-gradient(90deg, rgba(255,193,7,0.16), var(--color-carbon) 70%)'
+                        : 'var(--color-carbon)',
+                      border: isFirst ? '1.5px solid #FFC107' : '1px solid var(--color-graphite)',
+                      borderRadius: '14px',
                       cursor: 'pointer',
                       transition: 'all 0.15s ease'
                     }}
                   >
-                    <div style={{
-                      width: 28,
-                      height: 28,
-                      borderRadius: '50%',
-                      border: `1.5px solid ${style.badge}`,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: 13,
-                      fontWeight: 'bold',
-                      color: style.badge,
-                      flexShrink: 0
-                    }}>
-                      {rank}
+                    {/* Rank — gold crown for #1, medal circles for #2/#3 */}
+                    <div style={{ width: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      {isFirst ? (
+                        <svg width="26" height="26" viewBox="0 0 24 24" fill="#FFC107" xmlns="http://www.w3.org/2000/svg" style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.45))' }}>
+                          <path d="M3 7l4.5 3.5L12 4l4.5 6.5L21 7l-1.8 10.5H4.8L3 7z" />
+                          <rect x="4.8" y="18.2" width="14.4" height="2.4" rx="0.8" />
+                          <circle cx="3" cy="6.2" r="1.4" />
+                          <circle cx="21" cy="6.2" r="1.4" />
+                          <circle cx="12" cy="3.2" r="1.4" />
+                        </svg>
+                      ) : (
+                        <span style={{ width: 24, height: 24, borderRadius: '50%', border: `1.5px solid ${medalColor}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 800, color: medalColor }}>
+                          {rank}
+                        </span>
+                      )}
                     </div>
 
-                    <div style={{ position: 'relative', flexShrink: 0 }}>
+                    <div style={{ flexShrink: 0 }}>
                       {p.photo_url ? (
-                        <img src={p.photo_url} crossOrigin="anonymous" alt={p.name} style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', border: '1.5px solid var(--color-graphite)' }} />
+                        <img src={p.photo_url} crossOrigin="anonymous" alt={p.name} style={{ width: 44, height: 44, borderRadius: '10px', objectFit: 'cover', border: isFirst ? '1.5px solid #FFC107' : '1.5px solid var(--color-graphite)' }} />
                       ) : (
-                        <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#252d27', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1.5px solid var(--color-graphite)' }}>
+                        <div style={{ width: 44, height: 44, borderRadius: '10px', background: '#252d27', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1.5px solid var(--color-graphite)' }}>
                           <i className="bi bi-person-fill" style={{ color: 'var(--color-ash)', fontSize: 18 }} />
                         </div>
-                      )}
-                      {style.emoji && (
-                        <span style={{ position: 'absolute', top: -6, right: -6, fontSize: 12 }}>{style.emoji}</span>
                       )}
                     </div>
 
                     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, textAlign: 'left' }}>
                       <span style={{ fontSize: 14, fontWeight: 'bold', color: 'var(--color-chalk)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</span>
-                      <span style={{ fontSize: 11, color: 'var(--color-ash)', fontFamily: 'monospace' }}>BJP Code: <span style={{ color: 'var(--color-signal-mint)', fontWeight: 600 }}>{p.bjp_code}</span></span>
+                      <span style={{ fontSize: 11, color: 'var(--color-ash)', fontFamily: 'monospace', marginTop: 2 }}>{t('BJP Code:')} <span style={{ color: 'var(--color-signal-mint)', fontWeight: 600 }}>{p.bjp_code}</span></span>
                     </div>
 
-                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                      <div style={{ fontSize: 16, fontWeight: 'bold', color: 'var(--color-signal-mint)' }}>{p.referrals || p.referred_count || 0}</div>
-                      <div style={{ fontSize: 9, color: 'var(--color-ash)', textTransform: 'uppercase' }}>Invited</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0, background: 'rgba(46,204,113,0.1)', padding: '5px 11px', borderRadius: 20 }}>
+                      <i className="bi bi-people-fill" style={{ fontSize: 12, color: 'var(--color-signal-mint)' }} />
+                      <span style={{ fontSize: 14, fontWeight: 'bold', color: 'var(--color-signal-mint)' }}>{p.referrals || p.referred_count || 0}</span>
                     </div>
                   </div>
                 );
@@ -3863,12 +3877,12 @@ function BestPerformersPanel({ onBack }) {
                       textTransform: 'uppercase',
                       whiteSpace: 'nowrap'
                     }}>
-                      {selectedMember.rank === 1 ? '👑 Champion' : `Rank #${selectedMember.rank}`}
+                      {selectedMember.rank === 1 ? t('👑 Champion') : t('Rank #{rank}', { rank: selectedMember.rank })}
                     </div>
 
                     <div>
                       <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-chalk)', marginBottom: 2, wordBreak: 'break-all' }}>{selectedMember.name}</h3>
-                      <p style={{ fontSize: 11, color: 'var(--color-signal-mint)', fontWeight: 600, margin: 0 }}>Volunteer Agent</p>
+                      <p style={{ fontSize: 11, color: 'var(--color-signal-mint)', fontWeight: 600, margin: 0 }}>{t('Volunteer Agent')}</p>
                     </div>
                   </div>
 
@@ -3891,7 +3905,7 @@ function BestPerformersPanel({ onBack }) {
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: 'var(--color-ash)' }}>
                         <i className="bi bi-hash" style={{ color: '#FF9933' }} />
-                        <span>Member Code</span>
+                        <span>{t('Member Code')}</span>
                       </div>
                       <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-chalk)', fontFamily: 'monospace' }}>{selectedMember.bjp_code}</span>
                     </div>
@@ -3907,7 +3921,7 @@ function BestPerformersPanel({ onBack }) {
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: 'var(--color-ash)' }}>
                         <i className="bi bi-card-text" style={{ color: '#FF9933' }} />
-                        <span>EPIC Number</span>
+                        <span>{t('EPIC Number')}</span>
                       </div>
                       <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-chalk)', fontFamily: 'monospace' }}>{selectedMember.epic_no}</span>
                     </div>
@@ -3923,7 +3937,7 @@ function BestPerformersPanel({ onBack }) {
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: 'var(--color-ash)' }}>
                         <i className="bi bi-geo-alt" style={{ color: '#FF9933' }} />
-                        <span>Assembly</span>
+                        <span>{t('Assembly')}</span>
                       </div>
                       <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-chalk)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={selectedMember.assembly_name}>{selectedMember.assembly_name}</span>
                     </div>
@@ -3939,7 +3953,7 @@ function BestPerformersPanel({ onBack }) {
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: 'var(--color-ash)' }}>
                         <i className="bi bi-map" style={{ color: '#FF9933' }} />
-                        <span>District</span>
+                        <span>{t('District')}</span>
                       </div>
                       <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-chalk)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={selectedMember.district}>{selectedMember.district}</span>
                     </div>
@@ -3955,7 +3969,7 @@ function BestPerformersPanel({ onBack }) {
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: 'var(--color-ash)' }}>
                         <i className="bi bi-pin-map" style={{ color: '#FF9933' }} />
-                        <span>Part Number</span>
+                        <span>{t('Part Number')}</span>
                       </div>
                       <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-chalk)', fontFamily: 'monospace' }}>{selectedMember.part_no}</span>
                     </div>
@@ -3971,7 +3985,7 @@ function BestPerformersPanel({ onBack }) {
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                         <i className="bi bi-people-fill" style={{ color: 'var(--color-signal-mint)', fontSize: 14 }} />
-                        <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-chalk)' }}>Total Refs</span>
+                        <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-chalk)' }}>{t('Total Refs')}</span>
                       </div>
                       <span style={{ fontSize: 16, fontWeight: 800, color: 'var(--color-signal-mint)' }}>{selectedMember.referrals}</span>
                     </div>
@@ -4093,6 +4107,7 @@ export default function ChatbotPage() {
   const sendHintTimer = useRef(null)
   const [otpResendIn, setOtpResendIn] = useState(0)  // seconds left before "Resend OTP" is allowed
   const otpTimerRef = useRef(null)
+  const { t, lang, setLang } = useLang()
   const [activeView, setActiveView] = useState('chat')
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [isFlipped, setIsFlipped]   = useState(false)
@@ -4354,7 +4369,7 @@ export default function ChatbotPage() {
     setShowModal(false)
     setMessages([])
     setChatState(S.WELCOME)
-    addMsg('bot', 'text', { text: '🔒 You have been logged out after 1 hour of inactivity. Tap Start to continue.' })
+    addMsg('bot', 'text', { text: t('🔒 You have been logged out after 1 hour of inactivity. Tap Start to continue.') })
     addMsg('bot', 'welcome_banner', {})
   // addMsg is a stable useCallback([]) declared later — referencing it in the
   // dep array here would hit the temporal dead zone at render (ReferenceError).
@@ -4437,9 +4452,9 @@ export default function ChatbotPage() {
       // value, which caused a false "Already you are a member" on a plain revisit.
       const urlRef = hasReferralInUrl()
       if (urlRef) {
-        addMsg('bot', 'text', { text: '⚠️ *Already you are a member!* Try to logout and rescan the QR.' })
+        addMsg('bot', 'text', { text: t('⚠️ *Already you are a member!* Try to logout and rescan the QR.') })
       } else {
-        addMsg('bot', 'text', { text: '👋 Welcome back to *BJP Tamil Nadu!*' })
+        addMsg('bot', 'text', { text: t('👋 Welcome back to *BJP Tamil Nadu!*') })
       }
 
       const bjpCode = cache.card.bjp_code || cache.card.ptc_code
@@ -4459,15 +4474,15 @@ export default function ChatbotPage() {
 
   // ── Flow handlers ─────────────────────────────────────────
   const handleStart = async () => {
-    addMsg('user', 'text', { text: 'Start' })
+    addMsg('user', 'text', { text: t('Start') })
     setChatState(S.AWAIT_MOBILE)
-    await botSay('📱 Please enter your 10-digit mobile number to get started.', 400)
+    await botSay(t('📱 Please enter your 10-digit mobile number to get started.'), 400)
   }
 
   const handleMobileSubmit = async () => {
     const mobile = inputValue.trim()
     if (!/^\d{10}$/.test(mobile)) {
-      await botSay('❌ Please enter a valid 10-digit mobile number.', 300)
+      await botSay(t('❌ Please enter a valid 10-digit mobile number.'), 300)
       return
     }
     mobileRef.current = mobile
@@ -4481,15 +4496,15 @@ export default function ChatbotPage() {
       const sent = await chat.sendOtp(mobile)
       setIsTyping(false)
       if (!sent?.success) {
-        await botSay('❌ Could not send OTP right now. Please try again in a moment.', 300)
+        await botSay(t('❌ Could not send OTP right now. Please try again in a moment.'), 300)
         return
       }
     } catch (e) {
       setIsTyping(false)
-      await botSay(`❌ ${e?.message || 'Could not send OTP. Please try again.'}`, 300)
+      await botSay(`❌ ${e?.message || t('Could not send OTP. Please try again.')}`, 300)
       return
     }
-    await botSay(`🔐 We've sent a 6-digit OTP to ${maskMobile(mobile)}. Please enter it to continue.`, 300)
+    await botSay(t("🔐 We've sent a 6-digit OTP to {mobile}. Please enter it to continue.", { mobile: maskMobile(mobile) }), 300)
     setChatState(S.AWAIT_OTP)
     startOtpCountdown(60)
   }
@@ -4497,7 +4512,7 @@ export default function ChatbotPage() {
   const handleOtpSubmit = async () => {
     const otp = inputValue.trim()
     if (!/^\d{6}$/.test(otp)) {
-      await botSay('❌ Please enter the 6-digit OTP sent to your number.', 300)
+      await botSay(t('❌ Please enter the 6-digit OTP sent to your number.'), 300)
       return
     }
     const mobile = mobileRef.current
@@ -4526,19 +4541,19 @@ export default function ChatbotPage() {
         if (card.bjp_code) {
           fetchMemberStatus(card.bjp_code)
         }
-        await botSay('✅ Verified! Here is your Digital Member ID Card:', 300)
+        await botSay(t('✅ Verified! Here is your Digital Member ID Card:'), 300)
         addMsg('bot', 'generated_card', { card })
         setChatState(S.DONE)
         return
       }
       // Verified and no existing registration → start a new registration.
-      await botSay('✅ Mobile verified! You are not registered yet — enter your EPIC Number (Voter ID) to continue.', 300)
-      await botSay('📋 Format: 3 letters + 7 digits  e.g. ABC1234567', 200)
+      await botSay(t('✅ Mobile verified! You are not registered yet — enter your EPIC Number (Voter ID) to continue.'), 300)
+      await botSay(t('📋 Format: 3 letters + 7 digits  e.g. ABC1234567'), 200)
       setChatState(S.AWAIT_EPIC)
     } catch (err) {
       setIsTyping(false)
       // 400 = invalid/expired OTP, 429 = too many attempts
-      await botSay(`❌ ${err?.message || 'Invalid OTP. Please try again.'}`, 300)
+      await botSay(`❌ ${err?.message || t('Invalid OTP. Please try again.')}`, 300)
       // stay on AWAIT_OTP so the user can retry
     }
   }
@@ -4564,25 +4579,25 @@ export default function ChatbotPage() {
       const sent = await chat.sendOtp(mobile)
       setIsTyping(false)
       if (sent?.success) {
-        await botSay(`📨 A new OTP has been sent to ${maskMobile(mobile)}.`, 250)
+        await botSay(t('📨 A new OTP has been sent to {mobile}.', { mobile: maskMobile(mobile) }), 250)
         startOtpCountdown(60)
       } else {
-        await botSay('❌ Could not resend OTP. Please try again shortly.', 250)
+        await botSay(t('❌ Could not resend OTP. Please try again shortly.'), 250)
       }
     } catch (e) {
       setIsTyping(false)
       // Backend enforces a 60s cooldown; if we're early it returns the wait time.
-      const msg = e?.message || 'Could not resend OTP. Please try again.'
+      const msg = e?.message || t('Could not resend OTP. Please try again.')
       const m = /(\d+)\s*s/.exec(msg)
       if (m) startOtpCountdown(Math.min(60, parseInt(m[1], 10)))
-      await botSay(`⏳ ${msg}`, 250)
+      await botSay(t('⏳ {message}', { message: msg }), 250)
     }
   }
 
   const handleEpicSubmit = async () => {
     const epic = inputValue.trim().toUpperCase()
     if (!/^[A-Z]{3}\d{7}$/.test(epic)) {
-      await botSay('❌ Invalid format. Use 3 letters + 7 digits (e.g., ABC1234567).', 300)
+      await botSay(t('❌ Invalid format. Use 3 letters + 7 digits (e.g., ABC1234567).'), 300)
       return
     }
     epicRef.current = epic
@@ -4610,7 +4625,7 @@ export default function ChatbotPage() {
         if (card.bjp_code) {
           fetchMemberStatus(card.bjp_code)
         }
-        await botSay('✅ You are already a registered member! Here is your Digital Member ID Card:', 300)
+        await botSay(t('✅ You are already a registered member! Here is your Digital Member ID Card:'), 300)
         addMsg('bot', 'generated_card', { card })
         setChatState(S.DONE)
         return
@@ -4618,10 +4633,10 @@ export default function ChatbotPage() {
 
       const voter = res.voter || res.data || res
       if (!voter || (!voter.name && !voter.Name && !voter.voter_name)) {
-        throw new Error('Voter data not found in response')
+        throw new Error(t('Voter data not found in response'))
       }
       voterRef.current = voter
-      await botSay('✅ Voter found! Please confirm your details:', 200)
+      await botSay(t('✅ Voter found! Please confirm your details:'), 200)
       addMsg('bot', 'voter_card', { voter })
       setChatState(S.CONFIRM)
     } catch (err) {
@@ -4641,33 +4656,33 @@ export default function ChatbotPage() {
         }
         cardRef.current = card
         saveCache(card, {})
-        await botSay('✅ You are already a registered member! Here is your Digital Member ID Card:', 300)
+        await botSay(t('✅ You are already a registered member! Here is your Digital Member ID Card:'), 300)
         addMsg('bot', 'generated_card', { card })
         setChatState(S.DONE)
         return
       }
-      await botSay(`❌ ${err.message || 'EPIC not found. Please check and try again.'}`, 200)
+      await botSay(`❌ ${err.message || t('EPIC not found. Please check and try again.')}`, 200)
     }
   }
 
   const handleConfirm = async () => {
-    addMsg('user', 'text', { text: '✓ Confirmed' })
-    await botSay('📸 Please upload your recent passport-size photo to generate your card.', 400)
+    addMsg('user', 'text', { text: t('✓ Confirmed') })
+    await botSay(t('📸 Please upload your recent passport-size photo to generate your card.'), 400)
     setChatState(S.AWAIT_PHOTO)
   }
 
   const handleRetry = async () => {
-    addMsg('user', 'text', { text: '↩ Try Again' })
+    addMsg('user', 'text', { text: t('↩ Try Again') })
     epicRef.current = ''
     voterRef.current = null
-    await botSay('📋 Please enter your EPIC Number again.', 300)
+    await botSay(t('📋 Please enter your EPIC Number again.'), 300)
     setChatState(S.AWAIT_EPIC)
   }
 
   const handleFileSelect = (file) => {
     if (!file) return
     if (!file.type.startsWith('image/')) {
-      botSay('❌ Please select an image file (JPG, PNG, etc.).', 200)
+      botSay(t('❌ Please select an image file (JPG, PNG, etc.).'), 200)
       return
     }
     const reader = new FileReader()
@@ -4678,9 +4693,9 @@ export default function ChatbotPage() {
   const handleCropComplete = async (blob) => {
     setCropOpen(false)
     setCropSrc('')
-    addMsg('user', 'text', { text: '📸 Photo uploaded' })
+    addMsg('user', 'text', { text: t('📸 Photo uploaded') })
     setChatState(S.GENERATING)
-    await botSay('⏳ Generating your card… please wait a moment.', 400)
+    await botSay(t('⏳ Generating your card… please wait a moment.'), 400)
 
     try {
       const { ref, rid } = referralRef.current
@@ -4743,13 +4758,13 @@ export default function ChatbotPage() {
         localStorage.removeItem('bjp_referral')
       } catch {}
 
-      await botSay('🎉 Your Digital Member ID Card is ready!', 200)
+      await botSay(t('🎉 Your Digital Member ID Card is ready!'), 200)
       addMsg('bot', 'generated_card', { card, isNew: true })
 
       // Send Welcome Letter PDF attachment
       await sleep(1000)
       await botSay(
-        '✉️ *Welcome to BJP Tamil Nadu!*\nWe have prepared your official welcome letter. Click below to view, print, or save it as a PDF:',
+        t('✉️ *Welcome to BJP Tamil Nadu!*\nWe have prepared your official welcome letter. Click below to view, print, or save it as a PDF:'),
         300
       )
       await sleep(400)
@@ -4766,7 +4781,7 @@ export default function ChatbotPage() {
       setChatState(S.DONE)
     } catch (err) {
       setChatState(S.AWAIT_PHOTO)
-      await botSay(`❌ ${err.message || 'Error generating card. Please try uploading your photo again.'}`, 200)
+      await botSay(`❌ ${err.message || t('Error generating card. Please try uploading your photo again.')}`, 200)
     }
   }
 
@@ -4774,16 +4789,16 @@ export default function ChatbotPage() {
     const boothNo = inputValue.trim()
     if (!boothNo) return
     const bjpCode = cardRef.current?.bjp_code || cardRef.current?.ptc_code || profileRef.current?.bjp_code || profileRef.current?.ptc_code
-    addMsg('user', 'text', { text: `Booth No: ${boothNo}` })
+    addMsg('user', 'text', { text: t('Booth No: {booth}', { booth: boothNo }) })
     setInputValue('')
     setIsTyping(true)
     try {
       const res = await chat.requestBoothAgent(bjpCode, epicRef.current, boothNo)
       setIsTyping(false)
-      await botSay(res.message || '✅ Booth Agent request submitted! Admin will review it shortly.', 200)
+      await botSay(res.message || t('✅ Booth Agent request submitted! Admin will review it shortly.'), 200)
     } catch (err) {
       setIsTyping(false)
-      await botSay(`ℹ️ ${err.message || 'Unable to submit request. Please try again.'}`, 200)
+      await botSay(`ℹ️ ${err.message || t('Unable to submit request. Please try again.')}`, 200)
     }
     setChatState(S.DONE)
   }
@@ -4902,13 +4917,13 @@ export default function ChatbotPage() {
   const getInputCfg = () => {
     switch (chatState) {
       case S.AWAIT_MOBILE:
-        return { type: 'tel', placeholder: 'Enter 10-digit mobile number', maxLength: 10, inputMode: 'numeric' }
+        return { type: 'tel', placeholder: t('Enter 10-digit mobile number'), maxLength: 10, inputMode: 'numeric' }
       case S.AWAIT_OTP:
-        return { type: 'tel', placeholder: 'Enter 6-digit OTP', maxLength: 6, inputMode: 'numeric' }
+        return { type: 'tel', placeholder: t('Enter 6-digit OTP'), maxLength: 6, inputMode: 'numeric' }
       case S.AWAIT_EPIC:
-        return { type: 'text', placeholder: 'EPIC Number (e.g. ABC1234567)', maxLength: 10 }
+        return { type: 'text', placeholder: t('EPIC Number (e.g. ABC1234567)'), maxLength: 10 }
       case S.AWAIT_BOOTH_NO:
-        return { type: 'text', placeholder: 'Enter your Booth Number', maxLength: 30 }
+        return { type: 'text', placeholder: t('Enter your Booth Number'), maxLength: 30 }
       default:
         return null
     }
@@ -5038,14 +5053,14 @@ export default function ChatbotPage() {
         const entries = Object.entries(booth).filter(([k, v]) => !SKIP_KEYS.has(k) && v !== null && v !== undefined && v !== '')
         return (
           <div className="info-card booth-card">
-            <div className="info-card-header"><i className="bi bi-building" /> Booth Information</div>
+            <div className="info-card-header"><i className="bi bi-building" /> {t('Booth Information')}</div>
             <div className="vdc-body">
               {entries.length > 0 ? entries.map(([k, v]) => (
                 <div className="vdc-row" key={k}>
                   <span className="vdc-label">{k.replace(/_/g, ' ')}</span>
                   <span className="vdc-value">{String(v)}</span>
                 </div>
-              )) : <p style={{ padding: '10px 12px', fontSize: 12, color: '#8696a0' }}>No booth information available.</p>}
+              )) : <p style={{ padding: '10px 12px', fontSize: 12, color: '#8696a0' }}>{t('No booth information available.')}</p>}
             </div>
           </div>
         )
@@ -5056,9 +5071,9 @@ export default function ChatbotPage() {
         const members = msg.members || []
         return (
           <div className="members-card info-card">
-            <div className="info-card-header"><i className="bi bi-people-fill" /> My Members ({members.length})</div>
+            <div className="info-card-header"><i className="bi bi-people-fill" /> {t('My Members')} ({members.length})</div>
             {members.length === 0 ? (
-              <p className="members-empty">No members yet. Share your referral link!</p>
+              <p className="members-empty">{t('No members yet. Share your referral link!')}</p>
             ) : (
               <ul className="members-list">
                 {members.slice(0, 15).map((m, i) => (
@@ -5078,10 +5093,10 @@ export default function ChatbotPage() {
         return (
           <div className="members-card info-card best-performers-card">
             <div className="info-card-header">
-              <i className="bi bi-trophy-fill text-warning me-2" /> Top 5 Referrers
+              <i className="bi bi-trophy-fill text-warning me-2" /> {t('Top 5 Referrers')}
             </div>
             {performers.length === 0 ? (
-              <p className="members-empty">No referrals generated yet. Invite members to lead the board!</p>
+              <p className="members-empty">{t('No referrals generated yet. Invite members to lead the board!')}</p>
             ) : (
               <ul className="members-list best-performers-list" style={{ listStyle: 'none', padding: 0 }}>
                 {performers.map((p, i) => (
@@ -5101,11 +5116,11 @@ export default function ChatbotPage() {
                       }}>{p.rank}</span>
                       <div style={{ display: 'flex', flexDirection: 'column' }}>
                         <span style={{ fontSize: 13, fontWeight: '500' }}>{p.name}</span>
-                        <span style={{ fontSize: 10, opacity: 0.6 }}>BJP Code: {p.bjp_code}</span>
+                        <span style={{ fontSize: 10, opacity: 0.6 }}>{t('BJP Code:')} {p.bjp_code}</span>
                       </div>
                     </div>
                     <span className="badge-status badge-generated" style={{ fontSize: 12, fontWeight: 'bold' }}>
-                      {p.referred_count} {p.referred_count === 1 ? 'referral' : 'referrals'}
+                      {p.referred_count === 1 ? t('{count} referral', { count: p.referred_count }) : t('{count} referrals', { count: p.referred_count })}
                     </span>
                   </li>
                 ))}
@@ -5166,13 +5181,30 @@ export default function ChatbotPage() {
             <div className="left-menu-profile">
               <img src="/bjp_logo.svg" alt="BJP" onError={(e) => { e.target.style.display = 'none' }} />
               <div className="left-menu-profile-info">
-                <div className="left-menu-brand">BJP TAMIL NADU</div>
+                <div className="left-menu-brand">{t('BJP TAMIL NADU')}</div>
                 <div className="left-menu-status">
-                  <span className="status-dot-green" /> Online
+                  <span className="status-dot-green" /> {t('Online')}
                 </div>
               </div>
             </div>
             <div className="left-menu-header-actions" style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+              {/* Language toggle: E (English) / த (Tamil) */}
+              <div className="lang-toggle" role="group" aria-label="Language">
+                <button
+                  type="button"
+                  className={`lang-toggle-btn${lang === 'en' ? ' active' : ''}`}
+                  onClick={() => setLang('en')}
+                  aria-pressed={lang === 'en'}
+                  title="English"
+                >E</button>
+                <button
+                  type="button"
+                  className={`lang-toggle-btn${lang === 'ta' ? ' active' : ''}`}
+                  onClick={() => setLang('ta')}
+                  aria-pressed={lang === 'ta'}
+                  title="தமிழ்"
+                >த</button>
+              </div>
               {isDone && (
                 <button
                   className={`chat-header-btn bell-alert-btn ${
@@ -5181,8 +5213,8 @@ export default function ChatbotPage() {
                   onClick={handleBellClick}
                   title={
                     hasAppointment 
-                      ? 'Meeting Scheduled! Click to view details' 
-                      : 'Milestone Achieved! Click to Schedule Meeting with President'
+                      ? t('Meeting Scheduled! Click to view details') 
+                      : t('Milestone Achieved! Click to Schedule Meeting with President')
                   }
                   style={{ 
                     fontSize: 18, 
@@ -5200,9 +5232,9 @@ export default function ChatbotPage() {
                 <button
                   className="chat-header-btn"
                   onClick={() => {
-                    if (window.confirm('Logout and start over?')) handleLogout()
+                    if (window.confirm(t('Logout and start over?'))) handleLogout()
                   }}
-                  title="Logout"
+                  title={t('Logout')}
                   style={{ fontSize: 16 }}
                 >
                   <i className="bi bi-box-arrow-right" />
@@ -5220,11 +5252,11 @@ export default function ChatbotPage() {
               </div>
               <div className="left-chat-details">
                 <div className="left-chat-name-row">
-                  <span className="left-chat-name">BJP TN Member Bot</span>
+                  <span className="left-chat-name">{t('BJP TN Member Bot')}</span>
                   <span className="left-chat-time">{fmtTime(new Date())}</span>
                 </div>
                 <div className="left-chat-msg">
-                  {!isDone ? 'Register to generate your Member Card' : 'Registration completed successfully!'}
+                  {!isDone ? t('Register to generate your Member Card') : t('Registration completed successfully!')}
                 </div>
               </div>
             </div>
@@ -5260,7 +5292,7 @@ export default function ChatbotPage() {
                   aria-disabled={locked}
                   onClick={() => !locked && handleSidebarAction(item.action)}
                   onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && !locked) { e.preventDefault(); handleSidebarAction(item.action) } }}
-                  title={isComingSoon ? 'Coming Soon' : (item.action === 'appreciation_letter' && referredCount < 5) ? 'Invite 5 members to unlock appreciation letter' : locked ? 'Complete registration to unlock' : item.desc}
+                  title={isComingSoon ? t('Coming Soon') : (item.action === 'appreciation_letter' && referredCount < 5) ? t('Invite 5 members to unlock appreciation letter') : locked ? t('Complete registration to unlock') : t(item.desc)}
                 >
                   <div className="left-chat-avatar option-avatar">
                     <i className={`bi bi-${item.icon}`} />
@@ -5268,8 +5300,8 @@ export default function ChatbotPage() {
                   <div className="left-chat-details">
                     <div className="left-chat-name-row">
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                        <span className="left-chat-name">{item.label}</span>
-                        {isComingSoon && <span className="coming-soon-badge">Coming Soon</span>}
+                        <span className="left-chat-name">{t(item.label)}</span>
+                        {isComingSoon && <span className="coming-soon-badge">{t('Coming Soon')}</span>}
                         {itemHasNotif && (
                           <span style={{
                             display: 'inline-flex', alignItems: 'center', gap: 3,
@@ -5279,14 +5311,14 @@ export default function ChatbotPage() {
                             borderRadius: 20, padding: '1px 7px', fontSize: 10, fontWeight: 700
                           }}>
                             {notifStatus === 'confirmed'
-                              ? <><i className="bi bi-check-circle-fill" /> Accepted</>
-                              : <><i className="bi bi-x-circle-fill" /> Rejected</>}
+                              ? <><i className="bi bi-check-circle-fill" /> {t('Accepted')}</>
+                              : <><i className="bi bi-x-circle-fill" /> {t('Rejected')}</>}
                           </span>
                         )}
                       </div>
                       {locked && <i className="bi bi-lock-fill lock-icon" />}
                     </div>
-                    <div className="left-chat-msg">{item.desc}</div>
+                    <div className="left-chat-msg">{t(item.desc)}</div>
                   </div>
                 </div>
               )
@@ -5387,14 +5419,14 @@ export default function ChatbotPage() {
                 <img src="/bjp_logo.svg" alt="BJP" onError={(e) => { e.target.style.display = 'none' }} />
               </div>
               <div className="chat-header-info">
-                <div className="chat-header-name">BJP TAMIL NADU</div>
+                <div className="chat-header-name">{t('BJP TAMIL NADU')}</div>
                 <div className="chat-header-status">
                   {chatState === S.GENERATING ? (
-                    <><span className="status-dot-pulsing" /> Generating membership card...</>
+                    <><span className="status-dot-pulsing" /> {t('Generating membership card...')}</>
                   ) : isDone ? (
-                    <><span className="status-dot-green" /> Online</>
+                    <><span className="status-dot-green" /> {t('Online')}</>
                   ) : (
-                    <><span className="status-dot-green" /> Registration in progress</>
+                    <><span className="status-dot-green" /> {t('Registration in progress')}</>
                   )}
                 </div>
               </div>
@@ -5449,6 +5481,9 @@ export default function ChatbotPage() {
                     .replace(/\*(.*?)\*/g, '<strong>$1</strong>')
                   return (
                     <div key={msg.id} className="msg-row bot">
+                      <div className="msg-avatar" aria-hidden="true">
+                        <img src="/bjp_logo.svg" alt="BJP" onError={(e) => { e.target.onerror = null; e.target.src = '/bjp_logo.png' }} />
+                      </div>
                       <div className="msg-bubble msg-bubble-interactive">
                         <div className="interactive-body">
                           <span dangerouslySetInnerHTML={{ __html: safeHtml }} />
@@ -5458,10 +5493,10 @@ export default function ChatbotPage() {
                         </div>
                         <div className="interactive-buttons">
                           <button className="interactive-btn" onClick={() => fileInputRef.current?.click()}>
-                            <i className="bi bi-cloud-upload-fill" /> Upload Image
+                            <i className="bi bi-cloud-upload-fill" /> {t('Upload Image')}
                           </button>
                           <button className="interactive-btn" onClick={() => cameraInputRef.current?.click()}>
-                            <i className="bi bi-camera-fill" /> Take Photo
+                            <i className="bi bi-camera-fill" /> {t('Take Photo')}
                           </button>
                         </div>
                       </div>
@@ -5474,6 +5509,11 @@ export default function ChatbotPage() {
                     key={msg.id}
                     className={`msg-row ${msg.from}`}
                   >
+                    <div className="msg-avatar" aria-hidden="true">
+                      {msg.from === 'bot'
+                        ? <img src="/bjp_logo.svg" alt="BJP" onError={(e) => { e.target.onerror = null; e.target.src = '/bjp_logo.png' }} />
+                        : <i className="bi bi-person-fill" />}
+                    </div>
                     <div className={`msg-bubble ${['voter_card','generated_card','booth_info','referral_link','members_list','profile_card','welcome_banner','welcome_letter','appreciation_letter'].includes(msg.type) ? 'wide' : ''}`}>
                       {renderMsgContent(msg)}
                       <div className="msg-time">
@@ -5486,7 +5526,10 @@ export default function ChatbotPage() {
 
               {isTyping && (
                 <div className="msg-row bot">
-                  <div className="typing-bubble" role="status" aria-label="Bot is typing">
+                  <div className="msg-avatar" aria-hidden="true">
+                    <img src="/bjp_logo.svg" alt="BJP" onError={(e) => { e.target.onerror = null; e.target.src = '/bjp_logo.png' }} />
+                  </div>
+                  <div className="typing-bubble" role="status" aria-label={t('Bot is typing')}>
                     <span className="typing-dot" />
                     <span className="typing-dot" />
                     <span className="typing-dot" />
@@ -5502,11 +5545,11 @@ export default function ChatbotPage() {
               <div className="otp-resend-bar">
                 {otpResendIn > 0 ? (
                   <span className="otp-resend-wait">
-                    <i className="bi bi-clock-history" /> Resend OTP in {otpResendIn}s
+                    <i className="bi bi-clock-history" /> {t('Resend OTP in {seconds}s', { seconds: otpResendIn })}
                   </span>
                 ) : (
                   <button type="button" className="otp-resend-btn" onClick={handleResendOtp} disabled={isTyping}>
-                    <i className="bi bi-arrow-clockwise" /> Resend OTP
+                    <i className="bi bi-arrow-clockwise" /> {t('Resend OTP')}
                   </button>
                 )}
               </div>
@@ -5537,17 +5580,17 @@ export default function ChatbotPage() {
               ) : chatState === S.GENERATING ? (
                 <div className="generating-bar">
                   <div className="spinner-border spinner-border-sm text-success" role="status" />
-                  <span>Generating your card, please wait...</span>
+                  <span>{t('Generating your card, please wait...')}</span>
                 </div>
               ) : isDone && !inputCfg ? (
                 <div className="chat-form done-bar">
                   <div className="chat-input-wrapper">
                     <span className="done-status">
                       <i className="bi bi-shield-fill-check text-success" />
-                      Card Generated Successfully
+                      {t('Card Generated Successfully')}
                     </span>
                   </div>
-                  <button className="chat-send-btn menu-btn" onClick={handleSidebarOpen} title="Menu" style={{ position: 'relative' }}>
+                  <button className="chat-send-btn menu-btn" onClick={handleSidebarOpen} title={t('Menu')} style={{ position: 'relative' }}>
                     <i className="bi bi-grid-3x3-gap-fill" />
                     {hasSidebarNotification && <span style={{ position: 'absolute', top: 4, right: 4, width: 8, height: 8, borderRadius: '50%', background: '#e53935', display: 'block' }} />}
                   </button>
@@ -5578,8 +5621,8 @@ export default function ChatbotPage() {
                   <button
                     type="submit"
                     className={`chat-send-btn${getIsSendDisabled() ? ' not-ready' : ''}`}
-                    aria-label="Send"
-                    title="Send"
+                    aria-label={t('Send')}
+                    title={t('Send')}
                   >
                     <i className="bi bi-send-fill" />
                   </button>
@@ -5599,8 +5642,8 @@ export default function ChatbotPage() {
               <img src="/bjp_logo.svg" alt="BJP" className="sidebar-logo"
                 onError={(e) => { e.target.src = '/bjp_logo.png' }} />
               <div>
-                <div className="sidebar-brand">BJP TAMIL NADU</div>
-                <div className="sidebar-tagline">Nation First. Party Next. Self Last.</div>
+                <div className="sidebar-brand">{t('BJP TAMIL NADU')}</div>
+                <div className="sidebar-tagline">{t('Nation First. Party Next. Self Last.')}</div>
               </div>
               <button 
                 onClick={() => setSidebarOpen(false)}
@@ -5620,7 +5663,7 @@ export default function ChatbotPage() {
                   justifyContent: 'center',
                   zIndex: 10
                 }}
-                aria-label="Close sidebar"
+                aria-label={t('Close sidebar')}
               >
                 <i className="bi bi-x" />
               </button>
@@ -5657,8 +5700,8 @@ export default function ChatbotPage() {
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
                         <i className={`bi bi-${item.icon}`} />
-                        <span>{item.label}</span>
-                        {isComingSoon && <span className="coming-soon-badge">Coming Soon</span>}
+                        <span>{t(item.label)}</span>
+                        {isComingSoon && <span className="coming-soon-badge">{t('Coming Soon')}</span>}
                         {itemHasNotif && (
                           <span style={{
                             display: 'inline-flex', alignItems: 'center', gap: 4,
@@ -5669,8 +5712,8 @@ export default function ChatbotPage() {
                             animation: 'pulse 1.5s infinite'
                           }}>
                             {notifStatus === 'confirmed'
-                              ? <><i className="bi bi-check-circle-fill" /> Accepted</>  
-                              : <><i className="bi bi-x-circle-fill" /> Rejected</>}
+                              ? <><i className="bi bi-check-circle-fill" /> {t('Accepted')}</>  
+                              : <><i className="bi bi-x-circle-fill" /> {t('Rejected')}</>}
                           </span>
                         )}
                       </div>
@@ -5682,7 +5725,7 @@ export default function ChatbotPage() {
             </nav>
             <div className="sidebar-footer">
               <button className="sidebar-logout-btn" onClick={handleLogout}>
-                <i className="bi bi-box-arrow-left" /> Logout
+                <i className="bi bi-box-arrow-left" /> {t('Logout')}
               </button>
             </div>
           </div>
@@ -5717,10 +5760,8 @@ export default function ChatbotPage() {
                 <div className="modal-icon-wrapper congrats">
                   <i className="bi bi-trophy-fill congrats-icon" />
                 </div>
-                <h2>Congratulations! 🎉</h2>
-                <p className="congrats-text">
-                  You have successfully completed <strong>5 referrals</strong>! As a token of appreciation for your outstanding support, you have earned a special opportunity to meet the State President. Are you interested in scheduling a meeting?
-                </p>
+                <h2>{t('Congratulations! 🎉')}</h2>
+                <p className="congrats-text" dangerouslySetInnerHTML={{ __html: t('You have successfully completed *5 referrals*! As a token of appreciation for your outstanding support, you have earned a special opportunity to meet the State President. Are you interested in scheduling a meeting?').replace(/\*(.*?)\*/g, '<strong>$1</strong>') }} />
                 {bookingError && <p className="modal-error-text" style={{ color: '#ff3b30', fontSize: 12, marginBottom: 16 }}>⚠️ {bookingError}</p>}
                 <div className="modal-actions-row" style={{ display: 'flex', gap: 12, marginTop: 20 }}>
                   <button 
@@ -5729,7 +5770,7 @@ export default function ChatbotPage() {
                     onClick={() => handleMeetingInterestSubmit('interested')}
                     disabled={isBooking}
                   >
-                    {isBooking ? 'Saving...' : 'Interested'}
+                    {isBooking ? t('Saving...') : t('Interested')}
                   </button>
                   <button 
                     className="btn-modal-action btn-cancel" 
@@ -5737,7 +5778,7 @@ export default function ChatbotPage() {
                     onClick={() => handleMeetingInterestSubmit('not_interested')}
                     disabled={isBooking}
                   >
-                    {isBooking ? 'Saving...' : 'Not Interested'}
+                    {isBooking ? t('Saving...') : t('Not Interested')}
                   </button>
                 </div>
               </div>
@@ -5748,16 +5789,16 @@ export default function ChatbotPage() {
                 <div className="modal-icon-wrapper success">
                   <i className="bi bi-check-circle-fill success-icon" />
                 </div>
-                <h2>Preference Saved! 🗓️</h2>
+                <h2>{t('Preference Saved! 🗓️')}</h2>
                 <p className="success-text">
                   {meetingInterest === 'interested'
-                    ? 'Thanks for your interest! Your request to meet the State President has been recorded. Our team will contact you soon.'
-                    : 'Thank you for your response. Your preference has been successfully recorded.'
+                    ? t('Thanks for your interest! Your request to meet the State President has been recorded. Our team will contact you soon.')
+                    : t('Thank you for your response. Your preference has been successfully recorded.')
                   }
                 </p>
                 <div className="modal-actions-row">
                   <button className="btn-modal-action btn-schedule" onClick={() => setShowModal(false)}>
-                    Done
+                    {t('Done')}
                   </button>
                 </div>
               </div>
@@ -5768,9 +5809,9 @@ export default function ChatbotPage() {
                 <div className="modal-icon-wrapper congrats" style={{ background: 'rgba(209, 176, 120, 0.12)' }}>
                   <i className="bi bi-building congrats-icon" style={{ color: '#D1B078' }} />
                 </div>
-                <h2>Local Body Elections 🗳️</h2>
+                <h2>{t('Local Body Elections 🗳️')}</h2>
                 <p className="congrats-text" style={{ fontSize: 13, lineHeight: '1.5' }}>
-                  Are you interested in participating or contesting in the upcoming Local Body Elections? BJP Tamil Nadu is planning candidate profiles and coordinators for each ward/panchayat. Let us know your interest below:
+                  {t('Are you interested in participating or contesting in the upcoming Local Body Elections? BJP Tamil Nadu is planning candidate profiles and coordinators for each ward/panchayat. Let us know your interest below:')}
                 </p>
                 {bookingError && <p className="modal-error-text" style={{ color: '#ff3b30', fontSize: 12, marginBottom: 16 }}>⚠️ {bookingError}</p>}
                 <div className="modal-actions-row" style={{ display: 'flex', gap: 12, marginTop: 20 }}>
@@ -5780,7 +5821,7 @@ export default function ChatbotPage() {
                     onClick={() => handleLocalBodyInterestSubmit('interested')}
                     disabled={isBooking}
                   >
-                    {isBooking ? 'Saving...' : 'Interested'}
+                    {isBooking ? t('Saving...') : t('Interested')}
                   </button>
                   <button 
                     className="btn-modal-action btn-cancel" 
@@ -5788,7 +5829,7 @@ export default function ChatbotPage() {
                     onClick={() => handleLocalBodyInterestSubmit('not_interested')}
                     disabled={isBooking}
                   >
-                    {isBooking ? 'Saving...' : 'Not Interested'}
+                    {isBooking ? t('Saving...') : t('Not Interested')}
                   </button>
                 </div>
               </div>
@@ -5799,11 +5840,11 @@ export default function ChatbotPage() {
                 <div className="modal-icon-wrapper success">
                   <i className="bi bi-check-circle-fill success-icon" />
                 </div>
-                <h2>Thank You! 🙏</h2>
+                <h2>{t('Thank You! 🙏')}</h2>
                 <p className="success-text" style={{ fontSize: 13, lineHeight: '1.5' }}>
                   {localBodyInterest === 'interested' 
-                    ? 'Thanks for your interest! Your preference has been recorded. Our team will reach out to you with further updates.'
-                    : 'Thank you for your response. Your preference has been successfully recorded.'
+                    ? t('Thanks for your interest! Your preference has been recorded. Our team will reach out to you with further updates.')
+                    : t('Thank you for your response. Your preference has been successfully recorded.')
                   }
                 </p>
                 <div className="modal-actions-row" style={{ marginTop: 20 }}>
@@ -5814,7 +5855,7 @@ export default function ChatbotPage() {
                       setBookingStep(1);
                     }
                   }}>
-                    Close
+                    {t('Close')}
                   </button>
                 </div>
               </div>
@@ -5825,13 +5866,13 @@ export default function ChatbotPage() {
                 <div className="modal-icon-wrapper success" style={{ backgroundColor: 'rgba(46, 125, 50, 0.12)' }}>
                   <i className="bi bi-patch-check-fill success-icon" style={{ color: '#2e7d32' }} />
                 </div>
-                <h2>Congratulations Organizer! 🎉</h2>
+                <h2>{t('Congratulations Organizer! 🎉')}</h2>
                 <p className="success-text" style={{ fontSize: 13, lineHeight: '1.5' }}>
-                  Your application to become a BJP Organizer has been accepted by the State Administrator. Thank you for your leadership and dedication to the party!
+                  {t('Your application to become a BJP Organizer has been accepted by the State Administrator. Thank you for your leadership and dedication to the party!')}
                 </p>
                 <div className="modal-actions-row" style={{ marginTop: 20 }}>
                   <button className="btn-modal-action btn-schedule" style={{ backgroundColor: '#2e7d32' }} onClick={() => handleAcknowledgeStatus('volunteer', 'confirmed')}>
-                    Done
+                    {t('Done')}
                   </button>
                 </div>
               </div>
@@ -5842,13 +5883,13 @@ export default function ChatbotPage() {
                 <div className="modal-icon-wrapper success" style={{ backgroundColor: 'rgba(198, 40, 40, 0.12)' }}>
                   <i className="bi bi-x-circle-fill success-icon" style={{ color: '#c62828' }} />
                 </div>
-                <h2>Organizer Application ℹ️</h2>
+                <h2>{t('Organizer Application ℹ️')}</h2>
                 <p className="success-text" style={{ fontSize: 13, lineHeight: '1.5' }}>
-                  Your application to become a BJP Organizer has been reviewed and rejected by the State Administrator at this time. Thank you for your interest; you can continue to participate and refer new members.
+                  {t('Your application to become a BJP Organizer has been reviewed and rejected by the State Administrator at this time. Thank you for your interest; you can continue to participate and refer new members.')}
                 </p>
                 <div className="modal-actions-row" style={{ marginTop: 20 }}>
                   <button className="btn-modal-action btn-schedule" style={{ backgroundColor: '#c62828' }} onClick={() => handleAcknowledgeStatus('volunteer', 'rejected')}>
-                    Done
+                    {t('Done')}
                   </button>
                 </div>
               </div>
@@ -5859,13 +5900,13 @@ export default function ChatbotPage() {
                 <div className="modal-icon-wrapper success" style={{ backgroundColor: 'rgba(21, 101, 192, 0.12)' }}>
                   <i className="bi bi-shield-fill-check success-icon" style={{ color: '#1565c0' }} />
                 </div>
-                <h2>Congratulations Booth Agent! 🗳️</h2>
+                <h2>{t('Congratulations Booth Agent! 🗳️')}</h2>
                 <p className="success-text" style={{ fontSize: 13, lineHeight: '1.5' }}>
-                  Your application to become a BJP Booth Agent has been confirmed by the State Administrator. You are now officially assigned to your booth! Thank you for your valuable support.
+                  {t('Your application to become a BJP Booth Agent has been confirmed by the State Administrator. You are now officially assigned to your booth! Thank you for your valuable support.')}
                 </p>
                 <div className="modal-actions-row" style={{ marginTop: 20 }}>
                   <button className="btn-modal-action btn-schedule" style={{ backgroundColor: '#1565c0' }} onClick={() => handleAcknowledgeStatus('booth_agent', 'confirmed')}>
-                    Done
+                    {t('Done')}
                   </button>
                 </div>
               </div>
@@ -5876,13 +5917,13 @@ export default function ChatbotPage() {
                 <div className="modal-icon-wrapper success" style={{ backgroundColor: 'rgba(198, 40, 40, 0.12)' }}>
                   <i className="bi bi-x-circle-fill success-icon" style={{ color: '#c62828' }} />
                 </div>
-                <h2>Booth Agent Application ℹ️</h2>
+                <h2>{t('Booth Agent Application ℹ️')}</h2>
                 <p className="success-text" style={{ fontSize: 13, lineHeight: '1.5' }}>
-                  Your application to become a BJP Booth Agent has been reviewed and rejected by the State Administrator at this time. Thank you for your interest.
+                  {t('Your application to become a BJP Booth Agent has been reviewed and rejected by the State Administrator at this time. Thank you for your interest.')}
                 </p>
                 <div className="modal-actions-row" style={{ marginTop: 20 }}>
                   <button className="btn-modal-action btn-schedule" style={{ backgroundColor: '#c62828' }} onClick={() => handleAcknowledgeStatus('booth_agent', 'rejected')}>
-                    Done
+                    {t('Done')}
                   </button>
                 </div>
               </div>

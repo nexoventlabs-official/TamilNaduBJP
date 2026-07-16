@@ -1,6 +1,13 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { admin } from '../../api'
+import '../../styles/admin-medialist.css'
+
+function Cover({ url }) {
+  const [error, setError] = useState(false)
+  if (url && !error) return <img className="ml-cover" src={url} alt="" onError={() => setError(true)} />
+  return <div className="ml-cover"><i className="bi bi-person-fill" /></div>
+}
 
 function Pagination({ page, total, perPage = 20, onChange }) {
   const totalPages = Math.max(1, Math.ceil(total / perPage))
@@ -111,94 +118,43 @@ export default function BoothAgentRequestsPage() {
           <div className="empty-state"><i className="bi bi-building" /><p>No {statusFilter} booth agent requests found.</p></div>
         ) : (
           <>
-            <div className="admin-table-wrap">
-              <table className="admin-table">
-                <thead>
-                  <tr>
-                    <th>#</th>
-                    <th>Name</th>
-                    <th>EPIC No</th>
-                    <th>BJP Code</th>
-                    <th>Booth No</th>
-                    <th>Mobile</th>
-                    <th>Requested At</th>
-                    <th>Status</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {requests.map((r, i) => {
-                    const status    = r.status || 'pending'
-                    const codeVal   = r.bjp_code || r.ptc_code
-                    const key       = codeVal || r.epic_no || i
-                    const isLoading = actionLoading[codeVal]
-                    return (
-                      <tr key={key}>
-                        <td style={{ color: '#8696a0' }}>{(page - 1) * 20 + i + 1}</td>
-                        <td>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            {r.photo_url ? (
-                              <img src={r.photo_url} alt="Photo" style={{ width: 28, height: 28, borderRadius: '50%', objectFit: 'cover' }} />
-                            ) : (
-                              <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'rgba(255,102,0,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                <i className="bi bi-person" style={{ color: 'var(--color-coral)' }} />
-                              </div>
-                            )}
-                            <Link to={`/admin/generated-voters/${codeVal}`} style={{ color: '#1e293b', textDecoration: 'none', fontWeight: 600 }}>
-                              {r.name || r.Name || '—'}
-                            </Link>
-                          </div>
-                        </td>
-                        <td>
-                          <Link to={`/admin/generated-voters/${codeVal}`} style={{ color: '#64b5f6', fontSize: 12 }}>{r.epic_no}</Link>
-                        </td>
-                        <td>
-                          {codeVal
-                            ? <Link to={`/admin/generated-voters/${codeVal}`} style={{ color: '#43a047', fontSize: 12 }}>{codeVal}</Link>
-                            : '—'
-                          }
-                        </td>
-                        <td>
-                          {r.booth_no
-                            ? <span style={{ background: 'rgba(21,101,192,0.12)', color: '#64b5f6', padding: '2px 8px', borderRadius: 12, fontSize: 12, fontWeight: 600 }}>{r.booth_no}</span>
-                            : '—'
-                          }
-                        </td>
-                        <td style={{ color: '#8696a0', fontSize: 12 }}>{r.mobile || '—'}</td>
-                        <td style={{ color: '#8696a0', fontSize: 11 }}>
-                          {r.requested_at ? new Date(r.requested_at).toLocaleDateString() : '—'}
-                        </td>
-                        <td><span className={`badge-status badge-${status}`}>{status}</span></td>
-                        <td>
-                          <div style={{ display: 'flex', gap: 5 }}>
-                            {status === 'pending' && (
-                              <>
-                                <button
-                                  className="btn-action btn-confirm"
-                                  onClick={() => handleAction(codeVal, 'confirm')}
-                                  disabled={!!isLoading}
-                                >
-                                  {isLoading === 'confirm' ? <span className="spinner-border spinner-border-sm" /> : <><i className="bi bi-check-lg" /> Confirm</>}
-                                </button>
-                                <button
-                                  className="btn-action btn-reject"
-                                  onClick={() => handleAction(codeVal, 'reject')}
-                                  disabled={!!isLoading}
-                                >
-                                  {isLoading === 'reject' ? <span className="spinner-border spinner-border-sm" /> : <><i className="bi bi-x-lg" /> Reject</>}
-                                </button>
-                              </>
-                            )}
-                            {status !== 'pending' && (
-                              <span style={{ fontSize: 11, color: '#8696a0', fontStyle: 'italic' }}>Reviewed</span>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
+            <div className="admin-medialist">
+              {requests.map((r, i) => {
+                const status    = r.status || 'pending'
+                const codeVal   = r.bjp_code || r.ptc_code
+                const key       = codeVal || r.epic_no || i
+                const isLoading = actionLoading[codeVal]
+                return (
+                  <div key={key} className="ml-row">
+                    <span className="ml-index">{(page - 1) * 20 + i + 1}</span>
+                    <Cover url={r.photo_url} />
+                    <div className="ml-info">
+                      <Link to={`/admin/generated-voters/${codeVal}`} className="ml-name">{r.name || r.Name || '—'}</Link>
+                      <span className="ml-sub">
+                        <code>{r.epic_no}</code>
+                        {codeVal && <span className="ml-code">{codeVal}</span>}
+                        {r.mobile && <span className="ml-mob">{r.mobile}</span>}
+                      </span>
+                    </div>
+                    <div className="ml-right">
+                      {r.booth_no && <span className="ml-tag"><i className="bi bi-building" /> Booth {r.booth_no}</span>}
+                      <span className={`ml-badge b-${status}`}>{status}</span>
+                      {status === 'pending' ? (
+                        <div className="ml-actions">
+                          <button className="btn-action btn-confirm" onClick={() => handleAction(codeVal, 'confirm')} disabled={!!isLoading}>
+                            {isLoading === 'confirm' ? <span className="spinner-border spinner-border-sm" /> : <><i className="bi bi-check-lg" /> Confirm</>}
+                          </button>
+                          <button className="btn-action btn-reject" onClick={() => handleAction(codeVal, 'reject')} disabled={!!isLoading}>
+                            {isLoading === 'reject' ? <span className="spinner-border spinner-border-sm" /> : <><i className="bi bi-x-lg" /> Reject</>}
+                          </button>
+                        </div>
+                      ) : (
+                        <span className="ml-date">{r.requested_at ? new Date(r.requested_at).toLocaleDateString() : ''}</span>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
             </div>
             <Pagination page={page} total={data.total} onChange={setPage} />
           </>

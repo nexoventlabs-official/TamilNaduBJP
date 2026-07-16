@@ -21,6 +21,7 @@ The shared doc correctly spotted the *symptom* (`Cannot read properties of undef
 ## Evidence (checked directly on the droplet)
 
 ### 1. The installed package still exports `generateCsrfToken`
+
 ```
 $ node -e "const {doubleCsrf}=require('csrf-csrf'); \
   const r=doubleCsrf({getSecret:()=>'x'.repeat(32), getSessionIdentifier:()=>'s'}); \
@@ -28,12 +29,14 @@ $ node -e "const {doubleCsrf}=require('csrf-csrf'); \
 
 [ 'invalidCsrfTokenError', 'generateCsrfToken', 'validateRequest', 'doubleCsrfProtection' ]
 ```
+
 - `generateCsrfToken` **exists** (the doc says it was renamed to `generateToken` — it was not).
 - `doubleCsrf({ getSessionIdentifier })` runs **without error** and returns the middleware.
 
 > If the doc's advice were applied, `generateToken` would be `undefined`, and the `/admin/api/csrf-token` endpoint would throw a `TypeError` → **HTTP 500 on every token request** → all admin POSTs would break. That is the exact failure the doc is trying to avoid.
 
 ### 2. The actual fix that was applied — `cookie-parser`
+
 `csrf-csrf` reads/writes its token cookie via `req.cookies`. That object only exists if the `cookie-parser` middleware runs first. The app didn't have it. The fix:
 
 ```js

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from 'react'
+import { useLang } from '../i18n/LanguageContext'
 
 /**
  * FlipCard3D
@@ -11,9 +12,10 @@ import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from 're
  *  showActions — show download/view buttons
  */
 export const FlipCard3D = forwardRef(function FlipCard3D(
-  { cardData, backUrl, width = 320, autoFlip = false, showActions = true },
+  { cardData, backUrl, width = 320, autoFlip = false, showActions = true, onCardClick = null, showDownloadIcon = false },
   ref
 ) {
+  const { t } = useLang()
   const [flipped, setFlipped]     = useState(false)
   const [downloading, setDownloading] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -341,6 +343,37 @@ export const FlipCard3D = forwardRef(function FlipCard3D(
       >
         {/* FRONT ONLY */}
         <div style={{ width: `${width}px`, height: `${height}px`, overflow: 'hidden', borderRadius: 12, position: 'relative', background: '#F9F8F6', boxShadow: 'var(--shadow-card)' }}>
+          {/* Tap-to-open-full-view overlay (chat card only) */}
+          {onCardClick && (
+            <div
+              role="button"
+              aria-label={t('Full View')}
+              onClick={onCardClick}
+              style={{ position: 'absolute', inset: 0, zIndex: 11, cursor: 'pointer' }}
+            />
+          )}
+          {/* Top-right download icon (chat card only) */}
+          {showDownloadIcon && (
+            <button
+              type="button"
+              aria-label={t('Download')}
+              title={t('Download')}
+              disabled={downloading}
+              onClick={(e) => { e.stopPropagation(); handleDownload() }}
+              style={{
+                position: 'absolute', top: 8, right: 8, zIndex: 12,
+                width: 34, height: 34, borderRadius: '50%',
+                border: 'none', cursor: downloading ? 'default' : 'pointer',
+                background: 'rgba(242, 101, 34, 0.95)', color: '#fff',
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.3)', fontSize: 15,
+              }}
+            >
+              {downloading
+                ? <span className="spinner-border spinner-border-sm" style={{ width: 14, height: 14, borderWidth: 2 }} />
+                : <i className="bi bi-download" />}
+            </button>
+          )}
           {loading && (
             <div className="card-skeleton">
               <div className="skeleton-header">
@@ -390,8 +423,8 @@ export const FlipCard3D = forwardRef(function FlipCard3D(
             className="flip-action-btn flip-action-download"
           >
             {downloading
-              ? <><span className="spinner-border spinner-border-sm" style={{ width: 12, height: 12, borderWidth: 2 }} /> Preparing…</>
-              : <><i className="bi bi-download" /> Download</>
+              ? <><span className="spinner-border spinner-border-sm" style={{ width: 12, height: 12, borderWidth: 2 }} /> {t('Preparing…')}</>
+              : <><i className="bi bi-download" /> {t('Download')}</>
             }
           </button>
           <button
@@ -400,7 +433,7 @@ export const FlipCard3D = forwardRef(function FlipCard3D(
             }}
             className="flip-action-btn"
           >
-            <i className="bi bi-eye" /> Full View
+            <i className="bi bi-eye" /> {t('Full View')}
           </button>
         </div>
       )}

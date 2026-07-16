@@ -1,23 +1,15 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { admin } from '../../api'
+import '../../styles/admin-medialist.css'
 
-function MemberAvatar({ url }) {
+function MemberCover({ url }) {
   const [error, setError] = useState(false)
   if (url && !error) {
-    return (
-      <img
-        src={url}
-        alt="DP"
-        onError={() => setError(true)}
-        style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover', border: '1px solid var(--border-dim)' }}
-      />
-    )
+    return <img className="ml-cover" src={url} alt="DP" onError={() => setError(true)} />
   }
   return (
-    <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--admin-surface-raise)', border: '1px solid var(--border-dim)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--admin-ink-dim)' }}>
-      <i className="bi bi-person-fill" style={{ fontSize: 16 }} />
-    </div>
+    <div className="ml-cover"><i className="bi bi-person-fill" /></div>
   )
 }
 
@@ -104,59 +96,35 @@ export default function GeneratedVotersPage() {
           <div className="empty-state"><i className="bi bi-credit-card" /><p>No generated members found{search ? ` for "${search}"` : ''}.</p></div>
         ) : (
           <>
-            <div className="admin-table-wrap">
-              <table className="admin-table">
-                <thead>
-                  <tr>
-                    <th>#</th>
-                    <th>Name</th>
-                    <th>EPIC No</th>
-                    <th>Mobile</th>
-                    <th>Assembly</th>
-                    <th>BJP Code</th>
-                    <th>Generated At</th>
-                    <th>Referrals</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {voters.map((v, i) => {
-                    const codeVal = v.bjp_code || v.ptc_code
-                    return (
-                      <tr 
-                        key={codeVal || v.epic_no || i}
-                        onClick={() => codeVal && navigate(`/admin/generated-voters/${codeVal}`)}
-                        style={{ cursor: 'pointer' }}
-                        className="clickable-row"
-                      >
-                        <td style={{ color: 'var(--admin-ink-dim)' }}>{(page - 1) * 20 + i + 1}</td>
-                        <td>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                            <MemberAvatar url={v.photo_url} />
-                            <span style={{ fontWeight: 500 }}>{v.name || v.Name}</span>
-                          </div>
-                        </td>
-                        <td><code style={{ color: 'var(--admin-ink)', background: 'var(--admin-surface-raise)', border: '1px solid var(--border-dim)', padding: '2px 6px', borderRadius: 4, fontSize: 11 }}>{v.epic_no || v.EpicNo}</code></td>
-                        <td style={{ color: 'var(--admin-ink-dim)', fontSize: 12 }}>{v.mobile || '—'}</td>
-                        <td style={{ color: 'var(--admin-ink-dim)' }}>{v.assembly || v.AssemblyName}</td>
-                        <td>
-                          {codeVal
-                            ? <span style={{ color: 'var(--admin-badge-green)', fontWeight: 600, fontSize: 12 }}>{codeVal}</span>
-                            : <span style={{ color: 'var(--admin-ink-dim)' }}>—</span>
-                          }
-                        </td>
-                        <td style={{ color: 'var(--admin-ink-dim)', fontSize: 11 }}>
-                          {v.generated_at ? new Date(v.generated_at).toLocaleString() : '—'}
-                        </td>
-                        <td>
-                          <span className="badge-status badge-generated" style={{ fontWeight: '600' }}>
-                            {v.referred_members_count || 0}
-                          </span>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
+            <div className="admin-medialist">
+              {voters.map((v, i) => {
+                const codeVal = v.bjp_code || v.ptc_code
+                return (
+                  <div
+                    key={codeVal || v.epic_no || i}
+                    className="ml-row ml-clickable"
+                    onClick={() => codeVal && navigate(`/admin/generated-voters/${codeVal}`)}
+                  >
+                    <span className="ml-index">{(page - 1) * 20 + i + 1}</span>
+                    <MemberCover url={v.photo_url} />
+                    <div className="ml-info">
+                      <span className="ml-name">{v.name || v.Name || '—'}</span>
+                      <span className="ml-sub">
+                        <code>{v.epic_no || v.EpicNo}</code>
+                        {codeVal && <span className="ml-code">{codeVal}</span>}
+                        {(v.assembly || v.AssemblyName) && <span>{v.assembly || v.AssemblyName}</span>}
+                        {v.mobile && <span>{v.mobile}</span>}
+                      </span>
+                    </div>
+                    <div className="ml-right">
+                      <span className="ml-count" title="Referrals">
+                        <i className="bi bi-people-fill" /> {v.referred_members_count || 0}
+                      </span>
+                      <span className="ml-date">{v.generated_at ? new Date(v.generated_at).toLocaleDateString() : ''}</span>
+                    </div>
+                  </div>
+                )
+              })}
             </div>
             <Pagination page={page} total={data.total} onChange={setPage} />
           </>

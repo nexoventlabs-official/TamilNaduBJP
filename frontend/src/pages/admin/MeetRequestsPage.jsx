@@ -1,24 +1,12 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { admin } from '../../api'
+import '../../styles/admin-medialist.css'
 
-function MemberAvatar({ url }) {
+function Cover({ url }) {
   const [error, setError] = useState(false)
-  if (url && !error) {
-    return (
-      <img
-        src={url}
-        alt="DP"
-        onError={() => setError(true)}
-        style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover', border: '1px solid var(--border-dim)' }}
-      />
-    )
-  }
-  return (
-    <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--admin-surface-raise)', border: '1px solid var(--border-dim)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--admin-ink-dim)' }}>
-      <i className="bi bi-person-fill" style={{ fontSize: 16 }} />
-    </div>
-  )
+  if (url && !error) return <img className="ml-cover" src={url} alt="" onError={() => setError(true)} />
+  return <div className="ml-cover"><i className="bi bi-person-fill" /></div>
 }
 
 function Pagination({ page, total, perPage = 20, onChange }) {
@@ -106,65 +94,34 @@ export default function MeetRequestsPage() {
           <div className="empty-state"><i className="bi bi-people" /><p>No meeting requests found{search ? ` for "${search}"` : ''}.</p></div>
         ) : (
           <>
-            <div className="admin-table-wrap">
-              <table className="admin-table">
-                <thead>
-                  <tr>
-                    <th>#</th>
-                    <th>Name</th>
-                    <th>BJP Code</th>
-                    <th>EPIC No</th>
-                    <th>Mobile</th>
-                    <th>Assembly</th>
-                    <th>Referrals</th>
-                    <th>Request Status</th>
-                    <th>Requested At</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {requests.map((v, i) => {
-                    const codeVal = v.bjp_code
-                    return (
-                      <tr 
-                        key={codeVal || v.epic_no || i}
-                        onClick={() => codeVal && navigate(`/admin/generated-voters/${codeVal}`)}
-                        style={{ cursor: 'pointer' }}
-                        className="clickable-row"
-                      >
-                        <td style={{ color: 'var(--admin-ink-dim)' }}>{(page - 1) * 20 + i + 1}</td>
-                        <td>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                            <MemberAvatar url={v.photo_url} />
-                            <span style={{ fontWeight: 500 }}>{v.name}</span>
-                          </div>
-                        </td>
-                        <td>
-                          {codeVal
-                            ? <span style={{ color: 'var(--admin-badge-green)', fontWeight: 600, fontSize: 12 }}>{codeVal}</span>
-                            : <span style={{ color: 'var(--admin-ink-dim)' }}>—</span>
-                          }
-                        </td>
-                        <td><code style={{ color: 'var(--admin-ink)', background: 'var(--admin-surface-raise)', border: '1px solid var(--border-dim)', padding: '2px 6px', borderRadius: 4, fontSize: 11 }}>{v.epic_no || '—'}</code></td>
-                        <td style={{ color: 'var(--admin-ink-dim)', fontSize: 12 }}>{v.mobile || '—'}</td>
-                        <td style={{ color: 'var(--admin-ink-dim)' }}>{v.assembly || '—'}</td>
-                        <td>
-                          <span className="badge-status badge-generated" style={{ fontWeight: '600' }}>
-                            {v.referred_count || 0}
-                          </span>
-                        </td>
-                        <td>
-                          <span className="badge-status badge-generated" style={{ fontWeight: '600', padding: '4px 8px', background: 'rgba(46,125,50,0.12)', color: '#2e7d32', border: '1px solid rgba(46,125,50,0.2)' }}>
-                            Interested
-                          </span>
-                        </td>
-                        <td style={{ color: 'var(--admin-ink-dim)', fontSize: 11 }}>
-                          {v.created_at ? new Date(v.created_at).toLocaleString() : '—'}
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
+            <div className="admin-medialist">
+              {requests.map((v, i) => {
+                const codeVal = v.bjp_code
+                return (
+                  <div
+                    key={codeVal || v.epic_no || i}
+                    className="ml-row ml-clickable"
+                    onClick={() => codeVal && navigate(`/admin/generated-voters/${codeVal}`)}
+                  >
+                    <span className="ml-index">{(page - 1) * 20 + i + 1}</span>
+                    <Cover url={v.photo_url} />
+                    <div className="ml-info">
+                      <span className="ml-name">{v.name || '—'}</span>
+                      <span className="ml-sub">
+                        <code>{v.epic_no || '—'}</code>
+                        {codeVal && <span className="ml-code">{codeVal}</span>}
+                        {v.assembly && <span>{v.assembly}</span>}
+                        {v.mobile && <span className="ml-mob">{v.mobile}</span>}
+                      </span>
+                    </div>
+                    <div className="ml-right">
+                      <span className="ml-count" title="Referrals"><i className="bi bi-people-fill" /> {v.referred_count || 0}</span>
+                      <span className="ml-badge b-interested">Interested</span>
+                      <span className="ml-date">{v.created_at ? new Date(v.created_at).toLocaleDateString() : ''}</span>
+                    </div>
+                  </div>
+                )
+              })}
             </div>
             <Pagination page={page} total={data.total} onChange={setPage} />
           </>
